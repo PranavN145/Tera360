@@ -1,0 +1,64 @@
+{
+  "id": "e81d7c3b-5a41-4b19-86c2-terra360-env",
+  "name": "Terra360 Local Development",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "testCitizenEmail",
+      "value": "citizen@terra360.in",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "testCitizenPassword",
+      "value": "Password123!",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "testDriverEmail",
+      "value": "driver@terra360.in",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "testDriverPassword",
+      "value": "Password123!",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "tempRegisterEmail",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "lastReportId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "lastContactId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment",
+  "_postman_exported_at": "2026-11-08T11:25:00.000Z",
+  "_postman_exported_using": "Postman/10.0.0"
+}
+

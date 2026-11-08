@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Env & secrets — only .env.example may be committed
+.env
+.env.*
+!.env.example
+
+# Keys
+*.pem
+*.key
+id_rsa
+id_ed25519
+*.p12
+*.pfx
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Logs & coverage
+*.log
+npm-debug.log*
+coverage/
+.nyc_output/
+
+# OS noise
+.DS_Store
+Thumbs.db
+

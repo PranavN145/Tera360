@@ -1,0 +1,1656 @@
+{
+  "info": {
+    "_postman_id": "7d91e320-91a4-4f51-b841-terra360-collection",
+    "name": "Terra360 API - Phase 2 Verification",
+    "description": "Comprehensive API test suite for Terra360 early-warning platform covering Health Probes, Authentication & Sessions, Public Read APIs, and Public Hazard & Contact Submission Write APIs.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01. Health & Probes",
+      "description": "Service liveness and MongoDB readiness probes.",
+      "item": [
+        {
+          "name": "GET Health Check (Liveness)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Process liveness probe (no DB call). Returns 200 healthy."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Service status is healthy', function () {",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.status).to.eql('healthy');",
+                  "    pm.expect(jsonData.uptime).to.be.a('number');",
+                  "    pm.expect(jsonData.timestamp).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET Readiness Check (MongoDB Ready)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ready",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ready"
+              ]
+            },
+            "description": "Readiness probe verifying active MongoDB connection to Terra360."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Database connection is ready and points to Terra360', function () {",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.status).to.eql('ready');",
+                  "    pm.expect(jsonData.database).to.eql('connected');",
+                  "    pm.expect(jsonData.databaseName).to.eql('Terra360');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02. Authentication & Sessions",
+      "description": "Registration (citizen/driver only), JWT auth, HTTP-only refresh rotation, session revocation, and profile fetching.",
+      "item": [
+        {
+          "name": "POST Register - Citizen (Success)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Generate a unique test email using timestamp to allow repeatable runs",
+                  "var uniqueEmail = 'test.citizen.' + Date.now() + '@terra360.local';",
+                  "pm.environment.set('tempRegisterEmail', uniqueEmail);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Citizen registered successfully', function () {",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.user.role).to.eql('citizen');",
+                  "    pm.expect(jsonData.data.user.email).to.eql(pm.environment.get('tempRegisterEmail'));",
+                  "    pm.expect(jsonData.data.user.passwordHash).to.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Citizen\",\n  \"email\": \"{{tempRegisterEmail}}\",\n  \"password\": \"{{testCitizenPassword}}\",\n  \"role\": \"citizen\",\n  \"phone\": \"+919876543210\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Self-registration for citizens. Schema strictly enforces citizen or driver."
+          }
+        },
+        {
+          "name": "POST Register - Role Restriction Violation (Negative)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Rejects public registration as officer or admin', function () {",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.error.code).to.eql('VALIDATION_ERROR');",
+                  "    pm.expect(jsonData.error.fields).to.have.property('role');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Malicious User\",\n  \"email\": \"try.officer@terra360.local\",\n  \"password\": \"Password123!\",\n  \"role\": \"officer\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Negative test: public registration as officer/admin/field_officer must be blocked with 400."
+          }
+        },
+        {
+          "name": "POST Register - Password Too Short (Negative)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Validation error on short password (< 8 chars)', function () {",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.error.code).to.eql('VALIDATION_ERROR');",
+                  "    pm.expect(jsonData.error.fields).to.have.property('password');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Short Pass User\",\n  \"email\": \"shortpass@terra360.local\",\n  \"password\": \"short\",\n  \"role\": \"citizen\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Negative test: passwords under 8 characters must be rejected."
+          }
+        },
+        {
+          "name": "POST Login - Citizen (Success)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Login returns user profile and access token', function () {",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.accessToken).to.be.a('string');",
+                  "    pm.expect(jsonData.data.user.email).to.eql(pm.environment.get('testCitizenEmail'));",
+                  "    pm.environment.set('accessToken', jsonData.data.accessToken);",
+                  "});",
+                  "pm.test('HTTP-only refresh cookie is present in response', function () {",
+                  "    pm.expect(pm.cookies.has('refreshToken') || pm.response.headers.get('set-cookie')).to.be.ok;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testCitizenEmail}}\",\n  \"password\": \"{{testCitizenPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Authenticates citizen demo user, stores accessToken into environment, and sets HTTP-only refreshToken cookie."
+          }
+        },
+        {
+          "name": "POST Login - Invalid Password (Negative)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 401 Unauthorized', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Rejects invalid credentials with generic error', function () {",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.error.code).to.eql('INVALID_CREDENTIALS');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testCitizenEmail}}\",\n  \"password\": \"WrongPassword999!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Negative test: rejects invalid credentials without revealing whether email exists."
+          }
+        },
+        {
+          "name": "GET Current User (Authenticated)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Returns authenticated user profile', function () {",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.user).to.be.an('object');",
+                  "    pm.expect(jsonData.data.user.email).to.eql(pm.environment.get('testCitizenEmail'));",
+                  "    pm.expect(jsonData.data.user.passwordHash).to.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            },
+            "description": "Fetches currently logged-in user profile using Bearer accessToken."
+          }
+        },
+        {
+          "name": "GET Current User - Missing Token (Negative)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 401 Unauthorized', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Fails when Authorization header is absent', function () {",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            },
+            "description": "Negative test: unauthenticated access to /users/me is rejected with 401."
+          }
+        },
+        {
+          "name": "POST Refresh Token (Cookie Rotation)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Rotates refresh token and returns new accessToken', function () {",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.accessToken).to.be.a('string');",
+                  "    pm.environment.set('accessToken', jsonData.data.accessToken);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Exchanges valid HTTP-only refreshToken cookie for a new 15m accessToken and rotated 7d refreshToken."
+          }
+        },
+        {
+          "name": "POST Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Successfully logged out and cookie cleared', function () {",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Revokes current refresh token session in MongoDB and clears the refresh cookie."
+          }
+        }
+      ]
+    },
+    {
+      "name": "03. Public Read APIs",
+      "description": "Public landing page APIs for live statistics, major NH risk map corridors, published alerts, and road statuses.",
+      "item": [
+        {
+          "name": "GET Public Stats",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Returns standard stats counter object', function () {",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.have.property('publishedAlerts');",
+                  "    pm.expect(jsonData.data).to.have.property('blockedRoads');",
+                  "    pm.expect(jsonData.data).to.have.property('roadsUnderCaution');",
+                  "    pm.expect(jsonData.data).to.have.property('openRoads');",
+                  "    pm.expect(jsonData.data).to.have.property('totalMonitoredCorridors');",
+                  "    pm.expect(jsonData.data.publishedAlerts).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/public/stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "public",
+                "stats"
+              ]
+            },
+            "description": "Aggregated counters for public homepage display."
+          }
+        },
+        {
+          "name": "GET Public Risk Map - All Corridors",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Returns list of monitored road corridors', function () {",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "    if (jsonData.data.length > 0) {",
+                  "        var item = jsonData.data[0];",
+                  "        pm.expect(item).to.have.property('name');",
+                  "        pm.expect(item).to.have.property('code');",
+                  "        pm.expect(item).to.have.property('state');",
+                  "        pm.expect(item).to.have.property('status');",
+                  "        pm.expect(item).to.have.property('riskLevel');",
+                  "        pm.expect(item.createdBy).to.be.undefined;",
+                  "        pm.expect(item.isDeleted).to.be.undefined;",
+                  "        pm.expect(item.__v).to.be.undefined;",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/public/risk-map",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "public",
+                "risk-map"
+              ]
+            },
+            "description": "Returns road corridors for the homepage interactive risk map preview."
+          }
+        },
+        {
+          "name": "GET Public Risk Map - State Filter",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('All returned corridors match requested state', function () {",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "    jsonData.data.forEach(function(item) {",
+                  "        pm.expect(item.state.toLowerCase()).to.eql('uttarakhand');",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/public/risk-map?state=Uttarakhand",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "public",
+                "risk-map"
+              ],
+              "query": [
+                {
+                  "key": "state",
+                  "value": "Uttarakhand"
+                }
+              ]
+            },
+            "description": "Filters public risk map to a specific state (e.g. Uttarakhand)."
+          }
+        },
+        {
+          "name": "GET Public Alerts - All Published",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Pagination metadata present', function () {",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.pagination).to.be.an('object');",
+                  "    pm.expect(jsonData.pagination.page).to.be.a('number');",
+                  "    pm.expect(jsonData.pagination.limit).to.be.a('number');",
+                  "    pm.expect(jsonData.pagination.total).to.be.a('number');",
+                  "    pm.expect(jsonData.pagination.totalPages).to.be.a('number');",
+                  "});",
+                  "pm.test('Only published alerts returned without internal fields', function () {",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "    jsonData.data.forEach(function(alert) {",
+                  "        pm.expect(alert.status).to.eql('published');",
+                  "        pm.expect(alert.createdBy).to.be.undefined;",
+                  "        pm.expect(alert.isDeleted).to.be.undefined;",
+                  "        pm.expect(alert.__v).to.be.undefined;",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/public/alerts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "public",
+                "alerts"
+              ]
+            },
+            "description": "Fetches official landslide alerts. Never exposes internal review fields or drafts."
+          }
+        },
+        {
+          "name": "GET Public Alerts - Filtered & Paginated",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Matches pagination limits and filters', function () {",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.pagination.page).to.eql(1);",
+                  "    pm.expect(jsonData.pagination.limit).to.eql(5);",
+                  "    jsonData.data.forEach(function(alert) {",
+                  "        pm.expect(alert.severity).to.eql('Critical');",
+                  "        pm.expect(alert.state.toLowerCase()).to.eql('uttarakhand');",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/public/alerts?severity=Critical&state=Uttarakhand&page=1&limit=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "public",
+                "alerts"
+              ],
+              "query": [
+                {
+                  "key": "severity",
+                  "value": "Critical"
+                },
+                {
+                  "key": "state",
+                  "value": "Uttarakhand"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Filter published alerts by severity=Critical and state=Uttarakhand with page pagination."
+          }
+        },
+        {
+          "name": "GET Public Alerts - Invalid Severity Filter (Negative)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Zod rejects invalid severity enum in query', function () {",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.error.code).to.eql('VALIDATION_ERROR');",
+                  "    pm.expect(jsonData.error.fields).to.have.property('severity');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/public/alerts?severity=ExtremeDanger",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "public",
+                "alerts"
+              ],
+              "query": [
+                {
+                  "key": "severity",
+                  "value": "ExtremeDanger"
+                }
+              ]
+            },
+            "description": "Negative test: invalid enum query parameter returns 400 VALIDATION_ERROR."
+          }
+        },
+        {
+          "name": "GET Public Road Status - All",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Returns list of roads with operational status', function () {",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "    if (jsonData.data.length > 0) {",
+                  "        var road = jsonData.data[0];",
+                  "        pm.expect(road).to.have.property('status');",
+                  "        pm.expect(road).to.have.property('riskLevel');",
+                  "        pm.expect(road).to.have.property('lastUpdated');",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/public/road-status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "public",
+                "road-status"
+              ]
+            },
+            "description": "Fetches current highway and road corridor operational statuses."
+          }
+        },
+        {
+          "name": "GET Public Road Status - Filtered (Blocked Roads)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('All returned roads have status blocked', function () {",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    jsonData.data.forEach(function(road) {",
+                  "        pm.expect(road.status).to.eql('blocked');",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/public/road-status?status=blocked&state=Uttarakhand",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "public",
+                "road-status"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "blocked"
+                },
+                {
+                  "key": "state",
+                  "value": "Uttarakhand"
+                }
+              ]
+            },
+            "description": "Filters roads by status=blocked in Uttarakhand."
+          }
+        },
+        {
+          "name": "GET Public Road Status - Invalid Status Filter (Negative)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Zod rejects invalid status enum in query', function () {",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.error.code).to.eql('VALIDATION_ERROR');",
+                  "    pm.expect(jsonData.error.fields).to.have.property('status');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/public/road-status?status=destroyed",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "public",
+                "road-status"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "destroyed"
+                }
+              ]
+            },
+            "description": "Negative test: invalid road status query filter returns 400 VALIDATION_ERROR."
+          }
+        }
+      ]
+    },
+    {
+      "name": "04. Public Write APIs",
+      "description": "Public hazard reporting and operations desk inquiries with rate limiting, mass assignment protection, and validation.",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Ensure each automated test execution uses a distinct client IP to prevent test suite rate-limit collisions",
+              "if (!pm.request.headers.has('X-Forwarded-For')) {",
+              "    pm.request.headers.add({",
+              "        key: 'X-Forwarded-For',",
+              "        value: '198.51.100.' + (Math.floor(Math.random() * 250) + 1)",
+              "    });",
+              "}"
+            ]
+          }
+        }
+      ],
+      "item": [
+        {
+          "name": "POST Submit Hazard Report (Full Fields & Coordinates)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Report created with unique TR-YYYY ID and default status', function () {",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.reportId).to.match(/^TR-\\d{4}-[A-Z0-9]+$/);",
+                  "    pm.expect(jsonData.data.status).to.eql('submitted');",
+                  "    pm.expect(jsonData.data.source).to.eql('public');",
+                  "    pm.expect(jsonData.data.severity).to.eql('Critical');",
+                  "    pm.expect(jsonData.data.coordinates).to.be.an('object');",
+                  "    pm.expect(jsonData.data.coordinates.coordinates).to.eql([78.52, 30.15]);",
+                  "    pm.environment.set('lastReportId', jsonData.data.reportId);",
+                  "});",
+                  "pm.test('No sensitive internal audit fields leaked to public client', function () {",
+                  "    pm.expect(jsonData.data.ipAddress).to.be.undefined;",
+                  "    pm.expect(jsonData.data.userAgent).to.be.undefined;",
+                  "    pm.expect(jsonData.data.verifiedBy).to.be.undefined;",
+                  "    pm.expect(jsonData.data.isDeleted).to.be.undefined;",
+                  "    pm.expect(jsonData.data.__v).to.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"state\": \"Uttarakhand\",\n  \"location\": \"NH-58 near Devprayag km 65\",\n  \"hazardType\": \"Rockfall\",\n  \"severity\": \"Critical\",\n  \"description\": \"Major boulders detached from hillside above highway; one lane obstructed.\",\n  \"reporterName\": \"Rajesh Semwal\",\n  \"reporterPhone\": \"+919876500112\",\n  \"photoUrl\": \"https://res.cloudinary.com/terra360/photos/boulder-nh58.jpg\",\n  \"coordinates\": [\n    78.52,\n    30.15\n  ],\n  \"captchaToken\": \"1x0000000000000000000000000000000AA\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reports/public",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "public"
+              ]
+            },
+            "description": "Submits a public landslide danger report with full coordinates, photo, and reporter info."
+          }
+        },
+        {
+          "name": "POST Submit Hazard Report (Minimal Fields & Defaults)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Severity defaults to Warning and status defaults to submitted', function () {",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.severity).to.eql('Warning');",
+                  "    pm.expect(jsonData.data.status).to.eql('submitted');",
+                  "    pm.expect(jsonData.data.source).to.eql('public');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"state\": \"Himachal Pradesh\",\n  \"location\": \"Mandi-Kullu Highway NH-21\",\n  \"hazardType\": \"Mudflow\",\n  \"description\": \"Mud slurry covering asphalt following 2 hours of cloudburst.\",\n  \"captchaToken\": \"1x0000000000000000000000000000000AA\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reports/public",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "public"
+              ]
+            },
+            "description": "Submits hazard report with only required fields; verifies default severity=Warning and status=submitted."
+          }
+        },
+        {
+          "name": "POST Submit Hazard Report - Missing Location (Negative)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Validation error on missing location field', function () {",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.error.code).to.eql('VALIDATION_ERROR');",
+                  "    pm.expect(jsonData.error.fields).to.have.property('location');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"state\": \"Uttarakhand\",\n  \"hazardType\": \"Rockfall\",\n  \"description\": \"Rocks falling on road near Rishikesh\",\n  \"captchaToken\": \"1x0000000000000000000000000000000AA\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reports/public",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "public"
+              ]
+            },
+            "description": "Negative test: rejects report payload with missing location."
+          }
+        },
+        {
+          "name": "POST Submit Hazard Report - Coordinates Out of Bounds (Negative)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Validation error on invalid coordinate bounds', function () {",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.error.code).to.eql('VALIDATION_ERROR');",
+                  "    pm.expect(jsonData.error.fields).to.have.property('coordinates');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"state\": \"Uttarakhand\",\n  \"location\": \"NH-58 km 40\",\n  \"hazardType\": \"Rockfall\",\n  \"description\": \"Rockfall observed with invalid coordinates\",\n  \"coordinates\": [\n    250,\n    45\n  ],\n  \"captchaToken\": \"1x0000000000000000000000000000000AA\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reports/public",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "public"
+              ]
+            },
+            "description": "Negative test: longitude 250 exceeds valid [-180, 180] range."
+          }
+        },
+        {
+          "name": "POST Submit Hazard Report - Missing CAPTCHA Token (Negative)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Validation error on missing captchaToken', function () {",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.error.code).to.eql('VALIDATION_ERROR');",
+                  "    pm.expect(jsonData.error.fields).to.have.property('captchaToken');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"state\": \"Uttarakhand\",\n  \"location\": \"NH-58 near Rishikesh\",\n  \"hazardType\": \"Rockfall\",\n  \"description\": \"Testing submission without CAPTCHA token.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reports/public",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "public"
+              ]
+            },
+            "description": "Negative test: rejects report submission when captchaToken is missing."
+          }
+        },
+        {
+          "name": "POST Submit Hazard Report - Insecure Photo URL (Negative)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Validation error on non-HTTPS photo URL', function () {",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.error.code).to.eql('VALIDATION_ERROR');",
+                  "    pm.expect(jsonData.error.fields).to.have.property('photoUrl');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"state\": \"Uttarakhand\",\n  \"location\": \"NH-58 near Byasi\",\n  \"hazardType\": \"Rockfall\",\n  \"description\": \"Testing insecure HTTP photo URL scheme.\",\n  \"photoUrl\": \"http://res.cloudinary.com/terra360/photo.jpg\",\n  \"captchaToken\": \"1x0000000000000000000000000000000AA\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reports/public",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "public"
+              ]
+            },
+            "description": "Negative test: rejects insecure HTTP photo attachment URL."
+          }
+        },
+        {
+          "name": "POST Submit Hazard Report - Unapproved Storage Domain (Negative)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Validation error on unapproved photo storage domain', function () {",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.error.code).to.eql('VALIDATION_ERROR');",
+                  "    pm.expect(jsonData.error.fields).to.have.property('photoUrl');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"state\": \"Uttarakhand\",\n  \"location\": \"NH-58 near Byasi\",\n  \"hazardType\": \"Rockfall\",\n  \"description\": \"Testing unapproved external domain for photo URL.\",\n  \"photoUrl\": \"https://unapproved-bucket.com/photo.jpg\",\n  \"captchaToken\": \"1x0000000000000000000000000000000AA\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reports/public",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "public"
+              ]
+            },
+            "description": "Negative test: rejects photoUrl hosted on domain not in ALLOWED_PHOTO_DOMAINS."
+          }
+        },
+        {
+          "name": "POST Submit Hazard Report - Mass Assignment Protection (Security)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Attacker forged fields ignored by server', function () {",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.reportId).to.not.eql('FORGED_ID_999');",
+                  "    pm.expect(jsonData.data.status).to.eql('submitted');",
+                  "    pm.expect(jsonData.data.source).to.eql('public');",
+                  "    pm.expect(jsonData.data.verifiedBy).to.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"state\": \"Uttarakhand\",\n  \"location\": \"NH-58 Security Test Stretch\",\n  \"hazardType\": \"Subsidence\",\n  \"description\": \"Road crack widening under heavy monsoon rain.\",\n  \"reportId\": \"FORGED_ID_999\",\n  \"status\": \"verified\",\n  \"source\": \"field_officer\",\n  \"verifiedBy\": \"507f1f77bcf86cd799439011\",\n  \"isDeleted\": true,\n  \"captchaToken\": \"1x0000000000000000000000000000000AA\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reports/public",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "public"
+              ]
+            },
+            "description": "Security test: verifies that forged status/source/verifiedBy fields are stripped and ignored."
+          }
+        },
+        {
+          "name": "POST Submit Contact Message (Full Fields)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Contact message created with status new and normalized email', function () {",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.id).to.be.a('string');",
+                  "    pm.expect(jsonData.data.status).to.eql('new');",
+                  "    pm.expect(jsonData.data.email).to.eql('contact.tester@example.com');",
+                  "    pm.environment.set('lastContactId', jsonData.data.id);",
+                  "});",
+                  "pm.test('Internal staff fields not leaked in public confirmation', function () {",
+                  "    pm.expect(jsonData.data.ipAddress).to.be.undefined;",
+                  "    pm.expect(jsonData.data.userAgent).to.be.undefined;",
+                  "    pm.expect(jsonData.data.notes).to.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Anand Joshi\",\n  \"email\": \"CONTACT.TESTER@Example.COM\",\n  \"state\": \"Uttarakhand\",\n  \"phone\": \"+919876543299\",\n  \"message\": \"Inquiry regarding integration of local village panchayat rain gauges into Terra360 network.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contact",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contact"
+              ]
+            },
+            "description": "Submits an operations desk contact inquiry. Email is normalized to lowercase."
+          }
+        },
+        {
+          "name": "POST Submit Contact Message - Invalid Email (Negative)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Validation error on malformed email address', function () {",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.error.code).to.eql('VALIDATION_ERROR');",
+                  "    pm.expect(jsonData.error.fields).to.have.property('email');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Anand Joshi\",\n  \"email\": \"not-an-email-address\",\n  \"state\": \"Uttarakhand\",\n  \"message\": \"Testing email validation with malformed email.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contact",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contact"
+              ]
+            },
+            "description": "Negative test: malformed email string fails validation with 400."
+          }
+        },
+        {
+          "name": "POST Submit Contact Message - Message Too Short (Negative)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Validation error on message shorter than 5 chars', function () {",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.error.code).to.eql('VALIDATION_ERROR');",
+                  "    pm.expect(jsonData.error.fields).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Anand Joshi\",\n  \"email\": \"anand@example.com\",\n  \"state\": \"Uttarakhand\",\n  \"message\": \"Hi\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contact",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contact"
+              ]
+            },
+            "description": "Negative test: message under 5 characters is rejected with 400."
+          }
+        },
+        {
+          "name": "POST Submit Contact Message - Mass Assignment (Security)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status forced to new and injected internal notes ignored', function () {",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.status).to.eql('new');",
+                  "    pm.expect(jsonData.data.notes).to.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Spam Infiltrator\",\n  \"email\": \"spam@example.com\",\n  \"state\": \"Uttarakhand\",\n  \"message\": \"Automated submission attempting to resolve message immediately.\",\n  \"status\": \"resolved\",\n  \"notes\": \"Injected internal review note\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contact",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contact"
+              ]
+            },
+            "description": "Security test: verifies status is forced to new and internal notes cannot be injected."
+          }
+        }
+      ]
+    },
+    {
+      "name": "05. Security & Rate Limiting",
+      "description": "Verifies security headers, rate limit headers, and standard 404 response shape.",
+      "item": [
+        {
+          "name": "GET Security Headers & Rate Limit Headers Inspection",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Helmet security headers present', function () {",
+                  "    pm.expect(pm.response.headers.has('x-content-type-options') || pm.response.headers.has('x-frame-options')).to.be.true;",
+                  "});",
+                  "pm.test('Standard rate limit headers present', function () {",
+                  "    var hasRateLimit = pm.response.headers.has('ratelimit-limit') || pm.response.headers.has('x-ratelimit-limit');",
+                  "    pm.expect(hasRateLimit).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/public/stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "public",
+                "stats"
+              ]
+            },
+            "description": "Checks that Helmet security headers and global rate limiting headers are returned on /api routes."
+          }
+        },
+        {
+          "name": "GET Non-Existent Endpoint (404 Not Found)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 404 Not Found', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Returns standard ROUTE_NOT_FOUND error shape', function () {",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.error.code).to.eql('ROUTE_NOT_FOUND');",
+                  "    pm.expect(jsonData.error.message).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/non-existent-endpoint",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "non-existent-endpoint"
+              ]
+            },
+            "description": "Negative test: undefined routes return consistent JSON error response."
+          }
+        }
+      ]
+    }
+  ]
+}
