@@ -6,9 +6,17 @@ import dotenv from 'dotenv';
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 dotenv.config();
 
-const envSchema = z.object({
+export const portSchema = z
+  .preprocess((val) => {
+    if (val === undefined || val === null) return 5000;
+    if (typeof val === 'string' && val.trim() === '') return 5000;
+    return val;
+  }, z.coerce.number().int().min(1).max(65535))
+  .default(5000);
+
+export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  PORT: z.coerce.number().default(5000),
+  PORT: portSchema,
   MONGODB_URI: z.string().min(1).default('mongodb://localhost:27017/terra360'),
   JWT_ACCESS_SECRET: z
     .string()

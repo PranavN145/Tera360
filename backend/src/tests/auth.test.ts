@@ -16,6 +16,7 @@ import {
   verifyEmailSchema,
   resetPasswordSchema,
 } from '../modules/auth/auth.schema';
+import { portSchema } from '../config/env';
 import { roleGuard } from '../middleware/roleGuard';
 import { requireAuth } from '../middleware/requireAuth';
 import bcrypt from 'bcryptjs';
@@ -144,6 +145,50 @@ async function runTests() {
   await test('verifyEmailSchema requires token', () => {
     assert.strictEqual(verifyEmailSchema.safeParse({}).success, false);
     assert.strictEqual(verifyEmailSchema.safeParse({ token: 'verification_token_123' }).success, true);
+  });
+
+  // ── PORT Configuration & Defaulting Tests ──
+  await test('PORT undefined → 5000', () => {
+    const result = portSchema.safeParse(undefined);
+    assert.strictEqual(result.success, true);
+    if (result.success) {
+      assert.strictEqual(result.data, 5000);
+    }
+  });
+
+  await test('PORT empty string → 5000', () => {
+    const result = portSchema.safeParse('');
+    assert.strictEqual(result.success, true);
+    if (result.success) {
+      assert.strictEqual(result.data, 5000);
+    }
+  });
+
+  await test('PORT whitespace → 5000', () => {
+    const result = portSchema.safeParse('   ');
+    assert.strictEqual(result.success, true);
+    if (result.success) {
+      assert.strictEqual(result.data, 5000);
+    }
+  });
+
+  await test('PORT 10000 → 10000', () => {
+    const result = portSchema.safeParse('10000');
+    assert.strictEqual(result.success, true);
+    if (result.success) {
+      assert.strictEqual(result.data, 10000);
+    }
+  });
+
+  await test('PORT 0 → validation error', () => {
+    assert.strictEqual(portSchema.safeParse('0').success, false);
+    assert.strictEqual(portSchema.safeParse(0).success, false);
+  });
+
+  await test('Invalid non-numeric PORT → validation error', () => {
+    assert.strictEqual(portSchema.safeParse('abc').success, false);
+    assert.strictEqual(portSchema.safeParse('70000').success, false);
+    assert.strictEqual(portSchema.safeParse('3000.5').success, false);
   });
 
   // ── TEST GROUP 2: Cryptographic & Security Utilities ──
