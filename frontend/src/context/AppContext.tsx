@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { User, UserRole, UpdateProfilePayload } from "@/types/auth";
-import { authApi, usersApi } from "@/lib/api";
+import { authApi, usersApi, setAuthRestorationPromise } from "@/lib/api";
 
 export type { User, UserRole };
 
@@ -92,28 +92,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let isMounted = true;
 
-    async function restoreSession() {
+    const restorePromise = (async (): Promise<boolean> => {
       try {
         const token = await authApi.refresh();
-        if (token && isMounted) {
+        if (token) {
           const profile = await authApi.getMe();
           if (isMounted) {
             setUser(profile);
           }
+          return true;
+        } else {
+          if (isMounted) {
+            setUser(null);
+          }
+          return false;
         }
       } catch {
         // Not authenticated or refresh token expired
         if (isMounted) {
           setUser(null);
         }
+        return false;
       } finally {
         if (isMounted) {
           setIsLoadingAuth(false);
         }
+        setAuthRestorationPromise(null);
       }
-    }
+    })();
 
-    restoreSession();
+    setAuthRestorationPromise(restorePromise);
 
     return () => {
       isMounted = false;

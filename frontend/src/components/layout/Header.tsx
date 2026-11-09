@@ -151,9 +151,9 @@ export default function Header() {
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-50 pt-[16px] lg:pt-[20px] px-4 sm:px-6 pointer-events-none transition-all">
-        {/* Compact width: ~66% on desktop, max-width 1080px, centered */}
-        <div className="w-[94%] sm:w-[90%] lg:w-[68%] xl:w-[65%] max-w-[1080px] mx-auto pointer-events-auto">
-          {/* Compact floating navbar: 56px-58px height, rounded-[36px], background #F6F4EC */}
+        {/* Responsive floating navbar width: ample room for logo, nav, and auth buttons */}
+        <div className="w-[94%] sm:w-[92%] lg:w-[88%] xl:w-[80%] 2xl:w-[72%] max-w-[1140px] mx-auto pointer-events-auto">
+          {/* Compact floating navbar: 54px-58px height, rounded-[36px], background #F6F4EC */}
           <div className="relative w-full h-[54px] lg:h-[58px] bg-[#F6F4EC]/95 backdrop-blur-md rounded-[36px] px-4 sm:px-5 lg:px-6 border border-[#173D32]/10 shadow-[0_4px_25px_-4px_rgba(23,61,50,0.12)] flex items-center justify-between transition-all">
           
           {/* Left: Logo */}
@@ -185,7 +185,7 @@ export default function Header() {
 
           {/* Center: Navigation Links centered directly between Logo on left and Login on right with equal space */}
           <nav
-            className="hidden lg:flex flex-1 items-center justify-center gap-6 xl:gap-8 px-4"
+            className="hidden lg:flex flex-1 items-center justify-center gap-5 xl:gap-7 px-2"
             aria-label="Main Navigation"
           >
             {NAV_ITEMS.map((item) => {
@@ -195,7 +195,7 @@ export default function Header() {
                   key={item.name}
                   href={item.href}
                   onClick={(e) => handleNavClick(e, item.targetId)}
-                  className={`relative py-1 text-[15px] transition-colors focus-visible:outline-2 focus-visible:outline-[#173D32] rounded-xs whitespace-nowrap cursor-pointer ${
+                  className={`relative py-1 text-[14px] xl:text-[15px] transition-colors focus-visible:outline-2 focus-visible:outline-[#173D32] rounded-xs whitespace-nowrap cursor-pointer ${
                     active
                       ? "font-bold text-[#173D32]"
                       : "font-semibold text-[#173D32]/75 hover:text-[#173D32]"
@@ -216,7 +216,7 @@ export default function Header() {
           </nav>
 
           {/* Right: Login & Register Buttons */}
-          <div className="hidden lg:flex items-center justify-end gap-2.5 shrink-0">
+          <div className="hidden lg:flex items-center justify-end gap-2 shrink-0">
             {user ? (
               <div className="flex items-center gap-2">
                 <Link
@@ -240,9 +240,9 @@ export default function Header() {
                 </Link>
                 <Link
                   href={getRolePortalPath(user.role)}
-                  className="h-[32px] px-2.5 inline-flex items-center justify-center rounded-full bg-[#173D32] text-[#F6F4EC] hover:bg-[#1f4e40] text-xs font-bold transition-colors"
+                  className="h-[32px] px-3 inline-flex items-center justify-center rounded-full bg-[#173D32] text-[#F6F4EC] hover:bg-[#1f4e40] text-xs font-bold transition-colors"
                 >
-                  Portal
+                  {user.role === "officer" ? "Officer Portal →" : "Portal"}
                 </Link>
                 <button
                   type="button"
@@ -260,13 +260,13 @@ export default function Header() {
               <>
                 <Link
                   href="/login"
-                  className="h-[36px] px-4.5 inline-flex items-center justify-center rounded-full border-2 border-[#173D32] text-[#173D32] hover:bg-[#173D32]/5 text-[13px] font-bold tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-[#173D32] cursor-pointer"
+                  className="h-[36px] px-4.5 inline-flex items-center justify-center rounded-full border-2 border-[#173D32] text-[#173D32] hover:bg-[#173D32]/5 text-[13px] font-bold tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-[#173D32] cursor-pointer whitespace-nowrap"
                 >
                   Login
                 </Link>
                 <Link
                   href="/register"
-                  className="h-[36px] px-5 inline-flex items-center justify-center rounded-full bg-[#173D32] text-[#F6F4EC] hover:bg-[#1a4437] text-[13px] font-bold tracking-wide transition-colors shadow-xs hover:shadow focus-visible:outline-2 focus-visible:outline-[#173D32] cursor-pointer"
+                  className="h-[36px] px-5 inline-flex items-center justify-center rounded-full bg-[#173D32] text-[#F6F4EC] hover:bg-[#1a4437] text-[13px] font-bold tracking-wide transition-colors shadow-xs hover:shadow focus-visible:outline-2 focus-visible:outline-[#173D32] cursor-pointer whitespace-nowrap"
                 >
                   Register
                 </Link>
@@ -381,22 +381,22 @@ export default function Header() {
                   </div>
                 </div>
               ) : (
-                <>
+                <div className="flex gap-2.5 w-full">
                   <Link
                     href="/login"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="min-h-[44px] flex items-center justify-center w-full px-5 rounded-full text-sm font-semibold text-[#173D32] border-2 border-[#173D32] hover:bg-[#173D32]/5 transition-colors cursor-pointer"
+                    className="min-h-[44px] flex-1 flex items-center justify-center px-4 rounded-full text-sm font-bold text-[#173D32] border-2 border-[#173D32] hover:bg-[#173D32]/5 transition-colors cursor-pointer"
                   >
                     Login
                   </Link>
                   <Link
                     href="/register"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="min-h-[44px] flex items-center justify-center w-full px-5 rounded-full text-sm font-semibold bg-[#173D32] text-[#F6F4EC] hover:bg-[#1a4437] shadow-sm transition-colors cursor-pointer"
+                    className="min-h-[44px] flex-1 flex items-center justify-center px-4 rounded-full text-sm font-bold bg-[#173D32] text-[#F6F4EC] hover:bg-[#1a4437] shadow-sm transition-colors cursor-pointer"
                   >
                     Register
                   </Link>
-                </>
+                </div>
               )}
             </div>
           </div>
