@@ -1,31 +1,65 @@
+# ==============================================================================
+# Terra360 Root .gitignore
+# ==============================================================================
+
 # Dependencies
 node_modules/
+/.pnp
+.pnp.*
 
-# Env & secrets — only .env.example may be committed
-.env
-.env.*
-!.env.example
-
-# Keys
-*.pem
-*.key
-id_rsa
-id_ed25519
-*.p12
-*.pfx
-
-# Build output
+# Build Outputs & Framework Artifacts
+.next/
+out/
 dist/
 build/
 *.tsbuildinfo
+.turbo/
+.vercel/
 
-# Logs & coverage
-*.log
-npm-debug.log*
+# Secrets & Environment Configurations (Keep local, commit only .env.example)
+.env
+.env.*
+!.env.example
+*.env
+*.env.*
+!*.env.example
+
+# Private Keys, Certificates & Tokens
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+
+# Test Output & Coverage
 coverage/
 .nyc_output/
 
-# OS noise
+# Logs & Debugging Output
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Operating System Files
 .DS_Store
 Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
 
+# IDE & Editor Temporary Files
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Temporary & Local Scratch Files
+scratch/
+tmp/
+temp/

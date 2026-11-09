@@ -16,7 +16,7 @@ export default function AuthModal() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [role, setRole] = useState<"citizen" | "driver">("citizen");
-  const [phone, setPhone] = useState("");
+  const phone = "";
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -24,9 +24,12 @@ export default function AuthModal() {
 
   // Sync mode with context authMode when opened
   useEffect(() => {
-    setMode(authMode);
-    setErrorMessage(null);
-    setVerificationPendingMsg(null);
+    const timer = setTimeout(() => {
+      setMode(authMode);
+      setErrorMessage(null);
+      setVerificationPendingMsg(null);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [authMode, isAuthModalOpen]);
 
   // Close on Escape key
