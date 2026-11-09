@@ -98,6 +98,45 @@ export class ReportService {
       createdAt: newReport.createdAt,
     };
   }
+
+  /**
+   * List hazard reports for operational officers and emergency desks.
+   */
+  async listReports(query?: {
+    state?: string;
+    status?: string;
+    limit?: number;
+  }): Promise<PublicReportOutput[]> {
+    const filter: Record<string, any> = { isDeleted: false };
+    if (query?.state && query.state !== 'All' && query.state !== 'All States') {
+      filter.state = new RegExp(`^${query.state.trim()}$`, 'i');
+    }
+    if (query?.status && query.status !== 'All') {
+      filter.status = query.status;
+    }
+    const limit = Math.min(query?.limit || 50, 100);
+
+    const reports = await Report.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    return reports.map((r) => ({
+      reportId: r.reportId,
+      state: r.state,
+      location: r.location,
+      hazardType: r.hazardType,
+      severity: r.severity,
+      description: r.description,
+      reporterName: r.reporterName,
+      reporterPhone: r.reporterPhone,
+      photoUrl: r.photoUrl,
+      coordinates: r.coordinates,
+      status: r.status,
+      source: r.source,
+      createdAt: r.createdAt,
+    }));
+  }
 }
 
 export const reportService = new ReportService();

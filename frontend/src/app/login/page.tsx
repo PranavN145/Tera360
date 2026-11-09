@@ -1,31 +1,105 @@
 "use client";
 
-import React, { useState, Suspense } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useApp } from "@/context/AppContext";
 import { getRolePortalPath, ApiClientError } from "@/lib/api";
 
+const DEMO_ACCOUNTS = [
+  {
+    role: "officer",
+    buttonLabel: "Continue as Officer",
+    title: "Operations Officer",
+    name: "Vikram Sharma",
+    email: "officer@terra360.in",
+    password: "Password123!",
+    badge: "Operations & Warnings",
+    icon: "📊",
+    borderClass: "border-emerald-300/80 bg-emerald-50/70 hover:bg-emerald-100/80 text-emerald-950",
+  },
+  {
+    role: "field_officer",
+    buttonLabel: "Continue as Field Officer",
+    title: "Field Response Officer",
+    name: "Temsu Jamir",
+    email: "field@terra360.in",
+    password: "Password123!",
+    badge: "Sensors & Clearance",
+    icon: "👮",
+    borderClass: "border-blue-300/80 bg-blue-50/70 hover:bg-blue-100/80 text-blue-950",
+  },
+  {
+    role: "citizen",
+    buttonLabel: "Continue as Citizen",
+    title: "Community Resident",
+    name: "Priyam Hazarika",
+    email: "citizen@terra360.in",
+    password: "Password123!",
+    badge: "Community & Safe Place",
+    icon: "👤",
+    borderClass: "border-amber-300/80 bg-amber-50/70 hover:bg-amber-100/80 text-amber-950",
+  },
+];
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectParam = searchParams.get("redirect");
+  const emailParam = searchParams.get("email");
 
-  const { login, user } = useApp();
+  const { login, user, isLoadingAuth } = useApp();
 
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(emailParam || "");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [activeDemoRole, setActiveDemoRole] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
+  const [demoBannerInfo, setDemoBannerInfo] = useState<string | null>(null);
 
-  // If already logged in, redirect to appropriate portal
-  React.useEffect(() => {
-    if (user) {
+  // Sync email param if search query updates
+  useEffect(() => {
+    if (emailParam) {
+      setEmail(emailParam);
+    }
+  }, [emailParam]);
+
+  // Production-safe demo mode gating
+  const isDemoModeEnabled =
+    process.env.NEXT_PUBLIC_DEMO_MODE === "true" ||
+    (process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEMO_MODE !== "false");
+
+  // If already logged in, redirect directly to appropriate portal without flashing login form
+  useEffect(() => {
+    if (!isLoadingAuth && user) {
       const destination = redirectParam || getRolePortalPath(user.role);
       router.replace(destination);
     }
-  }, [user, redirectParam, router]);
+  }, [user, isLoadingAuth, redirectParam, router]);
+
+  // Safe back navigation: checks referrer origin; falls back to homepage "/"
+  // Unauthenticated users are NEVER returned to protected routes
+  const handleBack = () => {
+    if (
+      typeof window !== "undefined" &&
+      window.history.length > 1 &&
+      document.referrer &&
+      document.referrer.startsWith(window.location.origin) &&
+      !document.referrer.includes("/login") &&
+      !document.referrer.includes("/register") &&
+      !document.referrer.includes("/officer") &&
+      !document.referrer.includes("/field") &&
+      !document.referrer.includes("/citizen") &&
+      !document.referrer.includes("/admin") &&
+      !document.referrer.includes("/account")
+    ) {
+      router.back();
+    } else {
+      router.push("/");
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,6 +108,7 @@ function LoginForm() {
     setIsLoading(true);
     setErrorMessage(null);
     setErrorCode(null);
+    setDemoBannerInfo(null);
 
     try {
       const loggedInUser = await login({
@@ -41,7 +116,8 @@ function LoginForm() {
         password,
       });
 
-      const destination = redirectParam || getRolePortalPath(loggedInUser.role);
+      // For explicit demo role selection, navigate directly to that role's portal
+      const destination = getRolePortalPath(loggedInUser.role);
       router.push(destination);
     } catch (err: unknown) {
       if (err instanceof ApiClientError) {
@@ -54,190 +130,295 @@ function LoginForm() {
       }
     } finally {
       setIsLoading(false);
+      setActiveDemoRole(null);
     }
   };
 
-  const handleDemoLogin = async (demoEmail: string) => {
-    setEmail(demoEmail);
-    setPassword("Password123!");
+  // Populate credentials for user review
+  const handlePopulateDemo = (demoAccount: typeof DEMO_ACCOUNTS[0]) => {
+    setEmail(demoAccount.email);
+    setPassword(demoAccount.password);
+    setDemoBannerInfo(`Populated credentials for ${demoAccount.title}. You may review them below or proceed with sign in.`);
+    setErrorMessage(null);
+  };
+
+  // 1-Click Demo Login
+  const handleDirectDemoLogin = async (demoAccount: typeof DEMO_ACCOUNTS[0]) => {
+    setEmail(demoAccount.email);
+    setPassword(demoAccount.password);
+    setActiveDemoRole(demoAccount.role);
     setIsLoading(true);
     setErrorMessage(null);
+    setDemoBannerInfo(null);
 
     try {
       const loggedInUser = await login({
-        email: demoEmail,
-        password: "Password123!",
+        email: demoAccount.email,
+        password: demoAccount.password,
       });
 
-      const destination = redirectParam || getRolePortalPath(loggedInUser.role);
+      // For explicit demo role selection, navigate directly to that role's portal
+      const destination = getRolePortalPath(loggedInUser.role);
       router.push(destination);
     } catch (err: unknown) {
       if (err instanceof ApiClientError) {
         setErrorMessage(err.message);
       } else {
-        setErrorMessage("Demo login failed. Make sure the backend server is running.");
+        setErrorMessage("Demo authentication failed. Ensure backend server is running.");
       }
     } finally {
       setIsLoading(false);
+      setActiveDemoRole(null);
     }
   };
 
+  // If restoring auth session, do not flash login form before determining whether user is logged in
+  if (isLoadingAuth) {
+    return (
+      <div className="min-h-[85vh] flex items-center justify-center p-4 sm:p-6 bg-[#FAF8F2]">
+        <div className="w-full max-w-md bg-[#F6F4EC] border border-[#173D32]/15 rounded-3xl p-8 shadow-xl text-center">
+          <div className="w-10 h-10 border-3 border-[#173D32]/20 border-t-[#173D32] rounded-full animate-spin mx-auto mb-4" />
+          <h2 className="text-base font-bold text-[#173D32]">Checking Session Status</h2>
+          <p className="text-xs text-[#173D32]/70 mt-1">Verifying security clearance credentials...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-[85vh] flex items-center justify-center p-4 sm:p-6 bg-[#FAF8F2]">
-      <div className="w-full max-w-md bg-[#F6F4EC] border border-[#173D32]/15 rounded-3xl p-6 sm:p-8 shadow-xl text-[#173D32]">
-        {/* Brand / Header */}
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#DCE8D4]/70 text-[11px] font-bold text-[#173D32] mb-2 uppercase tracking-wider">
-            Terra360 Platform
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#173D32]">
-            Sign In
-          </h1>
-          <p className="text-xs sm:text-sm text-[#173D32]/70 mt-1">
-            Access real-time landslide telemetry and role portals
-          </p>
+    <div className="min-h-[85vh] flex flex-col items-center justify-center p-4 sm:p-6 bg-[#FAF8F2]">
+      <div className="w-full max-w-md">
+        {/* Safe Back Navigation Button */}
+        <div className="flex items-center justify-between mb-3">
+          <button
+            type="button"
+            onClick={handleBack}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/80 hover:bg-white text-[#173D32] border border-[#173D32]/15 text-xs font-bold shadow-2xs transition-all cursor-pointer group"
+            aria-label="Return to previous page or homepage"
+          >
+            <svg
+              className="w-4 h-4 transition-transform group-hover:-translate-x-0.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+            </svg>
+            <span>Back to Terra360</span>
+          </button>
+
+          <Link
+            href="/"
+            className="text-xs font-semibold text-[#173D32]/60 hover:text-[#173D32] hover:underline"
+          >
+            Public Home
+          </Link>
         </div>
 
-        {/* Error Alert */}
-        {errorMessage && (
-          <div
-            className={`mb-5 p-3.5 rounded-xl border text-xs sm:text-sm flex items-start gap-2.5 animate-in fade-in duration-200 ${
-              errorCode === "ACCOUNT_LOCKED"
-                ? "bg-amber-50 border-amber-300 text-amber-900"
-                : "bg-red-50 border-red-200 text-red-700"
-            }`}
-          >
-            <span
-              className={`font-bold text-base leading-none ${
-                errorCode === "ACCOUNT_LOCKED" ? "text-amber-700" : "text-red-800"
+        {/* Main Sign-In Card */}
+        <div className="bg-[#F6F4EC] border border-[#173D32]/15 rounded-3xl p-6 sm:p-8 shadow-xl text-[#173D32]">
+          {/* Brand Header */}
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#DCE8D4]/70 text-[11px] font-bold text-[#173D32] mb-2 uppercase tracking-wider">
+              Terra360 Platform
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#173D32]">
+              Sign In
+            </h1>
+            <p className="text-xs sm:text-sm text-[#173D32]/70 mt-1">
+              Access real-time landslide telemetry and role portals
+            </p>
+          </div>
+
+          {/* Error Alert */}
+          {errorMessage && (
+            <div
+              className={`mb-5 p-3.5 rounded-xl border text-xs sm:text-sm flex items-start gap-2.5 animate-in fade-in duration-200 ${
+                errorCode === "ACCOUNT_LOCKED"
+                  ? "bg-amber-50 border-amber-300 text-amber-900"
+                  : "bg-red-50 border-red-200 text-red-700"
               }`}
             >
-              !
-            </span>
-            <div className="flex-1 leading-relaxed">
-              {errorCode === "ACCOUNT_LOCKED" && (
-                <div className="font-bold text-amber-950 mb-0.5">Account Temporarily Locked</div>
-              )}
-              {errorMessage}
+              <span
+                className={`font-bold text-base leading-none ${
+                  errorCode === "ACCOUNT_LOCKED" ? "text-amber-700" : "text-red-800"
+                }`}
+              >
+                !
+              </span>
+              <div className="flex-1 leading-relaxed">
+                {errorCode === "ACCOUNT_LOCKED" && (
+                  <div className="font-bold text-amber-950 mb-0.5">Account Temporarily Locked</div>
+                )}
+                {errorMessage}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Quick Demo Logins Bar */}
-        <div className="mb-6 p-3 rounded-2xl bg-[#FAF8F2] border border-[#173D32]/10">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-[#173D32]/60 text-center mb-2">
-            One-Click Demo Profiles (Seed Accounts)
-          </div>
-          <div className="grid grid-cols-2 gap-1.5 text-xs font-semibold">
-            <button
-              type="button"
-              disabled={isLoading}
-              onClick={() => handleDemoLogin("citizen@terra360.in")}
-              className="px-2.5 py-1.5 rounded-lg bg-[#F6F4EC] hover:bg-[#DCE8D4] border border-[#173D32]/15 text-[#173D32] transition-colors text-left flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
-            >
-              <span>👤</span> Citizen
-            </button>
-            <button
-              type="button"
-              disabled={isLoading}
-              onClick={() => handleDemoLogin("driver@terra360.in")}
-              className="px-2.5 py-1.5 rounded-lg bg-[#F6F4EC] hover:bg-[#DCE8D4] border border-[#173D32]/15 text-[#173D32] transition-colors text-left flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
-            >
-              <span>🚛</span> Driver
-            </button>
-            <button
-              type="button"
-              disabled={isLoading}
-              onClick={() => handleDemoLogin("officer@terra360.in")}
-              className="px-2.5 py-1.5 rounded-lg bg-[#F6F4EC] hover:bg-[#DCE8D4] border border-[#173D32]/15 text-[#173D32] transition-colors text-left flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
-            >
-              <span>📊</span> Officer
-            </button>
-            <button
-              type="button"
-              disabled={isLoading}
-              onClick={() => handleDemoLogin("field@terra360.in")}
-              className="px-2.5 py-1.5 rounded-lg bg-[#F6F4EC] hover:bg-[#DCE8D4] border border-[#173D32]/15 text-[#173D32] transition-colors text-left flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
-            >
-              <span>👮</span> Field Officer
-            </button>
-          </div>
-        </div>
+          {/* Demo Info Notice */}
+          {demoBannerInfo && (
+            <div className="mb-3 py-1 px-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-900 flex items-center gap-1.5 animate-in fade-in">
+              <span className="font-bold text-emerald-700">✓</span>
+              <div className="flex-1 truncate">{demoBannerInfo}</div>
+            </div>
+          )}
 
-        {/* Credentials Form */}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div>
-            <label
-              htmlFor="email-input"
-              className="block text-xs font-bold text-[#173D32] uppercase tracking-wide mb-1.5"
-            >
-              Email Address
-            </label>
-            <input
-              id="email-input"
-              type="email"
-              autoComplete="email"
-              placeholder="e.g. citizen@terra360.in"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={isLoading}
-              className="w-full h-11 px-4 rounded-xl bg-[#FAF8F2] border border-[#173D32]/20 text-sm text-[#173D32] placeholder:text-[#173D32]/40 focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60"
-            />
-          </div>
+          {/* ── Demo Login Utility Panel ── */}
+          {isDemoModeEnabled && (
+            <div className="mb-4 p-2.5 sm:p-3 rounded-2xl bg-[#FAF8F2] border border-[#173D32]/12">
+              <div className="flex items-center justify-between mb-2 px-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#173D32]/70 flex items-center gap-1">
+                  <span>⚡</span>
+                  <span>Demo Mode</span>
+                </span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#DCE8D4] text-[#173D32] font-black uppercase tracking-wider">
+                  Active
+                </span>
+              </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
+              <div className="space-y-1.5">
+                {DEMO_ACCOUNTS.map((demo) => {
+                  const isCurrentRoleLoading = isLoading && activeDemoRole === demo.role;
+                  return (
+                    <div
+                      key={demo.role}
+                      className={`px-2.5 py-1.5 rounded-xl border transition-all ${demo.borderClass} flex items-center justify-between gap-2`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handlePopulateDemo(demo)}
+                        className="flex items-center gap-2 text-left flex-1 min-w-0 cursor-pointer group"
+                        title="Click to populate credentials for review"
+                      >
+                        <span className="text-sm shrink-0 leading-none">{demo.icon}</span>
+                        <div className="min-w-0">
+                          <div className="text-[11px] font-bold truncate flex items-center gap-1 text-[#173D32] leading-tight">
+                            <span>{demo.name}</span>
+                            <span className="text-[9.5px] opacity-70 font-normal">({demo.title})</span>
+                          </div>
+                          <div className="text-[10px] opacity-75 font-mono truncate leading-tight">{demo.email}</div>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isLoading}
+                        onClick={() => handleDirectDemoLogin(demo)}
+                        className="h-6 px-2.5 rounded-lg bg-[#173D32] hover:bg-[#1a4437] text-[#F6F4EC] text-[10px] font-bold transition-all shrink-0 cursor-pointer disabled:opacity-50 flex items-center gap-1 shadow-2xs"
+                        title={`Sign in immediately as ${demo.title}`}
+                      >
+                        {isCurrentRoleLoading ? (
+                          <>
+                            <div className="w-2.5 h-2.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            <span>...</span>
+                          </>
+                        ) : (
+                          "Sign In"
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Credentials Form */}
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div>
               <label
-                htmlFor="password-input"
-                className="block text-xs font-bold text-[#173D32] uppercase tracking-wide"
+                htmlFor="email-input"
+                className="block text-xs font-bold text-[#173D32] uppercase tracking-wide mb-1.5"
               >
-                Password
+                Email Address
               </label>
-              <Link
-                href="/forgot-password"
-                className="text-xs font-semibold text-[#173D32]/70 hover:text-[#173D32] hover:underline"
-              >
-                Forgot password?
-              </Link>
+              <input
+                id="email-input"
+                type="email"
+                autoComplete="email"
+                placeholder="e.g. officer@terra360.in"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled={isLoading}
+                className="w-full h-11 px-4 rounded-xl bg-[#FAF8F2] border border-[#173D32]/20 text-sm text-[#173D32] placeholder:text-[#173D32]/40 focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60"
+              />
             </div>
-            <input
-              id="password-input"
-              type="password"
-              autoComplete="current-password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
+
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label
+                  htmlFor="password-input"
+                  className="block text-xs font-bold text-[#173D32] uppercase tracking-wide"
+                >
+                  Password
+                </label>
+                <Link
+                  href="/forgot-password"
+                  className="text-xs font-semibold text-[#173D32]/70 hover:text-[#173D32] hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+
+              <div className="relative">
+                <input
+                  id="password-input"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  className="w-full h-11 pl-4 pr-11 rounded-xl bg-[#FAF8F2] border border-[#173D32]/20 text-sm text-[#173D32] focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#173D32]/60 hover:text-[#173D32] p-1 cursor-pointer"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
               disabled={isLoading}
-              className="w-full h-11 px-4 rounded-xl bg-[#FAF8F2] border border-[#173D32]/20 text-sm text-[#173D32] focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60"
-            />
+              className="w-full h-11 mt-2 rounded-full bg-[#173D32] hover:bg-[#1f4e40] text-[#F6F4EC] text-sm font-bold shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+            >
+              {isLoading && !activeDemoRole ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-[#F6F4EC]/30 border-t-[#F6F4EC] rounded-full animate-spin" />
+                  <span>Authenticating...</span>
+                </>
+              ) : (
+                "Sign In"
+              )}
+            </button>
+          </form>
+
+          {/* Switch to Register with preserved email parameter */}
+          <div className="mt-6 pt-5 border-t border-[#173D32]/10 text-center text-xs text-[#173D32]/70">
+            Do not have an account?{" "}
+            <Link
+              href={email ? `/register?email=${encodeURIComponent(email)}` : "/register"}
+              className="font-bold text-[#173D32] hover:underline"
+            >
+              Create an account
+            </Link>
           </div>
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full h-11 mt-2 rounded-full bg-[#173D32] hover:bg-[#1f4e40] text-[#F6F4EC] text-sm font-bold shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-          >
-            {isLoading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-[#F6F4EC]/30 border-t-[#F6F4EC] rounded-full animate-spin" />
-                <span>Authenticating...</span>
-              </>
-            ) : (
-              "Sign In"
-            )}
-          </button>
-        </form>
-
-        <div className="mt-6 pt-5 border-t border-[#173D32]/10 text-center text-xs text-[#173D32]/70">
-          Do not have an account?{" "}
-          <Link
-            href="/register"
-            className="font-bold text-[#173D32] hover:underline"
-          >
-            Create an account
-          </Link>
         </div>
       </div>
     </div>
@@ -248,7 +429,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-[85vh] flex items-center justify-center">
+        <div className="min-h-[85vh] flex items-center justify-center bg-[#FAF8F2]">
           <div className="w-8 h-8 border-2 border-[#173D32]/20 border-t-[#173D32] rounded-full animate-spin" />
         </div>
       }
@@ -257,4 +438,3 @@ export default function LoginPage() {
     </Suspense>
   );
 }
-

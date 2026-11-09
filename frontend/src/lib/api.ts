@@ -49,6 +49,7 @@ export class ApiClientError extends Error {
 
 // Strictly in-memory access token storage
 let inMemoryAccessToken: string | null = null;
+let lastRefreshedAt = 0;
 
 export function getAccessToken(): string | null {
   return inMemoryAccessToken;
@@ -56,14 +57,41 @@ export function getAccessToken(): string | null {
 
 export function setAccessToken(token: string | null): void {
   inMemoryAccessToken = token;
+  if (token) {
+    lastRefreshedAt = Date.now();
+  }
+}
+
+// Global Auth Restoration Coordinator: ensures API requests pause while initial session restore is running
+let authRestorationPromise: Promise<boolean> | null = null;
+
+export function setAuthRestorationPromise(promise: Promise<boolean> | null): void {
+  authRestorationPromise = promise;
+}
+
+export async function waitForAuthRestoration(): Promise<boolean> {
+  if (authRestorationPromise) {
+    try {
+      return await authRestorationPromise;
+    } catch {
+      return false;
+    }
+  }
+  return false;
 }
 
 // Single-flight refresh mutex to prevent duplicate concurrent refresh calls within runtime
 let refreshPromise: Promise<string | null> | null = null;
 
 export async function refreshAccessToken(): Promise<string | null> {
+  // If a refresh request is already in-flight, return the existing promise so all callers wait for it
   if (refreshPromise) {
     return refreshPromise;
+  }
+
+  // If token was refreshed within the last 2 seconds and exists, reuse it to prevent redundant rotation
+  if (inMemoryAccessToken && Date.now() - lastRefreshedAt < 2000) {
+    return inMemoryAccessToken;
   }
 
   const executeRefresh = async (): Promise<string | null> => {
@@ -133,6 +161,15 @@ export async function rawApiRequest<T>(
   const { retryOnAuthError = true, headers: customHeaders, ...restOptions } = options;
   const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
 
+  const isAuthEndpoint = endpoint.includes('/api/v1/auth/');
+  const isPublicEndpoint = endpoint.includes('/api/v1/public/');
+
+  // If this is a protected request, inMemoryAccessToken is null, and session restoration is in flight,
+  // pause and wait for restoration before firing the request!
+  if (!isAuthEndpoint && !isPublicEndpoint && !inMemoryAccessToken && authRestorationPromise) {
+    await waitForAuthRestoration();
+  }
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(customHeaders as Record<string, string>),
@@ -161,8 +198,6 @@ export async function rawApiRequest<T>(
   }
 
   // Handle 401 Unauthorized with token refresh (once)
-  const isAuthEndpoint = endpoint.includes('/api/v1/auth/');
-
   if (response.status === 401 && retryOnAuthError && !isAuthEndpoint) {
     const newToken = await refreshAccessToken();
     if (newToken) {
@@ -531,6 +566,33 @@ export const publicApi = {
       contact: res.data as ContactOutput,
       message: res.message || 'Your message has been received. Our operations desk will get in touch shortly.',
     };
+  },
+};
+
+export const reportsApi = {
+  /**
+   * GET /api/v1/reports
+   * List hazard reports for operational officers and emergency desks.
+   */
+  async getReports(query?: {
+    state?: string;
+    status?: string;
+    limit?: number;
+  }): Promise<HazardReportOutput[]> {
+    const params = new URLSearchParams();
+    if (query?.state && query.state !== 'All' && query.state !== 'All States') {
+      params.set('state', query.state);
+    }
+    if (query?.status && query.status !== 'All') {
+      params.set('status', query.status);
+    }
+    if (query?.limit) {
+      params.set('limit', String(query.limit));
+    }
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    return apiClient<HazardReportOutput[]>(`/api/v1/reports${qs}`, {
+      method: 'GET',
+    });
   },
 };
 
