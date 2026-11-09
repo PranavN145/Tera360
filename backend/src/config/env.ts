@@ -31,7 +31,7 @@ export const envSchema = z.object({
   CLIENT_URL: z.string().default('http://localhost:3000'),
   CORS_ORIGINS: z.string().default('http://localhost:3000'),
   COOKIE_DOMAIN: z.string().default('localhost'),
-  COOKIE_SAMESITE: z.enum(['strict', 'lax', 'none']).default('strict'),
+  COOKIE_SAMESITE: z.enum(['strict', 'lax', 'none']).default('none'),
   ENCRYPTION_KEY: z
     .string()
     .min(32)

@@ -1,32 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { authService } from './auth.service';
-import { env } from '../../config/env';
 import { AuthError } from '../../middleware/requireAuth';
-
-const REFRESH_COOKIE_NAME = 'refreshToken';
-
-function setRefreshTokenCookie(res: Response, token: string): void {
-  const isSecure = env.COOKIE_SAMESITE === 'none' || env.NODE_ENV === 'production';
-  res.cookie(REFRESH_COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: isSecure,
-    sameSite: env.COOKIE_SAMESITE,
-    domain: env.COOKIE_DOMAIN !== 'localhost' ? env.COOKIE_DOMAIN : undefined,
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    path: '/api/v1/auth',
-  });
-}
-
-function clearRefreshTokenCookie(res: Response): void {
-  const isSecure = env.COOKIE_SAMESITE === 'none' || env.NODE_ENV === 'production';
-  res.clearCookie(REFRESH_COOKIE_NAME, {
-    httpOnly: true,
-    secure: isSecure,
-    sameSite: env.COOKIE_SAMESITE,
-    domain: env.COOKIE_DOMAIN !== 'localhost' ? env.COOKIE_DOMAIN : undefined,
-    path: '/api/v1/auth',
-  });
-}
+import {
+  setRefreshTokenCookie,
+  clearRefreshTokenCookie,
+  getRefreshTokenFromRequest,
+} from '../../utils/cookie';
 
 export class AuthController {
   async register(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -68,7 +47,7 @@ export class AuthController {
 
   async refresh(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const rawRefreshToken = req.cookies?.[REFRESH_COOKIE_NAME];
+      const rawRefreshToken = getRefreshTokenFromRequest(req);
       if (!rawRefreshToken) {
         throw new AuthError('Refresh token cookie missing. Please sign in.', 'UNAUTHORIZED', 401);
       }
@@ -95,7 +74,7 @@ export class AuthController {
 
   async logout(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const rawRefreshToken = req.cookies?.[REFRESH_COOKIE_NAME];
+      const rawRefreshToken = getRefreshTokenFromRequest(req);
       await authService.logout(rawRefreshToken);
       clearRefreshTokenCookie(res);
 

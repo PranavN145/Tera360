@@ -1,15 +1,17 @@
 "use client";
 
 import React from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
+import PortalLayout from "@/components/portal/PortalLayout";
 import { useApp } from "@/context/AppContext";
+import { UserRole } from "@/types/auth";
 
 interface PortalShellProps {
   title: string;
   subtitle: string;
   icon: string;
   badgeColor?: string;
+  maxWidth?: string;
+  allowedRoles?: UserRole[];
   children?: React.ReactNode;
 }
 
@@ -18,19 +20,15 @@ export default function PortalShell({
   subtitle,
   icon,
   badgeColor = "bg-[#DCE8D4] text-[#173D32]",
+  maxWidth = "max-w-4xl",
+  allowedRoles,
   children,
 }: PortalShellProps) {
-  const { user, logout } = useApp();
-  const router = useRouter();
-
-  const handleLogout = async () => {
-    await logout();
-    router.push("/");
-  };
+  const { user } = useApp();
 
   return (
     <div className="min-h-[85vh] bg-[#FAF8F2] py-10 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
+      <div className={`${maxWidth} mx-auto`}>
         {/* Top Header Card */}
         <div className="bg-[#F6F4EC] border border-[#173D32]/15 rounded-3xl p-6 sm:p-8 shadow-sm mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#173D32]/10">
@@ -79,51 +77,51 @@ export default function PortalShell({
                 Sign Out
               </button>
             </div>
+    <PortalLayout
+      allowedRoles={allowedRoles || (user?.role ? [user.role] : ["officer", "citizen", "field_officer"])}
+      title={title}
+      subtitle={subtitle}
+    >
+      <div className="space-y-6">
+        {/* User Account Info Bar */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+          <div className="p-4 bg-[#FAF8F2] rounded-2xl border border-[#173D32]/10 shadow-2xs">
+            <span className="text-[#173D32]/60 font-medium block">Authenticated User</span>
+            <span className="font-extrabold text-[#173D32] text-sm mt-0.5 block truncate">
+              {user?.name || "Unknown"}
+            </span>
           </div>
-
-          {/* User Account Info Bar */}
-          <div className="pt-5 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-            <div className="p-3 bg-[#FAF8F2] rounded-xl border border-[#173D32]/10">
-              <span className="text-[#173D32]/60 font-medium block">Authenticated User</span>
-              <span className="font-bold text-[#173D32] text-sm mt-0.5 block truncate">
-                {user?.name || "Unknown"}
-              </span>
-            </div>
-            <div className="p-3 bg-[#FAF8F2] rounded-xl border border-[#173D32]/10">
-              <span className="text-[#173D32]/60 font-medium block">Email Address</span>
-              <span className="font-bold text-[#173D32] text-sm mt-0.5 block truncate">
-                {user?.email || "Unknown"}
-              </span>
-            </div>
-            <div className="p-3 bg-[#FAF8F2] rounded-xl border border-[#173D32]/10">
-              <span className="text-[#173D32]/60 font-medium block">Assigned Role</span>
-              <span className="font-bold text-[#173D32] text-sm mt-0.5 block capitalize">
-                {user?.role?.replace("_", " ") || "Citizen"}
-              </span>
-            </div>
+          <div className="p-4 bg-[#FAF8F2] rounded-2xl border border-[#173D32]/10 shadow-2xs">
+            <span className="text-[#173D32]/60 font-medium block">Email Address</span>
+            <span className="font-extrabold text-[#173D32] text-sm mt-0.5 block truncate">
+              {user?.email || "Unknown"}
+            </span>
+          </div>
+          <div className="p-4 bg-[#FAF8F2] rounded-2xl border border-[#173D32]/10 shadow-2xs">
+            <span className="text-[#173D32]/60 font-medium block">Assigned Role</span>
+            <span className="font-extrabold text-[#173D32] text-sm mt-0.5 block capitalize">
+              {user?.role?.replace("_", " ") || "Portal User"}
+            </span>
           </div>
         </div>
 
-        {/* Portal Body Content / Placeholder */}
-        <div className="bg-[#F6F4EC] border border-[#173D32]/15 rounded-3xl p-6 sm:p-8 shadow-sm">
+        {/* Portal Body Content */}
+        <div className="bg-[#FAF8F2] border border-[#173D32]/12 rounded-3xl p-6 sm:p-8 shadow-2xs">
           {children || (
-            <div className="text-center py-12">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#DCE8D4]/60 text-[#173D32] mb-3">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+            <div className="text-center py-10">
+              <div className="w-14 h-14 rounded-2xl bg-[#DCE8D4]/50 border border-[#173D32]/15 flex items-center justify-center text-3xl shadow-2xs mx-auto mb-3">
+                {icon}
               </div>
-              <h3 className="text-lg font-bold text-[#173D32] mb-1">
-                Portal Placeholder Active
+              <h3 className="text-lg font-extrabold text-[#173D32] mb-1">
+                {user?.role?.replace("_", " ").toUpperCase()} PORTAL ACTIVE
               </h3>
-              <p className="text-sm text-[#173D32]/70 max-w-md mx-auto">
-                Authentication and role-based access control are fully operational. Portal module workflows will be implemented in subsequent phases.
+              <p className="text-xs sm:text-sm text-[#173D32]/75 max-w-md mx-auto leading-relaxed">
+                Shared portal shell with mountain header artwork, vertical navigation sidebar, and footer branding is live.
               </p>
             </div>
           )}
         </div>
       </div>
-    </div>
+    </PortalLayout>
   );
 }
-

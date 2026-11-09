@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { useApp } from "@/context/AppContext";
@@ -12,9 +12,21 @@ type ActiveTab = "profile" | "password" | "sessions" | "privacy";
 
 function AccountDashboard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, updateProfile, logout, addToast } = useApp();
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>("profile");
+  const tabParam = searchParams.get("tab") as ActiveTab | null;
+  const [activeTab, setActiveTab] = useState<ActiveTab>(
+    tabParam && ["profile", "password", "sessions", "privacy"].includes(tabParam)
+      ? tabParam
+      : "profile"
+  );
+
+  useEffect(() => {
+    if (tabParam && ["profile", "password", "sessions", "privacy"].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
 
   // Profile Form States
   const [name, setName] = useState(user?.name || "");
@@ -813,7 +825,9 @@ function AccountDashboard() {
 export default function AccountPage() {
   return (
     <ProtectedRoute>
-      <AccountDashboard />
+      <Suspense fallback={<div className="min-h-[70vh] flex items-center justify-center"><div className="w-8 h-8 border-2 border-[#173D32]/20 border-t-[#173D32] rounded-full animate-spin" /></div>}>
+        <AccountDashboard />
+      </Suspense>
     </ProtectedRoute>
   );
 }

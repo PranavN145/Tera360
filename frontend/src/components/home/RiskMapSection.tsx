@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import SectionBackground from "@/components/ui/SectionBackground";
+import RiskMap from "@/components/RiskMap";
 import { useApp } from "@/context/AppContext";
 import { publicApi } from "@/lib/api";
 import {
@@ -441,57 +442,30 @@ export default function RiskMapSection() {
             )}
           </div>
 
-          {/* Interactive Simulated Radar Map Canvas Area */}
+          {/* Error Banner */}
+          {error && (
+            <div className="my-4 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 text-xs sm:text-sm">
+                <span>⚠️</span>
+                <span>{error}</span>
+              </div>
+              <button
+                type="button"
+                onClick={loadData}
+                className="px-3 py-1.5 rounded-full bg-[#173D32] text-[#F6F4EC] text-xs font-bold hover:bg-[#1f4e40] transition-colors cursor-pointer"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {/* Interactive Mapbox GL JS 3D Risk Map Canvas */}
           {viewMode === "map" ? (
             <div
-              className="relative flex-1 w-full my-4 rounded-2xl overflow-hidden flex items-center justify-center transition-transform duration-300 min-h-[380px]"
-              style={{ transform: `scale(${zoomLevel})` }}
+              className="relative flex-1 w-full my-4 rounded-2xl overflow-hidden flex items-center justify-center min-h-[460px] lg:min-h-[520px] bg-[#EEF3EA]"
             >
-              {/* Subtle Northeast Relief Map Illustration as textured backdrop */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-20 mix-blend-multiply">
-                <Image
-                  src="/images/map.png"
-                  alt="Northeast India Relief Map"
-                  fill
-                  sizes="1000px"
-                  className="object-contain p-6"
-                />
-              </div>
-
-              {/* Detailed Topographic Contour Lines */}
-              <svg
-                className={`absolute inset-0 w-full h-full pointer-events-none transition-opacity duration-500 ${
-                  activeLayer === "rainfall" ? "opacity-25" : "opacity-45"
-                }`}
-                viewBox="0 0 1000 600"
-                preserveAspectRatio="none"
-                fill="none"
-              >
-                <path
-                  d="M 50,300 Q 250,150 450,280 T 850,220"
-                  stroke="#173D32"
-                  strokeWidth="1.5"
-                  strokeDasharray="6 6"
-                />
-                <path d="M 120,400 Q 320,250 520,380 T 920,320" stroke="#173D32" strokeWidth="1" />
-                <path d="M 200,180 Q 400,80 600,200 T 980,140" stroke="#173D32" strokeWidth="1.2" />
-                <path
-                  d="M 30,520 Q 230,370 430,500 T 830,440"
-                  stroke="#173D32"
-                  strokeWidth="1.5"
-                  strokeDasharray="8 4"
-                />
-                {/* Elevation Contour Numbers */}
-                <text x="130" y="390" fill="#173D32" opacity="0.35" fontSize="11" fontWeight="bold">
-                  850m
-                </text>
-                <text x="460" y="270" fill="#173D32" opacity="0.35" fontSize="11" fontWeight="bold">
-                  1450m
-                </text>
-                <text x="860" y="210" fill="#173D32" opacity="0.35" fontSize="11" fontWeight="bold">
-                  2100m
-                </text>
-              </svg>
+              {/* Standalone 3D Mapbox GL Canvas */}
+              <RiskMap className="absolute inset-0 w-full h-full" />
 
               {/* Doppler Rainfall Radar Sweep Overlay */}
               {activeLayer === "rainfall" && (

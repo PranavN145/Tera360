@@ -65,13 +65,22 @@ app.use(
   })
 );
 
-// CORS allowlist
+// CORS allowlist (supports exact origins from CORS_ORIGINS/CLIENT_URL and Vercel deployments)
 const allowedOrigins = env.CORS_ORIGINS.split(',').map((origin) => origin.trim());
+if (env.CLIENT_URL && !allowedOrigins.includes(env.CLIENT_URL)) {
+  allowedOrigins.push(env.CLIENT_URL.trim());
+}
+
 app.use(
   cors({
     origin: (origin, callback) => {
       // Allow requests with no origin (e.g. mobile apps, curl, server-to-server)
-      if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        allowedOrigins.includes('*') ||
+        /^https:\/\/.*\.vercel\.app$/.test(origin)
+      ) {
         callback(null, true);
       } else {
         callback(new Error(`Origin '${origin}' not permitted by CORS policy`));
