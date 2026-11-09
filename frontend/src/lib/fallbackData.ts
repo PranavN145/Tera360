@@ -22,8 +22,8 @@ export const FALLBACK_ALERTS: PublicAlertItem[] = [
     advisory:
       "Heavy commercial vehicles strictly prohibited. Light transit restricted to daytime bypass convoy under Kohima Traffic Police directives.",
     status: "published",
-    publishedAt: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-    createdAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    publishedAt: "2025-06-15T14:15:00.000Z",
+    createdAt: "2025-06-15T14:00:00.000Z",
   },
   {
     id: "alert-demo-2",
@@ -41,8 +41,8 @@ export const FALLBACK_ALERTS: PublicAlertItem[] = [
     advisory:
       "Transit suspended between Sevoke and Rangpo. Commuters advised to divert via Panbu-Algarah-Lava alternative route.",
     status: "published",
-    publishedAt: new Date(Date.now() - 110 * 60 * 1000).toISOString(),
-    createdAt: new Date(Date.now() - 130 * 60 * 1000).toISOString(),
+    publishedAt: "2025-06-15T13:10:00.000Z",
+    createdAt: "2025-06-15T12:50:00.000Z",
   },
   {
     id: "alert-demo-3",
@@ -60,8 +60,8 @@ export const FALLBACK_ALERTS: PublicAlertItem[] = [
     advisory:
       "Transit speed capped at 20 km/h. Avoid halting inside tunnel vicinity. Emergency teams stationed on-site.",
     status: "published",
-    publishedAt: new Date(Date.now() - 190 * 60 * 1000).toISOString(),
-    createdAt: new Date(Date.now() - 210 * 60 * 1000).toISOString(),
+    publishedAt: "2025-06-15T11:50:00.000Z",
+    createdAt: "2025-06-15T11:30:00.000Z",
   },
   {
     id: "alert-demo-4",
@@ -79,8 +79,8 @@ export const FALLBACK_ALERTS: PublicAlertItem[] = [
     advisory:
       "Maintain safe following distance of 40 meters. Avoid night-time driving during active thunderstorm bands.",
     status: "published",
-    publishedAt: new Date(Date.now() - 320 * 60 * 1000).toISOString(),
-    createdAt: new Date(Date.now() - 340 * 60 * 1000).toISOString(),
+    publishedAt: "2025-06-15T09:40:00.000Z",
+    createdAt: "2025-06-15T09:20:00.000Z",
   },
   {
     id: "alert-demo-5",
@@ -98,8 +98,8 @@ export const FALLBACK_ALERTS: PublicAlertItem[] = [
     advisory:
       "Routine transit operational. Heavy freight operators requested to adhere to lane discipline along outer mountain edges.",
     status: "published",
-    publishedAt: new Date(Date.now() - 480 * 60 * 1000).toISOString(),
-    createdAt: new Date(Date.now() - 500 * 60 * 1000).toISOString(),
+    publishedAt: "2025-06-15T07:00:00.000Z",
+    createdAt: "2025-06-15T06:40:00.000Z",
   },
   {
     id: "alert-demo-6",
@@ -117,8 +117,8 @@ export const FALLBACK_ALERTS: PublicAlertItem[] = [
     advisory:
       "Motorists should observe roadside warning blinkers and obey Border Roads Organisation flaggers.",
     status: "published",
-    publishedAt: new Date(Date.now() - 620 * 60 * 1000).toISOString(),
-    createdAt: new Date(Date.now() - 650 * 60 * 1000).toISOString(),
+    publishedAt: "2025-06-15T04:40:00.000Z",
+    createdAt: "2025-06-15T04:10:00.000Z",
   },
 ];
 
@@ -134,7 +134,7 @@ export const FALLBACK_ROADS: PublicRiskMapItem[] = [
     statusReason: "Major slope collapse and deep mud deposit near Dzüdza Bridge; clearance underway.",
     coordinatesText: "25.6850° N, 94.0250° E",
     mapCoordinates: { x: 70, y: 52 },
-    lastUpdated: new Date().toISOString(),
+    lastUpdated: "2025-06-15T14:30:00.000Z",
   },
   {
     id: "road-2",
@@ -147,7 +147,7 @@ export const FALLBACK_ROADS: PublicRiskMapItem[] = [
     statusReason: "Active rockfall and riverbank slope cutting; alternative Lava route active.",
     coordinatesText: "27.0500° N, 88.4850° E",
     mapCoordinates: { x: 25, y: 42 },
-    lastUpdated: new Date().toISOString(),
+    lastUpdated: "2025-06-15T14:30:00.000Z",
   },
   {
     id: "road-3",
@@ -160,7 +160,7 @@ export const FALLBACK_ROADS: PublicRiskMapItem[] = [
     statusReason: "Periodic mud accumulation near Sonapur tunnel entrance; single-lane convoy active.",
     coordinatesText: "25.1050° N, 92.3600° E",
     mapCoordinates: { x: 42, y: 72 },
-    lastUpdated: new Date().toISOString(),
+    lastUpdated: "2025-06-15T14:30:00.000Z",
   },
   {
     id: "road-4",
@@ -173,7 +173,7 @@ export const FALLBACK_ROADS: PublicRiskMapItem[] = [
     statusReason: "Sub-surface saturation warning; intermittent rock shooting along slope curves.",
     coordinatesText: "25.1700° N, 93.0200° E",
     mapCoordinates: { x: 50, y: 60 },
-    lastUpdated: new Date().toISOString(),
+    lastUpdated: "2025-06-15T14:30:00.000Z",
   },
   {
     id: "road-5",
@@ -186,7 +186,7 @@ export const FALLBACK_ROADS: PublicRiskMapItem[] = [
     statusReason: "Minor tension cracks monitored; clear transit with speed precautions.",
     coordinatesText: "27.1200° N, 93.8100° E",
     mapCoordinates: { x: 72, y: 32 },
-    lastUpdated: new Date().toISOString(),
+    lastUpdated: "2025-06-15T14:30:00.000Z",
   },
   {
     id: "road-6",
@@ -199,7 +199,7 @@ export const FALLBACK_ROADS: PublicRiskMapItem[] = [
     statusReason: "Routine slope stabilization works; clear vehicular movement.",
     coordinatesText: "24.8400° N, 93.6300° E",
     mapCoordinates: { x: 72, y: 68 },
-    lastUpdated: new Date().toISOString(),
+    lastUpdated: "2025-06-15T14:30:00.000Z",
   },
   {
     id: "road-7",
@@ -212,7 +212,7 @@ export const FALLBACK_ROADS: PublicRiskMapItem[] = [
     statusReason: "Dry conditions; normal vehicular transit operating on schedule.",
     coordinatesText: "23.4500° N, 92.7500° E",
     mapCoordinates: { x: 64, y: 82 },
-    lastUpdated: new Date().toISOString(),
+    lastUpdated: "2025-06-15T14:30:00.000Z",
   },
   {
     id: "road-8",
@@ -225,7 +225,7 @@ export const FALLBACK_ROADS: PublicRiskMapItem[] = [
     statusReason: "Optimal transit condition. All drainage culverts inspected and clear.",
     coordinatesText: "23.5300° N, 91.4800° E",
     mapCoordinates: { x: 48, y: 80 },
-    lastUpdated: new Date().toISOString(),
+    lastUpdated: "2025-06-15T14:30:00.000Z",
   },
 ];
 
@@ -251,5 +251,5 @@ export const FALLBACK_STATS: PublicStats = {
   roadsUnderCaution: 2,
   openRoads: 14,
   communityReportsSubmitted: 48,
-  lastUpdated: new Date().toISOString(),
+  lastUpdated: "2025-06-15T14:30:00.000Z",
 };

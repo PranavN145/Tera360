@@ -7,6 +7,7 @@ import { useApp } from "@/context/AppContext";
 import { publicApi } from "@/lib/api";
 import { PublicAlertItem, alertItemToAlertDetail } from "@/types/public";
 import { FALLBACK_ALERTS } from "@/lib/fallbackData";
+import RelativeTime from "@/components/common/RelativeTime";
 
 const SEVERITY_THEME: Record<
   string,
@@ -253,7 +254,7 @@ export default function LatestAlerts() {
                         d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
                       />
                     </svg>
-                    <span>{alert.timestamp}</span>
+                    <RelativeTime date={item.publishedAt || item.createdAt} fallback="Recently" />
                   </div>
 
                   {/* Description */}

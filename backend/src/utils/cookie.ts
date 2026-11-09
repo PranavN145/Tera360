@@ -8,11 +8,22 @@ export function getRefreshTokenCookieOptions(): CookieOptions {
   const sameSite = env.COOKIE_SAMESITE as 'strict' | 'lax' | 'none';
   const isSecure = sameSite === 'none' || env.NODE_ENV === 'production';
 
+  // In cross-origin deployments (e.g. Render backend + Vercel frontend),
+  // omit domain attribute (undefined) for public suffixes (onrender.com, vercel.app)
+  // so the browser sets a Host-Only cookie rather than rejecting it under PSL rules.
+  let domain: string | undefined = undefined;
+  if (env.COOKIE_DOMAIN && env.COOKIE_DOMAIN !== 'localhost') {
+    const d = env.COOKIE_DOMAIN.toLowerCase().trim();
+    if (!d.endsWith('onrender.com') && !d.endsWith('vercel.app')) {
+      domain = env.COOKIE_DOMAIN;
+    }
+  }
+
   return {
     httpOnly: true,
     secure: isSecure,
     sameSite,
-    domain: env.COOKIE_DOMAIN !== 'localhost' ? env.COOKIE_DOMAIN : undefined,
+    domain,
     path: '/',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   };

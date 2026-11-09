@@ -29,6 +29,7 @@ export interface ApiResponse<T = unknown> {
 export interface AuthSuccessData {
   user: User;
   accessToken: string;
+  refreshToken?: string;
 }
 
 export interface RegisterSuccessData {
@@ -38,6 +39,7 @@ export interface RegisterSuccessData {
 
 export interface RefreshSuccessData {
   accessToken: string;
+  refreshToken?: string;
 }
 
 export interface UserProfileSuccessData {

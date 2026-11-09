@@ -88,9 +88,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }, 4500);
   }, []);
 
-  // Restore session silently on initial load or refresh via HttpOnly refresh cookie
+  // Restore session silently on initial load or refresh via HttpOnly refresh cookie & fallback token
   useEffect(() => {
     let isMounted = true;
+
+    // Check if user has an active session before firing request to avoid unnecessary 401 console errors
+    const hasSession =
+      typeof window !== "undefined" &&
+      localStorage.getItem("terra360_has_session") === "true";
+
+    if (!hasSession) {
+      setIsLoadingAuth(false);
+      return;
+    }
 
     const restorePromise = (async (): Promise<boolean> => {
       try {

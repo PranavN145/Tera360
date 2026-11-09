@@ -96,26 +96,51 @@ export async function refreshAccessToken(): Promise<string | null> {
 
   const executeRefresh = async (): Promise<string | null> => {
     try {
+      const fallbackToken =
+        typeof window !== 'undefined'
+          ? localStorage.getItem('terra360_refresh_token')
+          : null;
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (fallbackToken) {
+        headers['x-refresh-token'] = fallbackToken;
+      }
+
       const res = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
+        body: fallbackToken ? JSON.stringify({ refreshToken: fallbackToken }) : undefined,
         credentials: 'include',
       });
 
       if (!res.ok) {
         setAccessToken(null);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('terra360_refresh_token');
+          localStorage.removeItem('terra360_has_session');
+        }
         return null;
       }
 
       const json: ApiResponse<RefreshSuccessData> = await res.json();
       if (json.success && json.data?.accessToken) {
         setAccessToken(json.data.accessToken);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('terra360_has_session', 'true');
+          if (json.data.refreshToken) {
+            localStorage.setItem('terra360_refresh_token', json.data.refreshToken);
+          }
+        }
         return json.data.accessToken;
       }
 
       setAccessToken(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('terra360_refresh_token');
+        localStorage.removeItem('terra360_has_session');
+      }
       return null;
     } catch {
       setAccessToken(null);
@@ -271,6 +296,12 @@ export const authApi = {
     if (data.accessToken) {
       setAccessToken(data.accessToken);
     }
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('terra360_has_session', 'true');
+      if (data.refreshToken) {
+        localStorage.setItem('terra360_refresh_token', data.refreshToken);
+      }
+    }
     return data;
   },
 
@@ -280,12 +311,22 @@ export const authApi = {
 
   async logout(): Promise<MessageSuccessData> {
     try {
+      const fallbackToken =
+        typeof window !== 'undefined'
+          ? localStorage.getItem('terra360_refresh_token')
+          : null;
       return await apiClient<MessageSuccessData>('/api/v1/auth/logout', {
         method: 'POST',
+        headers: fallbackToken ? { 'x-refresh-token': fallbackToken } : undefined,
+        body: fallbackToken ? JSON.stringify({ refreshToken: fallbackToken }) : undefined,
         retryOnAuthError: false,
       });
     } finally {
       setAccessToken(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('terra360_refresh_token');
+        localStorage.removeItem('terra360_has_session');
+      }
     }
   },
 

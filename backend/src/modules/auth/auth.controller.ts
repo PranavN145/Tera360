@@ -38,6 +38,7 @@ export class AuthController {
         data: {
           user,
           accessToken,
+          refreshToken,
         },
       });
     } catch (error) {
@@ -47,7 +48,12 @@ export class AuthController {
 
   async refresh(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const rawRefreshToken = getRefreshTokenFromRequest(req);
+      // Check HttpOnly cookie first; fallback to request body or custom header for cross-site ITP environments
+      const rawRefreshToken =
+        getRefreshTokenFromRequest(req) ||
+        (req.body?.refreshToken as string | undefined) ||
+        (req.headers['x-refresh-token'] as string | undefined);
+
       if (!rawRefreshToken) {
         throw new AuthError('Refresh token cookie missing. Please sign in.', 'UNAUTHORIZED', 401);
       }
@@ -64,6 +70,7 @@ export class AuthController {
         success: true,
         data: {
           accessToken,
+          refreshToken: newRefreshToken,
         },
       });
     } catch (error) {
@@ -74,7 +81,11 @@ export class AuthController {
 
   async logout(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const rawRefreshToken = getRefreshTokenFromRequest(req);
+      const rawRefreshToken =
+        getRefreshTokenFromRequest(req) ||
+        (req.body?.refreshToken as string | undefined) ||
+        (req.headers['x-refresh-token'] as string | undefined);
+
       await authService.logout(rawRefreshToken);
       clearRefreshTokenCookie(res);
 

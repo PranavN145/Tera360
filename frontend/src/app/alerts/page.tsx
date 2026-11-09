@@ -7,6 +7,7 @@ import { useApp } from "@/context/AppContext";
 import { publicApi } from "@/lib/api";
 import { PublicAlertItem, alertItemToAlertDetail } from "@/types/public";
 import { FALLBACK_ALERTS } from "@/lib/fallbackData";
+import RelativeTime from "@/components/common/RelativeTime";
 
 const SEVERITY_THEME: Record<
   string,
@@ -372,7 +373,7 @@ export default function AlertsPage() {
                       >
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      <span>{alert.timestamp}</span>
+                      <RelativeTime date={item.publishedAt || item.createdAt} fallback="Recently" />
                     </div>
 
                     {/* Description */}
@@ -471,7 +472,7 @@ export default function AlertsPage() {
                       <span className="text-xs font-bold text-[#173D32]/75">
                         {alert.state}
                       </span>
-                      <span className="text-xs text-[#173D32]/50">| {alert.timestamp}</span>
+                      <span className="text-xs text-[#173D32]/50">| <RelativeTime date={item.publishedAt || item.createdAt} fallback="Recently" /></span>
                     </div>
 
                     <h3 className="text-lg sm:text-xl font-bold text-[#173D32] group-hover:text-[#112d25] transition-colors">

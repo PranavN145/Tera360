@@ -2,6 +2,7 @@
 
 import React, { useEffect } from "react";
 import { useApp } from "@/context/AppContext";
+import RelativeTime from "@/components/common/RelativeTime";
 
 export default function AlertDetailsModal() {
   const { selectedAlert, closeAlertModal, addToast } = useApp();
@@ -96,7 +97,7 @@ export default function AlertDetailsModal() {
 
           {/* Timestamp & Coordinates */}
           <div className="flex flex-wrap items-center gap-3 text-xs text-[#173D32]/65 mt-1.5">
-            <span>🕒 {selectedAlert.timestamp}</span>
+            <span>🕒 <RelativeTime date={selectedAlert.timestamp} fallback="Recently" /></span>
             <span>📍 {selectedAlert.coordinates}</span>
             <span>🛣️ Corridor: {selectedAlert.corridor}</span>
           </div>

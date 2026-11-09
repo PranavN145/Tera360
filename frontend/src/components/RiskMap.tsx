@@ -20,6 +20,12 @@ const MAPBOX_ACCESS_TOKEN: string =
     ? (import.meta as Record<string, any>).env.VITE_MAPBOX_ACCESS_TOKEN
     : "");
 
+const hasValidToken = Boolean(
+  MAPBOX_ACCESS_TOKEN &&
+  MAPBOX_ACCESS_TOKEN.trim().length > 0 &&
+  !MAPBOX_ACCESS_TOKEN.includes("your_mapbox_access_token")
+);
+
 export interface RiskMapProps {
   /** Center coordinates [longitude, latitude]. Defaults to NH-29 Dimapur–Kohima Corridor, Nagaland [94.02, 25.72] */
   center?: [number, number];
@@ -124,6 +130,13 @@ export default function RiskMap({
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
+
+    if (!hasValidToken) {
+      console.warn(
+        "Mapbox Access Token is missing. Set NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN in Vercel environment variables to enable 3D terrain and interactive telemetry."
+      );
+      return;
+    }
 
     // Securely set Mapbox access token
     mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
@@ -1063,6 +1076,28 @@ export default function RiskMap({
         ref={mapContainerRef}
         className="absolute inset-0 w-full h-full"
       />
+
+      {!hasValidToken && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#173D32]/85 backdrop-blur-xs p-6 text-center select-none">
+          <div className="max-w-md w-full p-6 sm:p-8 rounded-3xl bg-[#FAF8F2]/95 border border-[#173D32]/15 shadow-2xl flex flex-col items-center text-[#173D32]">
+            <div className="w-14 h-14 rounded-2xl bg-[#D6A65D]/20 border border-[#D6A65D]/40 flex items-center justify-center text-2xl mb-4 shadow-xs">
+              🗺️
+            </div>
+            <h3 className="text-lg sm:text-xl font-black tracking-tight text-[#173D32] mb-2">
+              Mapbox Access Token Required
+            </h3>
+            <p className="text-xs sm:text-sm text-[#173D32]/80 mb-4 leading-relaxed font-normal">
+              Interactive 3D mountain terrain, slope telemetry, and corridor risk heatmaps require an active Mapbox access token.
+            </p>
+            <div className="w-full text-[11px] sm:text-xs font-mono font-semibold bg-[#173D32]/10 border border-[#173D32]/20 rounded-xl p-2.5 text-[#173D32] break-all select-all mb-4 text-center">
+              NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
+            </div>
+            <p className="text-[11px] text-[#173D32]/60">
+              Add this key in your Vercel Project Environment Variables and redeploy.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Floating Top-Left Dashboard Overlay Card */}
       <div className="absolute top-3.5 left-3.5 sm:top-4 sm:left-4 z-20 max-w-[315px] sm:max-w-[340px] w-full bg-[#FAF8F2]/95 backdrop-blur-md rounded-2xl border border-[#173D32]/15 shadow-[0_12px_32px_rgba(23,61,50,0.14)] p-3.5 sm:p-4 text-[#173D32] select-none transition-all">
