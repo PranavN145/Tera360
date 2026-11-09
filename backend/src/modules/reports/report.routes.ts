@@ -3,6 +3,8 @@ import rateLimit from 'express-rate-limit';
 import { reportController } from './report.controller';
 import { validate } from '../../middleware/validate';
 import { createPublicReportSchema } from './report.schema';
+import { requireAuth } from '../../middleware/requireAuth';
+import { roleGuard } from '../../middleware/roleGuard';
 
 const router = Router();
 
@@ -21,6 +23,14 @@ export const publicReportLimiter = rateLimit({
     },
   },
 });
+
+// GET /api/v1/reports (Officers & Admins operational list)
+router.get(
+  '/',
+  requireAuth,
+  roleGuard('officer', 'admin', 'field_officer'),
+  reportController.listReports
+);
 
 // POST /api/v1/reports/public
 router.post(
