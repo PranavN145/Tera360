@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -28,7 +28,19 @@ export default function Header() {
   const router = useRouter();
   const { user, logout } = useApp();
 
-  // Prevent automatic scroll to bottom/hash on page refresh
+  // Flag and timer to suppress scroll-spy updates during programmatic click transitions
+  const isProgrammaticScrollRef = useRef(false);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const unlockScroll = useCallback(() => {
+    isProgrammaticScrollRef.current = false;
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+      scrollTimeoutRef.current = null;
+    }
+  }, []);
+
+  // Prevent automatic scroll to bottom/hash on page refresh, or scroll to target hash
   useEffect(() => {
     if (pathname !== "/") return;
 
@@ -37,12 +49,36 @@ export default function Header() {
       window.history.scrollRestoration = "manual";
     }
 
-    // If page is refreshed/opened with a hash like #report, remove the hash and scroll to top
-    if (window.location.hash) {
-      window.history.replaceState(null, "", window.location.pathname);
+    const navEntry =
+      typeof window !== "undefined" &&
+      window.performance &&
+      window.performance.getEntriesByType("navigation").length > 0
+        ? (window.performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming)
+        : undefined;
+    const isReload = navEntry?.type === "reload";
+
+    if (isReload) {
+      if (window.location.hash) {
+        window.history.replaceState(null, "", window.location.pathname);
+      }
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+      setActiveSection("home");
+    } else if (window.location.hash) {
+      const targetId = window.location.hash.replace("#", "");
+      let targetEl = document.getElementById(targetId);
+      if (!targetEl && targetId === "about") {
+        targetEl = document.getElementById("how-it-works") || document.getElementById("about");
+      }
+      if (targetEl) {
+        setActiveSection(targetId);
+        isProgrammaticScrollRef.current = true;
+        targetEl.scrollIntoView({ behavior: "smooth", block: "start" });
+        scrollTimeoutRef.current = setTimeout(() => {
+          isProgrammaticScrollRef.current = false;
+          scrollTimeoutRef.current = null;
+        }, 1200);
+      }
     }
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-    setActiveSection("home");
   }, [pathname]);
 
   // Track active section as user scrolls through the homepage
@@ -52,6 +88,9 @@ export default function Header() {
     const sectionIds = ["home", "risk-map", "alerts", "about", "report"];
 
     const handleScroll = () => {
+      // Do not update active state during programmatic click transitions
+      if (isProgrammaticScrollRef.current) return;
+
       // 1. If at top of the page (scrollY < 120), Home is active
       if (window.scrollY < 120) {
         setActiveSection("home");
@@ -87,10 +126,31 @@ export default function Header() {
       setActiveSection(currentSection);
     };
 
+    // User manual interaction instantly releases the programmatic scroll lock
+    const handleUserInteraction = () => {
+      if (isProgrammaticScrollRef.current) {
+        unlockScroll();
+      }
+    };
+
     window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("wheel", handleUserInteraction, { passive: true });
+    window.addEventListener("touchmove", handleUserInteraction, { passive: true });
+    window.addEventListener("keydown", handleUserInteraction, { passive: true });
+    window.addEventListener("scrollend", handleUserInteraction, { passive: true });
     handleScroll();
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [pathname]);
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("wheel", handleUserInteraction);
+      window.removeEventListener("touchmove", handleUserInteraction);
+      window.removeEventListener("keydown", handleUserInteraction);
+      window.removeEventListener("scrollend", handleUserInteraction);
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, [pathname, unlockScroll]);
 
   // Close on Escape key
   useEffect(() => {
@@ -119,13 +179,26 @@ export default function Header() {
     e: React.MouseEvent<HTMLAnchorElement>,
     targetId: string
   ) => {
+    setMobileMenuOpen(false);
+
     if (pathname === "/") {
       e.preventDefault();
-      setMobileMenuOpen(false);
+
+      // Immediately activate target button without delay
+      setActiveSection(targetId);
+
+      // Lock scroll-spy listener so intermediate sections don't cause the indicator to travel
+      isProgrammaticScrollRef.current = true;
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+      scrollTimeoutRef.current = setTimeout(() => {
+        isProgrammaticScrollRef.current = false;
+        scrollTimeoutRef.current = null;
+      }, 1200);
 
       if (targetId === "home") {
         window.scrollTo({ top: 0, behavior: "smooth" });
-        setActiveSection("home");
         return;
       }
 
@@ -136,8 +209,9 @@ export default function Header() {
 
       if (targetEl) {
         targetEl.scrollIntoView({ behavior: "smooth", block: "start" });
-        setActiveSection(targetId);
       }
+    } else {
+      setActiveSection(targetId);
     }
   };
 
@@ -195,7 +269,7 @@ export default function Header() {
                   key={item.name}
                   href={item.href}
                   onClick={(e) => handleNavClick(e, item.targetId)}
-                  className={`relative py-1 text-[14px] xl:text-[15px] transition-colors focus-visible:outline-2 focus-visible:outline-[#173D32] rounded-xs whitespace-nowrap cursor-pointer ${
+                  className={`relative py-1 text-[14px] xl:text-[15px] transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-[#173D32] rounded-xs whitespace-nowrap cursor-pointer ${
                     active
                       ? "font-bold text-[#173D32]"
                       : "font-semibold text-[#173D32]/75 hover:text-[#173D32]"
@@ -203,13 +277,15 @@ export default function Header() {
                   aria-current={active ? "page" : undefined}
                 >
                   <span>{item.name}</span>
-                  {/* Active link indicator with subtle forest-green underline */}
-                  {active && (
-                    <span
-                      className="absolute -bottom-1 left-0 right-0 h-[2.5px] bg-[#173D32] rounded-full"
-                      aria-hidden="true"
-                    />
-                  )}
+                  {/* Active link indicator with subtle 150-200ms transition */}
+                  <span
+                    className={`absolute -bottom-1 left-0 right-0 h-[2.5px] bg-[#173D32] rounded-full transition-all duration-200 ease-out origin-center ${
+                      active
+                        ? "opacity-100 scale-x-100"
+                        : "opacity-0 scale-x-50 pointer-events-none"
+                    }`}
+                    aria-hidden="true"
+                  />
                 </Link>
               );
             })}
@@ -325,7 +401,7 @@ export default function Header() {
                     key={item.name}
                     href={item.href}
                     onClick={(e) => handleNavClick(e, item.targetId)}
-                    className={`min-h-[44px] flex items-center justify-between px-4 py-2.5 rounded-2xl text-[16px] transition-colors cursor-pointer ${
+                    className={`min-h-[44px] flex items-center justify-between px-4 py-2.5 rounded-2xl text-[16px] transition-colors duration-200 cursor-pointer ${
                       active
                         ? "bg-[#DCE8D4] text-[#173D32] font-bold"
                         : "text-[#173D32]/85 hover:bg-[#173D32]/5 hover:text-[#173D32] font-medium"
@@ -333,9 +409,12 @@ export default function Header() {
                     aria-current={active ? "page" : undefined}
                   >
                     <span>{item.name}</span>
-                    {active && (
-                      <span className="w-2 h-2 rounded-full bg-[#173D32]" />
-                    )}
+                    <span
+                      className={`w-2 h-2 rounded-full bg-[#173D32] transition-all duration-200 ${
+                        active ? "opacity-100 scale-100" : "opacity-0 scale-50 pointer-events-none"
+                      }`}
+                      aria-hidden="true"
+                    />
                   </Link>
                 );
               })}
