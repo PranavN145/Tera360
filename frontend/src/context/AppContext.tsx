@@ -76,16 +76,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [selectedAlert, setSelectedAlert] = useState<AlertDetail | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
+  const removeToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
   const addToast = useCallback((toast: Omit<ToastMessage, "id">) => {
     const id = Math.random().toString(36).substring(2, 9);
     setToasts((prev) => [...prev, { ...toast, id }]);
     setTimeout(() => {
-      removeToast(id);
+      setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 4500);
-  }, []);
-
-  const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
   // Restore session silently on initial load or refresh via HttpOnly refresh cookie

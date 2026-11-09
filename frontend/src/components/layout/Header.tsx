@@ -42,7 +42,8 @@ export default function Header() {
       window.history.replaceState(null, "", window.location.pathname);
     }
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-    setActiveSection("home");
+    const timer = setTimeout(() => { setActiveSection("home"); }, 0);
+    return () => clearTimeout(timer);
   }, [pathname]);
 
   // Track active section as user scrolls through the homepage
