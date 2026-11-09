@@ -151,8 +151,8 @@ export default function Header() {
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-50 pt-[16px] lg:pt-[20px] px-4 sm:px-6 pointer-events-none transition-all">
-        {/* Responsive floating navbar width: ample room for logo, nav, and auth buttons */}
-        <div className="w-[94%] sm:w-[92%] lg:w-[88%] xl:w-[80%] 2xl:w-[72%] max-w-[1140px] mx-auto pointer-events-auto">
+        {/* Sleek, compact floating capsule navbar */}
+        <div className="w-[94%] sm:w-[92%] max-w-[820px] mx-auto pointer-events-auto">
           {/* Compact floating navbar: 54px-58px height, rounded-[36px], background #F6F4EC */}
           <div className="relative w-full h-[54px] lg:h-[58px] bg-[#F6F4EC]/95 backdrop-blur-md rounded-[36px] px-4 sm:px-5 lg:px-6 border border-[#173D32]/10 shadow-[0_4px_25px_-4px_rgba(23,61,50,0.12)] flex items-center justify-between transition-all">
           
