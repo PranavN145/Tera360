@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { User, UserRole, UpdateProfilePayload } from "@/types/auth";
 import { authApi, usersApi, setAuthRestorationPromise } from "@/lib/api";
+import { demoDataManager } from "@/data/demoDataManager";
 
 export type { User, UserRole };
 
@@ -88,7 +89,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }, 4500);
   }, []);
 
-  // Restore session silently on initial load or refresh via HttpOnly refresh cookie
+  // Restore session silently on initial load or refresh via HttpOnly refresh cookie or local demo persistence
   useEffect(() => {
     let isMounted = true;
 
@@ -99,27 +100,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const profile = await authApi.getMe();
           if (isMounted) {
             setUser(profile);
+            demoDataManager.setActiveDemoUser(profile);
           }
           return true;
-        } else {
-          if (isMounted) {
-            setUser(null);
-          }
-          return false;
         }
       } catch {
-        // Not authenticated or refresh token expired
-        if (isMounted) {
-          setUser(null);
-        }
-        return false;
-      } finally {
-        if (isMounted) {
-          setIsLoadingAuth(false);
-        }
-        setAuthRestorationPromise(null);
+        // Backend offline or token expired
       }
-    })();
+
+      // Offline Development Mode Fallback: restore active demo session from localStorage if present
+      const activeDemo = demoDataManager.getActiveDemoUser();
+      if (activeDemo && isMounted) {
+        setUser(activeDemo);
+        return true;
+      }
+
+      if (isMounted) {
+        setUser(null);
+      }
+      return false;
+    })().finally(() => {
+      if (isMounted) {
+        setIsLoadingAuth(false);
+      }
+      setAuthRestorationPromise(null);
+    });
 
     setAuthRestorationPromise(restorePromise);
 
@@ -129,105 +134,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (credentials: { email: string; password: string }): Promise<User> => {
-    try {
-      const data = await authApi.login(credentials);
-      setUser(data.user);
-      setIsAuthModalOpen(false);
-      addToast({
-        title: `Welcome, ${data.user.name}!`,
-        description: `Signed in as ${data.user.role}`,
-        type: "success",
-      });
-      return data.user;
-    } catch (err) {
-      // Offline fallback for demo seed accounts when backend is not running
-      const normalizedEmail = credentials.email.trim().toLowerCase();
-      const demoUsers: Record<string, User> = {
-        "officer@terra360.in": {
-          _id: "demo-officer-id",
-          name: "Vikram Sen (SDMA Officer)",
-          email: "officer@terra360.in",
-          role: "officer",
-          phone: "+91 98765 43210",
-          language: "en",
-          emailVerified: true,
-          isActive: true,
-          createdAt: new Date().toISOString(),
-        },
-        "citizen@terra360.in": {
-          _id: "demo-citizen-id",
-          name: "Temjen Ao",
-          email: "citizen@terra360.in",
-          role: "citizen",
-          phone: "+91 94360 12345",
-          language: "en",
-          emailVerified: true,
-          isActive: true,
-          village: {
-            state: "Nagaland",
-            district: "Kohima",
-            villageName: "Phesama",
-          },
-          familyContacts: [
-            {
-              name: "Arenla Ao",
-              phone: "+91 94360 98765",
-              relationship: "Spouse",
-            },
-          ],
-          alertPreferences: {
-            ivrs: true,
-            sms: true,
-            app: true,
-          },
-          createdAt: new Date().toISOString(),
-        },
-        "driver@terra360.in": {
-          _id: "demo-driver-id",
-          name: "Raju Sharma",
-          email: "driver@terra360.in",
-          role: "driver",
-          phone: "+91 98620 54321",
-          language: "hi",
-          emailVerified: true,
-          isActive: true,
-          createdAt: new Date().toISOString(),
-        },
-        "field@terra360.in": {
-          _id: "demo-field-id",
-          name: "Lhokhoto Sema",
-          email: "field@terra360.in",
-          role: "field_officer",
-          phone: "+91 94361 98765",
-          language: "en",
-          emailVerified: true,
-          isActive: true,
-          createdAt: new Date().toISOString(),
-        },
-        "admin@terra360.in": {
-          _id: "demo-admin-id",
-          name: "System Administrator",
-          email: "admin@terra360.in",
-          role: "admin",
-          emailVerified: true,
-          isActive: true,
-          createdAt: new Date().toISOString(),
-        },
-      };
-
-      if (demoUsers[normalizedEmail]) {
-        const mockUser = demoUsers[normalizedEmail];
-        setUser(mockUser);
-        setIsAuthModalOpen(false);
-        addToast({
-          title: `Welcome, ${mockUser.name}! (Demo Mode)`,
-          description: `Active role clearance: ${mockUser.role}`,
-          type: "success",
-        });
-        return mockUser;
-      }
-      throw err;
-    }
+    const data = await authApi.login(credentials);
+    setUser(data.user);
+    demoDataManager.setActiveDemoUser(data.user);
+    setIsAuthModalOpen(false);
+    addToast({
+      title: `Welcome, ${data.user.name}!`,
+      description: `Signed in as ${data.user.role}`,
+      type: "success",
+    });
+    return data.user;
   };
 
   const register = async (data: {
@@ -239,6 +155,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     language?: string;
   }): Promise<{ user: User; message: string }> => {
     const res = await authApi.register(data);
+    setUser(res.user);
+    demoDataManager.setActiveDemoUser(res.user);
     addToast({
       title: "Account Created",
       description: res.message || "Please check your email to verify your address.",
@@ -250,6 +168,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateProfile = async (data: UpdateProfilePayload): Promise<User> => {
     const updatedUser = await usersApi.updateProfile(data);
     setUser(updatedUser);
+    demoDataManager.setActiveDemoUser(updatedUser);
     addToast({
       title: "Profile Updated",
       description: "Your account details have been saved successfully.",
@@ -264,6 +183,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Ignore network errors on logout
     } finally {
+      demoDataManager.setActiveDemoUser(null);
       setUser(null);
       addToast({
         title: "Signed Out",

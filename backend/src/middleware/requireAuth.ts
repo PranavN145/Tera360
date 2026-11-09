@@ -49,3 +49,32 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
   }
 }
 
+export async function optionalAuth(req: Request, _res: Response, next: NextFunction): Promise<void> {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return next();
+  }
+
+  const token = authHeader.split(' ')[1];
+
+  try {
+    const payload = verifyAccessToken(token);
+
+    const user = await User.findById(payload.sub).select('+isActive +isDeleted');
+    if (user && user.isActive && !user.isDeleted) {
+      req.user = {
+        id: user._id.toString(),
+        email: user.email,
+        role: user.role,
+        name: user.name,
+        emailVerified: user.emailVerified,
+        isActive: user.isActive,
+      };
+    }
+  } catch {
+    // Token invalid or expired — proceed as unauthenticated without error
+  }
+  next();
+}
+

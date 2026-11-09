@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/context/AppContext";
 import { PortalRoleConfig } from "./portalNavConfig";
 import DropdownPortal from "@/components/ui/DropdownPortal";
+import { demoDataManager } from "@/data/demoDataManager";
 
 interface PortalHeaderProps {
   portalConfig: PortalRoleConfig;
@@ -26,6 +27,14 @@ export default function PortalHeader({
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const notifTriggerRef = useRef<HTMLButtonElement>(null);
   const profileTriggerRef = useRef<HTMLButtonElement>(null);
+
+  const [isDemoMode, setIsDemoMode] = useState(() => demoDataManager.isDemoModeActive());
+
+  useEffect(() => {
+    return demoDataManager.subscribe(() => {
+      setIsDemoMode(demoDataManager.isDemoModeActive());
+    });
+  }, []);
 
   const toggleNotifications = () => {
     setIsNotificationsOpen((prev) => {
@@ -122,11 +131,20 @@ export default function PortalHeader({
             </div>
           </Link>
 
-          {/* Portal Role Badge */}
+          {/* Portal Role Badge & Dev Mode Pill */}
           <div className="hidden sm:flex items-center gap-2 pl-3 border-l border-[#173D32]/20">
             <span className="px-2.5 py-0.5 rounded-full bg-white/70 border border-[#173D32]/15 text-xs font-bold text-[#173D32] tracking-wide uppercase shadow-2xs backdrop-blur-xs">
               {portalConfig.badgeLabel}
             </span>
+            {isDemoMode && (
+              <span
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-[11px] font-bold text-amber-900 shadow-2xs backdrop-blur-xs"
+                title="Frontend-First Mode: Local Demo Data Active (Backend Offline)"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                <span>⚡ Dev Mode</span>
+              </span>
+            )}
           </div>
         </div>
 
@@ -273,13 +291,18 @@ export default function PortalHeader({
                     </p>
                   </div>
                 </div>
-                <div className="mt-2.5 flex items-center gap-2">
+                <div className="mt-2.5 flex items-center gap-2 flex-wrap">
                   <span className="px-2.5 py-0.5 rounded-full bg-[#DCE8D4] text-[#173D32] text-[10px] font-bold uppercase tracking-wider">
                     {user?.role ? user.role.replace("_", " ") : portalConfig.badgeLabel}
                   </span>
                   {user?.emailVerified && (
                     <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-semibold">
                       Verified
+                    </span>
+                  )}
+                  {isDemoMode && (
+                    <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-bold border border-amber-200">
+                      ⚡ Dev Mode
                     </span>
                   )}
                 </div>

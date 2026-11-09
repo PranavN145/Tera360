@@ -24,6 +24,7 @@ import {
   CreateContactPayload,
   ContactOutput,
 } from '@/types/public';
+import { demoDataManager } from '@/data/demoDataManager';
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -105,12 +106,20 @@ export async function refreshAccessToken(): Promise<string | null> {
       });
 
       if (!res.ok) {
+        // Backend returned non-200. Check if active demo session is present in offline development mode
+        const activeDemo = demoDataManager.getActiveDemoUser();
+        if (activeDemo) {
+          const offlineToken = 'demo-offline-token';
+          setAccessToken(offlineToken);
+          return offlineToken;
+        }
         setAccessToken(null);
         return null;
       }
 
       const json: ApiResponse<RefreshSuccessData> = await res.json();
       if (json.success && json.data?.accessToken) {
+        demoDataManager.markBackendOffline(false);
         setAccessToken(json.data.accessToken);
         return json.data.accessToken;
       }
@@ -118,6 +127,14 @@ export async function refreshAccessToken(): Promise<string | null> {
       setAccessToken(null);
       return null;
     } catch {
+      // Backend unreachable (network failure / connection refused)
+      demoDataManager.markBackendOffline(true);
+      const activeDemo = demoDataManager.getActiveDemoUser();
+      if (activeDemo) {
+        const offlineToken = 'demo-offline-token';
+        setAccessToken(offlineToken);
+        return offlineToken;
+      }
       setAccessToken(null);
       return null;
     } finally {
@@ -188,7 +205,10 @@ export async function rawApiRequest<T>(
   let response: Response;
   try {
     response = await fetch(url, fetchOptions);
+    // Connection established successfully
+    demoDataManager.markBackendOffline(false);
   } catch (err: unknown) {
+    demoDataManager.markBackendOffline(true);
     const message = err instanceof Error ? err.message : 'Network connection failure';
     throw new ApiClientError(
       `Unable to reach server. Please check your connection. (${message})`,
@@ -208,6 +228,7 @@ export async function rawApiRequest<T>(
           headers,
         });
       } catch (err: unknown) {
+        demoDataManager.markBackendOffline(true);
         const message = err instanceof Error ? err.message : 'Network error during retry';
         throw new ApiClientError(message, 'NETWORK_ERROR', 0);
       }
@@ -252,26 +273,72 @@ export const authApi = {
     phone?: string;
     language?: string;
   }): Promise<RegisterSuccessData> {
-    return apiClient<RegisterSuccessData>('/api/v1/auth/register', {
-      method: 'POST',
-      body: JSON.stringify(data),
-      retryOnAuthError: false,
-    });
+    try {
+      return await apiClient<RegisterSuccessData>('/api/v1/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(data),
+        retryOnAuthError: false,
+      });
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError && err.code === 'NETWORK_ERROR') {
+        demoDataManager.markBackendOffline(true);
+        const newUser: User = {
+          _id: `demo-user-${Date.now()}`,
+          name: data.name,
+          email: data.email,
+          role: data.role,
+          phone: data.phone,
+          language: data.language || 'en',
+          emailVerified: true,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+        };
+        demoDataManager.setActiveDemoUser(newUser);
+        return {
+          user: newUser,
+          message: 'Account registered in Development Mode (Verification bypassed).',
+        };
+      }
+      throw err;
+    }
   },
 
   async login(credentials: {
     email: string;
     password: string;
   }): Promise<AuthSuccessData> {
-    const data = await apiClient<AuthSuccessData>('/api/v1/auth/login', {
-      method: 'POST',
-      body: JSON.stringify(credentials),
-      retryOnAuthError: false,
-    });
-    if (data.accessToken) {
-      setAccessToken(data.accessToken);
+    try {
+      const data = await apiClient<AuthSuccessData>('/api/v1/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(credentials),
+        retryOnAuthError: false,
+      });
+      if (data.accessToken) {
+        setAccessToken(data.accessToken);
+      }
+      demoDataManager.setActiveDemoUser(data.user);
+      return data;
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError && err.code === 'NETWORK_ERROR') {
+        demoDataManager.markBackendOffline(true);
+        const demoUser = demoDataManager.findDemoUserByEmail(credentials.email);
+        if (demoUser) {
+          const offlineToken = 'demo-offline-token';
+          setAccessToken(offlineToken);
+          demoDataManager.setActiveDemoUser(demoUser);
+          return {
+            user: demoUser,
+            accessToken: offlineToken,
+          };
+        }
+        throw new ApiClientError(
+          'Account not found in demo records. Please sign in with one of the predefined demo accounts.',
+          'INVALID_CREDENTIALS',
+          401
+        );
+      }
+      throw err;
     }
-    return data;
   },
 
   async refresh(): Promise<string | null> {
@@ -284,40 +351,77 @@ export const authApi = {
         method: 'POST',
         retryOnAuthError: false,
       });
+    } catch {
+      return { message: 'Signed out successfully.' };
     } finally {
+      demoDataManager.setActiveDemoUser(null);
       setAccessToken(null);
     }
   },
 
   async getMe(): Promise<User> {
-    const data = await apiClient<UserProfileSuccessData>('/api/v1/users/me', {
-      method: 'GET',
-    });
-    return data.user;
+    try {
+      const data = await apiClient<UserProfileSuccessData>('/api/v1/users/me', {
+        method: 'GET',
+      });
+      return data.user;
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError && err.code === 'NETWORK_ERROR') {
+        demoDataManager.markBackendOffline(true);
+        const activeDemo = demoDataManager.getActiveDemoUser();
+        if (activeDemo) return activeDemo;
+        throw new ApiClientError('Not authenticated', 'UNAUTHENTICATED', 401);
+      }
+      throw err;
+    }
   },
 
   async verifyEmail(token: string): Promise<MessageSuccessData> {
-    return apiClient<MessageSuccessData>('/api/v1/auth/verify-email', {
-      method: 'POST',
-      body: JSON.stringify({ token }),
-      retryOnAuthError: false,
-    });
+    try {
+      return await apiClient<MessageSuccessData>('/api/v1/auth/verify-email', {
+        method: 'POST',
+        body: JSON.stringify({ token }),
+        retryOnAuthError: false,
+      });
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError && err.code === 'NETWORK_ERROR') {
+        demoDataManager.markBackendOffline(true);
+        return { message: 'Email address verified successfully (Demo Mode).' };
+      }
+      throw err;
+    }
   },
 
   async forgotPassword(email: string): Promise<MessageSuccessData> {
-    return apiClient<MessageSuccessData>('/api/v1/auth/forgot-password', {
-      method: 'POST',
-      body: JSON.stringify({ email }),
-      retryOnAuthError: false,
-    });
+    try {
+      return await apiClient<MessageSuccessData>('/api/v1/auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+        retryOnAuthError: false,
+      });
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError && err.code === 'NETWORK_ERROR') {
+        demoDataManager.markBackendOffline(true);
+        return { message: 'Password recovery email dispatched (Demo Mode).' };
+      }
+      throw err;
+    }
   },
 
   async resetPassword(token: string, password: string): Promise<MessageSuccessData> {
-    return apiClient<MessageSuccessData>('/api/v1/auth/reset-password', {
-      method: 'POST',
-      body: JSON.stringify({ token, password }),
-      retryOnAuthError: false,
-    });
+    try {
+      return await apiClient<MessageSuccessData>('/api/v1/auth/reset-password', {
+        method: 'POST',
+        body: JSON.stringify({ token, password }),
+        retryOnAuthError: false,
+      });
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError && err.code === 'NETWORK_ERROR') {
+        demoDataManager.markBackendOffline(true);
+        return { message: 'Your password has been successfully reset (Demo Mode).' };
+      }
+      throw err;
+    }
   },
 };
 
@@ -327,22 +431,41 @@ export const usersApi = {
    * Fetches current authenticated user profile
    */
   async getMe(): Promise<User> {
-    const data = await apiClient<UserProfileSuccessData>('/api/v1/users/me', {
-      method: 'GET',
-    });
-    return data.user;
+    try {
+      const data = await apiClient<UserProfileSuccessData>('/api/v1/users/me', {
+        method: 'GET',
+      });
+      return data.user;
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError && err.code === 'NETWORK_ERROR') {
+        demoDataManager.markBackendOffline(true);
+        const activeDemo = demoDataManager.getActiveDemoUser();
+        if (activeDemo) return activeDemo;
+        throw new ApiClientError('Not authenticated', 'UNAUTHENTICATED', 401);
+      }
+      throw err;
+    }
   },
 
   /**
    * 2. PATCH /api/v1/users/me
-   * Updates permitted profile fields (name, phone, language)
+   * Updates permitted profile fields
    */
   async updateProfile(payload: UpdateProfilePayload): Promise<User> {
-    const data = await apiClient<UserProfileSuccessData>('/api/v1/users/me', {
-      method: 'PATCH',
-      body: JSON.stringify(payload),
-    });
-    return data.user;
+    try {
+      const data = await apiClient<UserProfileSuccessData>('/api/v1/users/me', {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+      demoDataManager.setActiveDemoUser(data.user);
+      return data.user;
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError && err.code === 'NETWORK_ERROR') {
+        demoDataManager.markBackendOffline(true);
+        return demoDataManager.updateDemoProfile(payload);
+      }
+      throw err;
+    }
   },
 
   /**
@@ -350,10 +473,18 @@ export const usersApi = {
    * Updates password with verification of current password
    */
   async changePassword(payload: ChangePasswordPayload): Promise<MessageSuccessData> {
-    return apiClient<MessageSuccessData>('/api/v1/users/me/password', {
-      method: 'PATCH',
-      body: JSON.stringify(payload),
-    });
+    try {
+      return await apiClient<MessageSuccessData>('/api/v1/users/me/password', {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError && err.code === 'NETWORK_ERROR') {
+        demoDataManager.markBackendOffline(true);
+        return demoDataManager.changeDemoPassword(payload);
+      }
+      throw err;
+    }
   },
 
   /**
@@ -361,10 +492,18 @@ export const usersApi = {
    * Lists active sessions with device & IP info
    */
   async getSessions(): Promise<UserSession[]> {
-    const data = await apiClient<SessionsSuccessData>('/api/v1/users/me/sessions', {
-      method: 'GET',
-    });
-    return data.sessions || [];
+    try {
+      const data = await apiClient<SessionsSuccessData>('/api/v1/users/me/sessions', {
+        method: 'GET',
+      });
+      return data.sessions || [];
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError && err.code === 'NETWORK_ERROR') {
+        demoDataManager.markBackendOffline(true);
+        return demoDataManager.getDemoSessions();
+      }
+      throw err;
+    }
   },
 
   /**
@@ -372,9 +511,17 @@ export const usersApi = {
    * Revokes an individual session
    */
   async revokeSession(sessionId: string): Promise<MessageSuccessData> {
-    return apiClient<MessageSuccessData>(`/api/v1/users/me/sessions/${encodeURIComponent(sessionId)}`, {
-      method: 'DELETE',
-    });
+    try {
+      return await apiClient<MessageSuccessData>(`/api/v1/users/me/sessions/${encodeURIComponent(sessionId)}`, {
+        method: 'DELETE',
+      });
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError && err.code === 'NETWORK_ERROR') {
+        demoDataManager.markBackendOffline(true);
+        return demoDataManager.revokeDemoSession(sessionId);
+      }
+      throw err;
+    }
   },
 
   /**
@@ -382,9 +529,17 @@ export const usersApi = {
    * Initiates export of user's personal data
    */
   async exportData(): Promise<UserExportData> {
-    return apiClient<UserExportData>('/api/v1/users/me/export', {
-      method: 'GET',
-    });
+    try {
+      return await apiClient<UserExportData>('/api/v1/users/me/export', {
+        method: 'GET',
+      });
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError && err.code === 'NETWORK_ERROR') {
+        demoDataManager.markBackendOffline(true);
+        return demoDataManager.exportDemoData();
+      }
+      throw err;
+    }
   },
 
   /**
@@ -399,37 +554,47 @@ export const usersApi = {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const res = await fetch(url, {
-      method: 'GET',
-      headers,
-      credentials: 'include',
-    });
+    try {
+      const res = await fetch(url, {
+        method: 'GET',
+        headers,
+        credentials: 'include',
+      });
 
-    if (!res.ok) {
-      let errorMsg = 'Failed to download account data';
-      try {
-        const json = await res.json();
-        if (json.error?.message) errorMsg = json.error.message;
-      } catch {
-        // use default errorMsg
+      if (!res.ok) {
+        throw new Error('Server export request failed');
       }
-      throw new ApiClientError(errorMsg, 'EXPORT_FAILED', res.status);
-    }
 
-    const blob = await res.blob();
-    const downloadUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.download = `terra360-account-export-${Date.now()}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(downloadUrl);
+      const blob = await res.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `terra360-account-export-${Date.now()}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch {
+      // Offline fallback: generate export directly from local demo storage
+      demoDataManager.markBackendOffline(true);
+      const exportData = demoDataManager.exportDemoData();
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+        type: 'application/json',
+      });
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `terra360-demo-export-${Date.now()}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    }
   },
 
   /**
    * 7. DELETE /api/v1/users/me
-   * Deactivates and deletes user account (requires confirmationText: 'DELETE')
+   * Deactivates and deletes user account
    */
   async deleteAccount(confirmationText: string): Promise<MessageSuccessData> {
     try {
@@ -437,6 +602,12 @@ export const usersApi = {
         method: 'DELETE',
         body: JSON.stringify({ confirmationText }),
       });
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError && err.code === 'NETWORK_ERROR') {
+        demoDataManager.markBackendOffline(true);
+        return demoDataManager.deleteDemoAccount();
+      }
+      throw err;
     } finally {
       setAccessToken(null);
     }
@@ -449,15 +620,23 @@ export const publicApi = {
    * Returns road corridors with coordinates and risk level for map visualization.
    */
   async getRiskMap(query?: { state?: string }): Promise<PublicRiskMapItem[]> {
-    const params = new URLSearchParams();
-    if (query?.state && query.state !== 'All' && query.state !== 'All States') {
-      params.set('state', query.state);
+    try {
+      const params = new URLSearchParams();
+      if (query?.state && query.state !== 'All' && query.state !== 'All States') {
+        params.set('state', query.state);
+      }
+      const qs = params.toString() ? `?${params.toString()}` : '';
+      return await apiClient<PublicRiskMapItem[]>(`/api/v1/public/risk-map${qs}`, {
+        method: 'GET',
+        retryOnAuthError: false,
+      });
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError && err.code === 'NETWORK_ERROR') {
+        demoDataManager.markBackendOffline(true);
+        return demoDataManager.getDemoRiskMap(query);
+      }
+      throw err;
     }
-    const qs = params.toString() ? `?${params.toString()}` : '';
-    return apiClient<PublicRiskMapItem[]>(`/api/v1/public/risk-map${qs}`, {
-      method: 'GET',
-      retryOnAuthError: false,
-    });
   },
 
   /**
@@ -470,35 +649,43 @@ export const publicApi = {
     page?: number;
     limit?: number;
   }): Promise<PublicAlertsResponse> {
-    const params = new URLSearchParams();
-    if (query?.state && query.state !== 'All' && query.state !== 'All States') {
-      params.set('state', query.state);
-    }
-    if (query?.severity && query.severity !== 'All') {
-      params.set('severity', query.severity);
-    }
-    if (query?.page) {
-      params.set('page', String(query.page));
-    }
-    if (query?.limit) {
-      params.set('limit', String(query.limit));
-    }
-    const qs = params.toString() ? `?${params.toString()}` : '';
+    try {
+      const params = new URLSearchParams();
+      if (query?.state && query.state !== 'All' && query.state !== 'All States') {
+        params.set('state', query.state);
+      }
+      if (query?.severity && query.severity !== 'All') {
+        params.set('severity', query.severity);
+      }
+      if (query?.page) {
+        params.set('page', String(query.page));
+      }
+      if (query?.limit) {
+        params.set('limit', String(query.limit));
+      }
+      const qs = params.toString() ? `?${params.toString()}` : '';
 
-    const res = await rawApiRequest<PublicAlertItem[]>(`/api/v1/public/alerts${qs}`, {
-      method: 'GET',
-      retryOnAuthError: false,
-    });
+      const res = await rawApiRequest<PublicAlertItem[]>(`/api/v1/public/alerts${qs}`, {
+        method: 'GET',
+        retryOnAuthError: false,
+      });
 
-    return {
-      alerts: res.data || [],
-      pagination: res.pagination || {
-        total: res.data?.length || 0,
-        page: query?.page || 1,
-        limit: query?.limit || 20,
-        totalPages: 1,
-      },
-    };
+      return {
+        alerts: res.data || [],
+        pagination: res.pagination || {
+          total: res.data?.length || 0,
+          page: query?.page || 1,
+          limit: query?.limit || 20,
+          totalPages: 1,
+        },
+      };
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError && err.code === 'NETWORK_ERROR') {
+        demoDataManager.markBackendOffline(true);
+        return demoDataManager.filterAlerts(query);
+      }
+      throw err;
+    }
   },
 
   /**
@@ -509,45 +696,68 @@ export const publicApi = {
     state?: string;
     status?: string;
   }): Promise<PublicRoadStatusItem[]> {
-    const params = new URLSearchParams();
-    if (query?.state && query.state !== 'All' && query.state !== 'All States') {
-      params.set('state', query.state);
-    }
-    if (query?.status && query.status !== 'All') {
-      params.set('status', query.status.toLowerCase());
-    }
-    const qs = params.toString() ? `?${params.toString()}` : '';
+    try {
+      const params = new URLSearchParams();
+      if (query?.state && query.state !== 'All' && query.state !== 'All States') {
+        params.set('state', query.state);
+      }
+      if (query?.status && query.status !== 'All') {
+        params.set('status', query.status.toLowerCase());
+      }
+      const qs = params.toString() ? `?${params.toString()}` : '';
 
-    return apiClient<PublicRoadStatusItem[]>(`/api/v1/public/road-status${qs}`, {
-      method: 'GET',
-      retryOnAuthError: false,
-    });
+      return await apiClient<PublicRoadStatusItem[]>(`/api/v1/public/road-status${qs}`, {
+        method: 'GET',
+        retryOnAuthError: false,
+      });
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError && err.code === 'NETWORK_ERROR') {
+        demoDataManager.markBackendOffline(true);
+        return demoDataManager.filterRoads(query);
+      }
+      throw err;
+    }
   },
 
   /**
    * 4. GET /api/v1/public/stats
-   * Returns live MongoDB aggregated counts.
+   * Returns live operational stats.
    */
   async getStats(): Promise<PublicStats> {
-    return apiClient<PublicStats>('/api/v1/public/stats', {
-      method: 'GET',
-      retryOnAuthError: false,
-    });
+    try {
+      return await apiClient<PublicStats>('/api/v1/public/stats', {
+        method: 'GET',
+        retryOnAuthError: false,
+      });
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError && err.code === 'NETWORK_ERROR') {
+        demoDataManager.markBackendOffline(true);
+        return demoDataManager.getDemoStats();
+      }
+      throw err;
+    }
   },
 
   /**
    * 5. POST /api/v1/reports/public
    * Submits a public landslide/hazard report.
-   * Strictly respects backend security boundaries.
    */
   async submitHazardReport(
     payload: CreateHazardReportPayload
   ): Promise<HazardReportOutput> {
-    return apiClient<HazardReportOutput>('/api/v1/reports/public', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-      retryOnAuthError: false,
-    });
+    try {
+      return await apiClient<HazardReportOutput>('/api/v1/reports/public', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        retryOnAuthError: false,
+      });
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError && err.code === 'NETWORK_ERROR') {
+        demoDataManager.markBackendOffline(true);
+        return demoDataManager.addDemoReport(payload);
+      }
+      throw err;
+    }
   },
 
   /**
@@ -557,19 +767,45 @@ export const publicApi = {
   async submitContact(
     payload: CreateContactPayload
   ): Promise<{ contact: ContactOutput; message: string }> {
-    const res = await rawApiRequest<ContactOutput>('/api/v1/contact', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-      retryOnAuthError: false,
-    });
-    return {
-      contact: res.data as ContactOutput,
-      message: res.message || 'Your message has been received. Our operations desk will get in touch shortly.',
-    };
+    try {
+      const res = await rawApiRequest<ContactOutput>('/api/v1/contact', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        retryOnAuthError: false,
+      });
+      return {
+        contact: res.data as ContactOutput,
+        message: res.message || 'Your message has been received. Our operations desk will get in touch shortly.',
+      };
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError && err.code === 'NETWORK_ERROR') {
+        demoDataManager.markBackendOffline(true);
+        return demoDataManager.addDemoContact(payload);
+      }
+      throw err;
+    }
   },
 };
 
 export const reportsApi = {
+  /**
+   * GET /api/v1/reports/my
+   * List hazard reports submitted by the authenticated citizen.
+   */
+  async getMyReports(): Promise<HazardReportOutput[]> {
+    try {
+      return await apiClient<HazardReportOutput[]>('/api/v1/reports/my', {
+        method: 'GET',
+      });
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError && err.code === 'NETWORK_ERROR') {
+        demoDataManager.markBackendOffline(true);
+        return demoDataManager.getMyDemoReports();
+      }
+      throw err;
+    }
+  },
+
   /**
    * GET /api/v1/reports
    * List hazard reports for operational officers and emergency desks.
@@ -579,20 +815,28 @@ export const reportsApi = {
     status?: string;
     limit?: number;
   }): Promise<HazardReportOutput[]> {
-    const params = new URLSearchParams();
-    if (query?.state && query.state !== 'All' && query.state !== 'All States') {
-      params.set('state', query.state);
+    try {
+      const params = new URLSearchParams();
+      if (query?.state && query.state !== 'All' && query.state !== 'All States') {
+        params.set('state', query.state);
+      }
+      if (query?.status && query.status !== 'All') {
+        params.set('status', query.status);
+      }
+      if (query?.limit) {
+        params.set('limit', String(query.limit));
+      }
+      const qs = params.toString() ? `?${params.toString()}` : '';
+      return await apiClient<HazardReportOutput[]>(`/api/v1/reports${qs}`, {
+        method: 'GET',
+      });
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError && err.code === 'NETWORK_ERROR') {
+        demoDataManager.markBackendOffline(true);
+        return demoDataManager.filterReports(query);
+      }
+      throw err;
     }
-    if (query?.status && query.status !== 'All') {
-      params.set('status', query.status);
-    }
-    if (query?.limit) {
-      params.set('limit', String(query.limit));
-    }
-    const qs = params.toString() ? `?${params.toString()}` : '';
-    return apiClient<HazardReportOutput[]>(`/api/v1/reports${qs}`, {
-      method: 'GET',
-    });
   },
 };
 

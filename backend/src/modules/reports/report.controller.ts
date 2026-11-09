@@ -11,12 +11,27 @@ export class ReportController {
       const report = await reportService.submitPublicReport(req.body, {
         ipAddress,
         userAgent,
+        userId: req.user?.id,
       });
 
       res.status(201).json({
         success: true,
         message: 'Hazard report submitted successfully. Thank you for contributing ground truth.',
         data: report,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async listMyReports(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.id;
+      const reports = await reportService.listMyReports(userId);
+
+      res.status(200).json({
+        success: true,
+        data: reports,
       });
     } catch (error) {
       next(error);

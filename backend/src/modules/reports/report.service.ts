@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import mongoose from 'mongoose';
 import { Report, IReportLocationPoint } from './report.model';
 import { CreatePublicReportInput } from './report.schema';
 import { captchaService } from '../../services/captcha.service';
@@ -6,6 +7,7 @@ import { captchaService } from '../../services/captcha.service';
 export interface RequestClientMeta {
   ipAddress?: string;
   userAgent?: string;
+  userId?: string;
 }
 
 export interface PublicReportOutput {
@@ -73,7 +75,8 @@ export class ReportService {
       coordinates: input.coordinates,
       // Security: hardcoded by server, immune to client manipulation
       status: 'submitted',
-      source: 'public',
+      source: meta.userId ? 'citizen' : 'public',
+      reporterId: meta.userId ? new mongoose.Types.ObjectId(meta.userId) : undefined,
       isDeleted: false,
       // Abuse prevention audit fields
       ipAddress: meta.ipAddress,
@@ -119,6 +122,36 @@ export class ReportService {
     const reports = await Report.find(filter)
       .sort({ createdAt: -1 })
       .limit(limit)
+      .lean();
+
+    return reports.map((r) => ({
+      reportId: r.reportId,
+      state: r.state,
+      location: r.location,
+      hazardType: r.hazardType,
+      severity: r.severity,
+      description: r.description,
+      reporterName: r.reporterName,
+      reporterPhone: r.reporterPhone,
+      photoUrl: r.photoUrl,
+      coordinates: r.coordinates,
+      status: r.status,
+      source: r.source,
+      createdAt: r.createdAt,
+    }));
+  }
+
+  /**
+   * List hazard reports submitted by the authenticated citizen.
+   * Strictly isolates reports so citizens can only retrieve their own submissions.
+   */
+  async listMyReports(userId: string): Promise<PublicReportOutput[]> {
+    const reports = await Report.find({
+      reporterId: new mongoose.Types.ObjectId(userId),
+      isDeleted: false,
+    })
+      .sort({ createdAt: -1 })
+      .limit(50)
       .lean();
 
     return reports.map((r) => ({

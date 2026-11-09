@@ -9,7 +9,7 @@ export interface PublicRiskMapItem {
   status: 'open' | 'caution' | 'partial' | 'blocked' | string;
   riskLevel: 'Low' | 'Moderate' | 'High' | 'Critical' | string;
   statusReason?: string | null;
-  geometry?: any;
+  geometry?: unknown;
   coordinatesText?: string | null;
   mapCoordinates?: { x: number; y: number } | null;
   lastUpdated: string;
@@ -23,7 +23,7 @@ export interface PublicAlertItem {
   corridor: string;
   location?: string | null;
   description: string;
-  coordinates?: any;
+  coordinates?: { type?: string; coordinates?: [number, number] } | null;
   coordinatesText?: string | null;
   rainfall24h?: string | null;
   saturation?: string | null;
