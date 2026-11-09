@@ -1,12 +1,15 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import {
   corridorRoutes,
   rescueRoute,
   STATE_PRESETS,
+  computeSimulatedCorridorRoutes,
+  nh29FieldSensors,
+  computeSimulatedSensors,
 } from "../data/mockLandslideData.js";
 
 // Read token securely from environment variable (Next.js or Vite)
@@ -36,7 +39,58 @@ export default function RiskMap({
   const [terrainEnabled, setTerrainEnabled] = useState(true);
   const [riskHeatmapEnabled, setRiskHeatmapEnabled] = useState(true);
   const [rescueRouteEnabled, setRescueRouteEnabled] = useState(true);
+  const [fieldSensorsEnabled, setFieldSensorsEnabled] = useState(true);
   const [isHudCollapsed, setIsHudCollapsed] = useState(false);
+
+  // ── Monsoon Simulation Playback State ─────────────────────────
+  const [simulationHour, setSimulationHour] = useState(14); // 00:00 to 24:00 (default peak at hour 14)
+  const [isPlaying, setIsPlaying] = useState(false);
+  const playbackIntervalRef = useRef(null);
+
+  // Compute dynamic simulated corridor routes GeoJSON based on simulation hour
+  const simulatedCorridorData = useMemo(() => {
+    return computeSimulatedCorridorRoutes(simulationHour);
+  }, [simulationHour]);
+
+  // Compute dynamic simulated field sensor telemetry along NH-29 Pherima slope
+  const simulatedSensorsData = useMemo(() => {
+    return computeSimulatedSensors(simulationHour);
+  }, [simulationHour]);
+
+  // Target segment (NH-29 Pherima Slide Cut) live telemetry values
+  const targetSegment = simulatedCorridorData.features.find(
+    (f) => f.properties?.id === "nh29-seg-3"
+  );
+  const targetProps = targetSegment?.properties || {
+    status: "critical",
+    soil_moisture_pct: 84,
+    pore_water_pressure_kpa: 210,
+    tilt_rate_mm_h: 0.28,
+  };
+  const isPorePressureCritical = (targetProps.pore_water_pressure_kpa || 0) >= 200;
+  const rainfallIntensity = Math.round(
+    12 + 72 * Math.exp(-Math.pow(simulationHour - 14, 2) / (2 * Math.pow(3.5, 2)))
+  );
+
+  // Playback timer effect (advances 1 hour every 900ms when playing)
+  useEffect(() => {
+    if (isPlaying) {
+      playbackIntervalRef.current = setInterval(() => {
+        setSimulationHour((prev) => (prev >= 24 ? 0 : prev + 1));
+      }, 900);
+    } else {
+      if (playbackIntervalRef.current) {
+        clearInterval(playbackIntervalRef.current);
+        playbackIntervalRef.current = null;
+      }
+    }
+
+    return () => {
+      if (playbackIntervalRef.current) {
+        clearInterval(playbackIntervalRef.current);
+      }
+    };
+  }, [isPlaying]);
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -180,7 +234,7 @@ export default function RiskMap({
       if (!map.getSource("corridor-routes")) {
         map.addSource("corridor-routes", {
           type: "geojson",
-          data: corridorRoutes,
+          data: simulatedCorridorData,
         });
       }
 
@@ -306,6 +360,168 @@ export default function RiskMap({
           labelLayerId
         );
       }
+
+      // 10b. Add Field Sensors GeoJSON point source & status-glowing circle layers along Pherima cut
+      if (!map.getSource("field-sensors")) {
+        map.addSource("field-sensors", {
+          type: "geojson",
+          data: simulatedSensorsData,
+        });
+      }
+
+      // Outer status-colored aura glow layer (Green = Normal, Red = Exceeding Threshold)
+      if (!map.getLayer("field-sensors-glow")) {
+        map.addLayer(
+          {
+            id: "field-sensors-glow",
+            type: "circle",
+            source: "field-sensors",
+            layout: {
+              visibility: fieldSensorsEnabled ? "visible" : "none",
+            },
+            paint: {
+              "circle-radius": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                10,
+                8,
+                13.5,
+                12,
+                16,
+                17,
+              ],
+              "circle-color": [
+                "match",
+                ["downcase", ["to-string", ["get", "status"]]],
+                "exceeding",
+                "#FF0000",
+                "critical",
+                "#FF0000",
+                "#00E676",
+              ],
+              "circle-blur": 0.65,
+              "circle-opacity": 0.85,
+            },
+          },
+          labelLayerId
+        );
+      }
+
+      // Inner crisp circular sensor node pin
+      if (!map.getLayer("field-sensors-point")) {
+        map.addLayer(
+          {
+            id: "field-sensors-point",
+            type: "circle",
+            source: "field-sensors",
+            layout: {
+              visibility: fieldSensorsEnabled ? "visible" : "none",
+            },
+            paint: {
+              "circle-radius": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                10,
+                4,
+                13.5,
+                6,
+                16,
+                8,
+              ],
+              "circle-color": [
+                "match",
+                ["downcase", ["to-string", ["get", "status"]]],
+                "exceeding",
+                "#FF0000",
+                "critical",
+                "#FF0000",
+                "#00E676",
+              ],
+              "circle-stroke-width": 2,
+              "circle-stroke-color": "#FFFFFF",
+              "circle-stroke-opacity": 1.0,
+              "circle-opacity": 1.0,
+            },
+          },
+          labelLayerId
+        );
+      }
+
+      // 10c. Hover Mini-Tooltip for Field Sensor Nodes
+      let sensorTooltipPopup = null;
+
+      const handleSensorMouseEnter = (e) => {
+        map.getCanvas().style.cursor = "pointer";
+        if (!e.features || !e.features[0]) return;
+
+        const props = e.features[0].properties || {};
+        const coordinates = e.features[0].geometry.coordinates.slice();
+        const id = props.id || props.sensor_id || "DAS-NODE-04";
+        const name = props.name || "Slope Field Sensor";
+        const type = props.type || "DAS Fiber Interferometer";
+        const location = props.location || "Pherima Slope Cut";
+        const strain = props.slope_strain || `${props.strain_microstrain || 48} µε`;
+        const status = String(props.status || "normal").toLowerCase();
+        const isExceeding = status === "exceeding" || status === "critical";
+        const statusLabel = isExceeding ? "Exceeding Threshold" : "Normal";
+        const statusColor = isExceeding ? "#DC2626" : "#16A34A";
+        const statusBg = isExceeding ? "#FEF2F2" : "#ECFDF5";
+        const statusBorder = isExceeding ? "#FECACA" : "#A7F3D0";
+        const depth = props.depth
+          ? `<div style="color: #6B7280; font-size: 9.5px; margin-top: 2px;">📍 ${location} • ${props.depth}</div>`
+          : "";
+
+        const tooltipHTML = `
+          <div style="font-family: system-ui, -apple-system, sans-serif; padding: 7px 9px; min-width: 215px; color: #173D32;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 3px;">
+              <span style="font-weight: 800; font-size: 11.5px; letter-spacing: 0.03em; color: #111827; display: flex; align-items: center; gap: 5px;">
+                <span style="display: inline-block; width: 7px; height: 7px; border-radius: 9999px; background-color: ${statusColor}; box-shadow: 0 0 6px ${statusColor};"></span>
+                ${id}
+              </span>
+              <span style="font-size: 9px; font-weight: 800; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background-color: ${statusBg}; color: ${statusColor}; border: 1px solid ${statusBorder};">
+                ${statusLabel}
+              </span>
+            </div>
+            <div style="font-size: 10.5px; color: #374151; font-weight: 700; margin-bottom: 2px;">
+              ${type}
+            </div>
+            ${depth}
+            <div style="margin-top: 6px; display: flex; align-items: center; justify-content: space-between; background-color: #F8FAFC; padding: 4px 8px; border-radius: 6px; border: 1px solid #E2E8F0; font-size: 10.5px;">
+              <span style="color: #4B5563; font-weight: 600;">Slope Strain:</span>
+              <span style="font-weight: 800; color: ${statusColor};">${strain}</span>
+            </div>
+          </div>
+        `;
+
+        if (sensorTooltipPopup) {
+          sensorTooltipPopup.remove();
+        }
+
+        sensorTooltipPopup = new mapboxgl.Popup({
+          closeButton: false,
+          closeOnClick: false,
+          offset: 12,
+          className: "sensor-node-tooltip",
+        })
+          .setLngLat(coordinates)
+          .setHTML(tooltipHTML)
+          .addTo(map);
+      };
+
+      const handleSensorMouseLeave = () => {
+        map.getCanvas().style.cursor = "";
+        if (sensorTooltipPopup) {
+          sensorTooltipPopup.remove();
+          sensorTooltipPopup = null;
+        }
+      };
+
+      map.on("mouseenter", "field-sensors-point", handleSensorMouseEnter);
+      map.on("mouseleave", "field-sensors-point", handleSensorMouseLeave);
+      map.on("mouseenter", "field-sensors-glow", handleSensorMouseEnter);
+      map.on("mouseleave", "field-sensors-glow", handleSensorMouseLeave);
 
       // 11. Telemetry Popups: Click listener on corridor segments
       const handleCorridorClick = (e) => {
@@ -611,6 +827,31 @@ export default function RiskMap({
     }
   };
 
+  const handleToggleSensors = (active) => {
+    setFieldSensorsEnabled(active);
+    const map = mapInstanceRef.current;
+    if (map && map.isStyleLoaded()) {
+      try {
+        if (map.getLayer("field-sensors-glow")) {
+          map.setLayoutProperty(
+            "field-sensors-glow",
+            "visibility",
+            active ? "visible" : "none"
+          );
+        }
+        if (map.getLayer("field-sensors-point")) {
+          map.setLayoutProperty(
+            "field-sensors-point",
+            "visibility",
+            active ? "visible" : "none"
+          );
+        }
+      } catch (err) {
+        console.warn("Sensors toggle warning:", err);
+      }
+    }
+  };
+
   // React to 3D Terrain Hillshade toggle switch
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -672,6 +913,27 @@ export default function RiskMap({
     }
   }, [rescueRouteEnabled]);
 
+  // React to Field Sensor Nodes toggle switch
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    if (map.getLayer("field-sensors-glow")) {
+      map.setLayoutProperty(
+        "field-sensors-glow",
+        "visibility",
+        fieldSensorsEnabled ? "visible" : "none"
+      );
+    }
+    if (map.getLayer("field-sensors-point")) {
+      map.setLayoutProperty(
+        "field-sensors-point",
+        "visibility",
+        fieldSensorsEnabled ? "visible" : "none"
+      );
+    }
+  }, [fieldSensorsEnabled]);
+
   // React to selectedState fly-to triggers
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -689,6 +951,54 @@ export default function RiskMap({
       });
     }
   }, [selectedState]);
+
+  // Dynamically update Mapbox source & trigger visual alert transition
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    try {
+      const source = map.getSource("corridor-routes");
+      if (source && typeof source.setData === "function") {
+        source.setData(simulatedCorridorData);
+      }
+
+      const sensorSource = map.getSource("field-sensors");
+      if (sensorSource && typeof sensorSource.setData === "function") {
+        sensorSource.setData(simulatedSensorsData);
+      }
+
+      // Visual alert transition: when pore-water pressure exceeds 200 kPa (hour 14:00),
+      // dynamically set the road segment line to solid pulsing red (#FF0000) with expanded glow
+      if (isPorePressureCritical) {
+        if (map.getLayer("corridor-layer")) {
+          map.setPaintProperty("corridor-layer", "line-width", 7.5);
+        }
+        if (map.getLayer("corridor-lines")) {
+          map.setPaintProperty("corridor-lines", "line-width", 7.5);
+        }
+        if (map.getLayer("hazard-risk-heatmap")) {
+          map.setPaintProperty("hazard-risk-heatmap", "line-width", 22);
+          map.setPaintProperty("hazard-risk-heatmap", "line-blur", 14);
+          map.setPaintProperty("hazard-risk-heatmap", "line-opacity", 0.9);
+        }
+      } else {
+        if (map.getLayer("corridor-layer")) {
+          map.setPaintProperty("corridor-layer", "line-width", 6);
+        }
+        if (map.getLayer("corridor-lines")) {
+          map.setPaintProperty("corridor-lines", "line-width", 6);
+        }
+        if (map.getLayer("hazard-risk-heatmap")) {
+          map.setPaintProperty("hazard-risk-heatmap", "line-width", 18);
+          map.setPaintProperty("hazard-risk-heatmap", "line-blur", 10);
+          map.setPaintProperty("hazard-risk-heatmap", "line-opacity", 0.7);
+        }
+      }
+    } catch (err) {
+      console.warn("Simulation data update error:", err);
+    }
+  }, [simulatedCorridorData, simulatedSensorsData, isPorePressureCritical]);
 
   return (
     <div
@@ -735,21 +1045,57 @@ export default function RiskMap({
             {/* Dynamic Status Badges */}
             <div className="space-y-2 mt-3 mb-3.5">
               {/* 1. Active Corridor Alert Badge */}
-              <div className="p-2.5 rounded-xl bg-red-50/95 border border-red-200/90 flex items-start gap-2 shadow-2xs">
+              <div
+                className={`p-2.5 rounded-xl border flex items-start gap-2 shadow-2xs transition-colors ${
+                  isPorePressureCritical
+                    ? "bg-red-50/95 border-red-300"
+                    : targetProps.status === "warning"
+                    ? "bg-amber-50/95 border-amber-200"
+                    : "bg-emerald-50/95 border-emerald-200"
+                }`}
+              >
                 <span className="text-sm mt-0.5 shrink-0" aria-hidden="true">
-                  ⚠️
+                  {isPorePressureCritical ? "⛔" : targetProps.status === "warning" ? "⚠️" : "✅"}
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-1">
-                    <span className="text-[10px] font-bold uppercase text-red-800 tracking-wider">
+                    <span
+                      className={`text-[10px] font-bold uppercase tracking-wider ${
+                        isPorePressureCritical
+                          ? "text-red-800"
+                          : targetProps.status === "warning"
+                          ? "text-amber-800"
+                          : "text-emerald-800"
+                      }`}
+                    >
                       Active Corridor Alert
                     </span>
-                    <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-red-600 text-white animate-pulse">
-                      BLOCKED
+                    <span
+                      className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded text-white ${
+                        isPorePressureCritical
+                          ? "bg-red-600 animate-pulse"
+                          : targetProps.status === "warning"
+                          ? "bg-amber-500"
+                          : "bg-emerald-600"
+                      }`}
+                    >
+                      {isPorePressureCritical
+                        ? "BLOCKED"
+                        : targetProps.status === "warning"
+                        ? "WARNING"
+                        : "PASSABLE"}
                     </span>
                   </div>
-                  <p className="text-xs font-bold text-red-950 mt-0.5 leading-snug">
-                    NH-29 Pherima Segment - BLOCKED
+                  <p
+                    className={`text-xs font-bold mt-0.5 leading-snug ${
+                      isPorePressureCritical
+                        ? "text-red-950"
+                        : targetProps.status === "warning"
+                        ? "text-amber-950"
+                        : "text-emerald-950"
+                    }`}
+                  >
+                    NH-29 Pherima Segment - {isPorePressureCritical ? "BLOCKED" : targetProps.status === "warning" ? "CAUTION" : "NORMAL TRANSIT"}
                   </p>
                 </div>
               </div>
@@ -765,11 +1111,15 @@ export default function RiskMap({
                       Rainfall Intensity
                     </span>
                     <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-cyan-700 text-white">
-                      84 mm/h
+                      {rainfallIntensity} mm/h
                     </span>
                   </div>
                   <p className="text-xs font-bold text-cyan-950 mt-0.5 leading-snug">
-                    Extreme Saturation (Doppler High)
+                    {isPorePressureCritical
+                      ? "Extreme Saturation (Doppler Peak)"
+                      : rainfallIntensity >= 45
+                      ? "Heavy Monsoon Downpour"
+                      : "Light Baseline Drizzle"}
                   </p>
                 </div>
               </div>
@@ -891,10 +1241,168 @@ export default function RiskMap({
                     </div>
                   </label>
                 </div>
+
+                {/* Field Sensor Nodes Toggle */}
+                <div className="flex items-center justify-between gap-2 p-1 rounded-lg hover:bg-[#173D32]/5 transition-colors">
+                  <span className="flex items-center gap-1.5">
+                    <span>📡</span> Field Sensor Nodes
+                  </span>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="sensors-toggle"
+                      aria-label="Toggle Field Sensor Nodes"
+                      checked={fieldSensorsEnabled}
+                      onChange={(e) => handleToggleSensors(e.target.checked)}
+                      className="sr-only"
+                    />
+                    <div
+                      role="switch"
+                      aria-checked={fieldSensorsEnabled}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        fieldSensorsEnabled ? "bg-[#173D32]" : "bg-gray-300"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          fieldSensorsEnabled ? "translate-x-4" : "translate-x-0"
+                        }`}
+                      />
+                    </div>
+                  </label>
+                </div>
               </div>
             </div>
           </>
         )}
+      </div>
+
+      {/* ── Bottom Anchored Monsoon Simulation Playback Control Bar ── */}
+      <div className="absolute bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 z-20 w-[95%] max-w-2xl bg-[#FAF8F2]/95 backdrop-blur-md rounded-2xl border border-[#173D32]/20 shadow-[0_12px_36px_rgba(23,61,50,0.18)] p-3 sm:p-4 text-[#173D32] transition-all select-none">
+        {/* Bar Header: Title, Time Badge, Peak Warning Indicator */}
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2 pb-2 border-b border-[#173D32]/10">
+          <div className="flex items-center gap-2">
+            <span className="text-base sm:text-lg">🌧️</span>
+            <div>
+              <div className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-[#173D32] flex items-center gap-1.5">
+                <span>Monsoon Simulation Playback</span>
+                <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-[#173D32]/10 text-[#173D32]">
+                  24-Hour Cycle
+                </span>
+              </div>
+              <div className="text-[10px] sm:text-[11px] text-[#173D32]/70 font-semibold">
+                IMD Doppler & Geotechnical Stress Playback
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Hour Time Badge */}
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#173D32] text-[#F6F4EC] font-black text-xs shadow-xs">
+              <span>⏱️</span>
+              <span>{String(simulationHour).padStart(2, "0")}:00 IST</span>
+            </div>
+
+            {/* Peak Alert Indicator (Active when pore-water pressure >= 200 kPa) */}
+            {isPorePressureCritical ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-red-600 text-white font-black text-[10px] uppercase tracking-wide animate-pulse shadow-sm">
+                <span>⚠️</span> &gt;200 kPa Peak (#FF0000)
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-[#00E676]/20 text-[#173D32] font-extrabold text-[10px] uppercase">
+                <span>💧</span> {rainfallIntensity} mm/h
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Playback Controls Row: Play/Pause button + Slider */}
+        <div className="flex items-center gap-2.5 sm:gap-3 mb-2">
+          {/* Play/Pause Button */}
+          <button
+            type="button"
+            onClick={() => setIsPlaying(!isPlaying)}
+            className={`h-9 px-3.5 rounded-xl font-extrabold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer shrink-0 ${
+              isPlaying
+                ? "bg-amber-500 hover:bg-amber-600 text-white"
+                : "bg-[#173D32] hover:bg-[#1f4e40] text-[#F6F4EC]"
+            }`}
+            aria-label={isPlaying ? "Pause Simulation" : "Play Simulation"}
+          >
+            <span className="text-sm">{isPlaying ? "⏸" : "▶"}</span>
+            <span>{isPlaying ? "Pause" : "Play"}</span>
+          </button>
+
+          {/* Reset button */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsPlaying(false);
+              setSimulationHour(0);
+            }}
+            className="h-9 px-2.5 rounded-xl border border-[#173D32]/20 hover:bg-[#173D32]/5 text-[#173D32] font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shrink-0"
+            title="Reset to 00:00"
+          >
+            <span>↺</span>
+            <span className="hidden sm:inline">Reset</span>
+          </button>
+
+          {/* 24-Hour Time Slider */}
+          <div className="flex-1 flex flex-col justify-center">
+            <input
+              type="range"
+              min="0"
+              max="24"
+              step="1"
+              value={simulationHour}
+              onChange={(e) => setSimulationHour(Number(e.target.value))}
+              aria-label="24-Hour Simulation Slider"
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#173D32]"
+            />
+            {/* Hour tick marks */}
+            <div className="flex justify-between text-[9px] font-bold text-[#173D32]/60 mt-1 px-0.5">
+              <span>00:00</span>
+              <span>06:00</span>
+              <span>12:00</span>
+              <span className={simulationHour === 14 ? "text-red-600 font-black animate-pulse" : "text-red-700 font-extrabold"}>
+                14:00 (Peak &gt;200kPa)
+              </span>
+              <span>18:00</span>
+              <span>24:00</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Live Segment Telemetry Bar for NH-29 Pherima Cut */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-2 border-t border-[#173D32]/10 text-[11px]">
+          <div className="px-2 py-1 rounded-lg bg-[#F6F4EC] border border-[#173D32]/10">
+            <span className="text-[#173D32]/60 font-semibold block text-[9.5px]">NH-29 Status</span>
+            <span className={`font-black text-xs uppercase ${isPorePressureCritical ? "text-red-600 animate-pulse" : targetProps.status === "warning" ? "text-amber-600" : "text-emerald-700"}`}>
+              {targetProps.status || "Safe"}
+            </span>
+          </div>
+
+          <div className="px-2 py-1 rounded-lg bg-[#F6F4EC] border border-[#173D32]/10">
+            <span className="text-[#173D32]/60 font-semibold block text-[9.5px]">Soil Moisture</span>
+            <span className="font-extrabold text-xs text-[#173D32]">
+              {targetProps.soil_moisture_pct}%
+            </span>
+          </div>
+
+          <div className={`px-2 py-1 rounded-lg border ${isPorePressureCritical ? "bg-red-50 border-red-300 text-red-900" : "bg-[#F6F4EC] border-[#173D32]/10"}`}>
+            <span className="text-[#173D32]/60 font-semibold block text-[9.5px]">Pore Pressure</span>
+            <span className={`font-black text-xs ${isPorePressureCritical ? "text-red-600 font-black" : "text-[#173D32]"}`}>
+              {targetProps.pore_water_pressure_kpa} kPa
+            </span>
+          </div>
+
+          <div className="px-2 py-1 rounded-lg bg-[#F6F4EC] border border-[#173D32]/10">
+            <span className="text-[#173D32]/60 font-semibold block text-[9.5px]">Tilt Rate</span>
+            <span className="font-extrabold text-xs text-[#173D32]">
+              {targetProps.tilt_rate_mm_h} mm/h
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );

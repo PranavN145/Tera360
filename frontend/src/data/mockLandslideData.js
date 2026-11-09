@@ -316,3 +316,308 @@ export const rescueRoute = {
     },
   ],
 };
+
+/**
+ * Computes simulated dynamic geotechnical telemetry across corridor routes for hour 00:00 to 24:00.
+ * At peak rainfall (hour 14:00), pore-water pressure exceeds 200 kPa triggering critical alert (#FF0000).
+ */
+export function computeSimulatedCorridorRoutes(hour = 14) {
+  const peakHour = 14;
+  const intensity = Math.exp(-Math.pow(hour - peakHour, 2) / (2 * Math.pow(3.5, 2)));
+
+  const updatedFeatures = corridorRoutes.features.map((feat) => {
+    const origProps = feat.properties || {};
+    const id = origProps.id || "";
+
+    let baseMoisture = 28;
+    let basePore = 45;
+    let baseTilt = 0.01;
+
+    let peakMoistureAdd = 30;
+    let peakPoreAdd = 80;
+    let peakTiltAdd = 0.08;
+
+    if (id === "nh29-seg-3") {
+      // High-vulnerability target segment: NH-29 Pherima Slide Cut
+      baseMoisture = 38;
+      basePore = 75;
+      baseTilt = 0.02;
+      peakMoistureAdd = 46; // Reaches 84% at hour 14
+      peakPoreAdd = 135;   // Reaches 210 kPa at hour 14 (> 200 kPa threshold!)
+      peakTiltAdd = 0.26;  // Reaches 0.28 mm/h at hour 14
+    } else if (id === "nh29-seg-2") {
+      // Approach zone: warning at peak
+      baseMoisture = 32;
+      basePore = 55;
+      baseTilt = 0.01;
+      peakMoistureAdd = 44; // Reaches 76% at hour 14
+      peakPoreAdd = 130;   // Reaches 185 kPa at hour 14
+      peakTiltAdd = 0.21;  // Reaches 0.22 mm/h at hour 14
+    } else if (id === "nh10-seg-1" || id === "nh27-seg-1") {
+      baseMoisture = 42;
+      basePore = 35;
+      baseTilt = 0.04;
+      peakMoistureAdd = 46;
+      peakPoreAdd = 170;
+      peakTiltAdd = 0.22;
+    }
+
+    const currentMoisture = Math.round(baseMoisture + peakMoistureAdd * intensity);
+    const currentPore = Math.round((basePore + peakPoreAdd * intensity) * 10) / 10;
+    const currentTilt = Math.round((baseTilt + peakTiltAdd * intensity) * 100) / 100;
+
+    let status = "safe";
+    let riskStatus = "Safe";
+    if (currentPore >= 200) {
+      status = "critical";
+      riskStatus = "Critical";
+    } else if (currentPore >= 150) {
+      status = "warning";
+      riskStatus = "Warning";
+    }
+
+    return {
+      ...feat,
+      properties: {
+        ...origProps,
+        soil_moisture_pct: currentMoisture,
+        soilMoisture: `${currentMoisture}%`,
+        pore_water_pressure_kpa: currentPore,
+        poreWaterPressure: `${currentPore} kPa`,
+        tilt_rate_mm_h: currentTilt,
+        tiltRate: `${currentTilt} mm/h`,
+        status,
+        riskStatus,
+      },
+    };
+  });
+
+  return {
+    ...corridorRoutes,
+    features: updatedFeatures,
+  };
+}
+
+/**
+ * Physical Field Sensor Installations along NH-29 Pherima Slope Cut.
+ * Includes DAS Fiber Interferometers, Borehole Piezometers, and Tiltmeters.
+ */
+export const nh29FieldSensors = {
+  type: "FeatureCollection",
+  features: [
+    {
+      type: "Feature",
+      id: "sensor-das-01",
+      properties: {
+        id: "DAS-NODE-01",
+        sensor_id: "DAS-NODE-01",
+        name: "DAS Fiber Interferometer 01",
+        type: "DAS Fiber Interferometer",
+        corridor: "NH-29 Pherima",
+        location: "Approach Toe Cut",
+        status: "normal", // "normal" | "exceeding"
+        strain_microstrain: 48,
+        slope_strain: "48 µε",
+        strain_threshold: 250,
+        status_label: "Normal",
+        depth: "Surface Trench (0.5m)",
+      },
+      geometry: {
+        type: "Point",
+        coordinates: [94.0135, 25.7242],
+      },
+    },
+    {
+      type: "Feature",
+      id: "sensor-bp-01",
+      properties: {
+        id: "BP-PHERIMA-01",
+        sensor_id: "BP-PHERIMA-01",
+        name: "Borehole Piezometer 01",
+        type: "Borehole Piezometer",
+        corridor: "NH-29 Pherima",
+        location: "Lower Retaining Berm",
+        status: "normal",
+        strain_microstrain: 65,
+        slope_strain: "65 µε",
+        strain_threshold: 250,
+        status_label: "Normal",
+        depth: "18m Cased Borehole",
+      },
+      geometry: {
+        type: "Point",
+        coordinates: [94.0178, 25.7218],
+      },
+    },
+    {
+      type: "Feature",
+      id: "sensor-das-04",
+      properties: {
+        id: "DAS-NODE-04",
+        sensor_id: "DAS-NODE-04",
+        name: "DAS Fiber Interferometer 04",
+        type: "DAS Fiber Interferometer",
+        corridor: "NH-29 Pherima",
+        location: "Active Crown Scarp (Main Slip Plane)",
+        status: "exceeding",
+        strain_microstrain: 580,
+        slope_strain: "580 µε (Movement Detected)",
+        strain_threshold: 250,
+        status_label: "Exceeding Threshold",
+        depth: "Continuous Optical Fiber Core",
+      },
+      geometry: {
+        type: "Point",
+        coordinates: [94.0202, 25.7201],
+      },
+    },
+    {
+      type: "Feature",
+      id: "sensor-tm-02",
+      properties: {
+        id: "TM-SLOPE-02",
+        sensor_id: "TM-SLOPE-02",
+        name: "Biaxial Surface Tiltmeter 02",
+        type: "Biaxial Tiltmeter",
+        corridor: "NH-29 Pherima",
+        location: "Upper Escarpment Headwall",
+        status: "exceeding",
+        strain_microstrain: 430,
+        slope_strain: "430 µε (Movement Detected)",
+        strain_threshold: 250,
+        status_label: "Exceeding Threshold",
+        depth: "Bedrock Anchor Pin",
+      },
+      geometry: {
+        type: "Point",
+        coordinates: [94.0235, 25.7172],
+      },
+    },
+    {
+      type: "Feature",
+      id: "sensor-bp-02",
+      properties: {
+        id: "BP-PHERIMA-02",
+        sensor_id: "BP-PHERIMA-02",
+        name: "Borehole Piezometer 02",
+        type: "Borehole Piezometer",
+        corridor: "NH-29 Pherima",
+        location: "Dzüdza Hydro-Notch",
+        status: "exceeding",
+        strain_microstrain: 620,
+        slope_strain: "620 µε (Hydrostatic Surge)",
+        strain_threshold: 250,
+        status_label: "Exceeding Threshold",
+        depth: "26m Subsurface Aquifer",
+      },
+      geometry: {
+        type: "Point",
+        coordinates: [94.0272, 25.7145],
+      },
+    },
+    {
+      type: "Feature",
+      id: "sensor-das-08",
+      properties: {
+        id: "DAS-NODE-08",
+        sensor_id: "DAS-NODE-08",
+        name: "DAS Fiber Interferometer 08",
+        type: "DAS Fiber Interferometer",
+        corridor: "NH-29 Pherima",
+        location: "East Flank Tension Crack",
+        status: "normal",
+        strain_microstrain: 110,
+        slope_strain: "110 µε",
+        strain_threshold: 250,
+        status_label: "Normal",
+        depth: "Distributed Optical Sensor Line",
+      },
+      geometry: {
+        type: "Point",
+        coordinates: [94.0315, 25.7108],
+      },
+    },
+    {
+      type: "Feature",
+      id: "sensor-tm-03",
+      properties: {
+        id: "TM-SLOPE-03",
+        sensor_id: "TM-SLOPE-03",
+        name: "In-Place Inclinometer 03",
+        type: "In-Place Inclinometer / Tiltmeter",
+        corridor: "NH-29 Pherima",
+        location: "Peducha Junction Scarp",
+        status: "normal",
+        strain_microstrain: 85,
+        slope_strain: "85 µε",
+        strain_threshold: 250,
+        status_label: "Normal",
+        depth: "14m Vertical Casing",
+      },
+      geometry: {
+        type: "Point",
+        coordinates: [94.0368, 25.7062],
+      },
+    },
+  ],
+};
+
+/**
+ * Computes simulated field sensor telemetry across NH-29 Pherima Slope for hour 00:00 to 24:00.
+ * Dynamic strain values peak at hour 14:00, exceeding 250 µε threshold (Red = Exceeding Threshold).
+ */
+export function computeSimulatedSensors(hour = 14) {
+  const peakHour = 14;
+  const intensity = Math.exp(-Math.pow(hour - peakHour, 2) / (2 * Math.pow(3.5, 2)));
+
+  const updatedFeatures = nh29FieldSensors.features.map((feat) => {
+    const origProps = feat.properties || {};
+    const id = origProps.id || "";
+
+    let baseStrain = 35;
+    let peakStrainAdd = 60;
+    const threshold = 250;
+
+    if (id === "DAS-NODE-04") {
+      baseStrain = 48;
+      peakStrainAdd = 532; // Reaches 580 µε at peak
+    } else if (id === "TM-SLOPE-02") {
+      baseStrain = 40;
+      peakStrainAdd = 390; // Reaches 430 µε at peak
+    } else if (id === "BP-PHERIMA-02") {
+      baseStrain = 55;
+      peakStrainAdd = 565; // Reaches 620 µε at peak
+    } else if (id === "DAS-NODE-08") {
+      baseStrain = 30;
+      peakStrainAdd = 140; // Reaches 170 µε at peak
+    } else if (id === "BP-PHERIMA-01") {
+      baseStrain = 25;
+      peakStrainAdd = 95; // Reaches 120 µε at peak
+    } else if (id === "TM-SLOPE-03") {
+      baseStrain = 28;
+      peakStrainAdd = 82; // Reaches 110 µε at peak
+    }
+
+    const currentStrain = Math.round(baseStrain + peakStrainAdd * intensity);
+    const isExceeding = currentStrain >= threshold;
+    const status = isExceeding ? "exceeding" : "normal";
+    const status_label = isExceeding ? "Exceeding Threshold" : "Normal";
+    const strainNote = isExceeding ? " (Movement Detected)" : "";
+
+    return {
+      ...feat,
+      properties: {
+        ...origProps,
+        strain_microstrain: currentStrain,
+        slope_strain: `${currentStrain} µε${strainNote}`,
+        status,
+        status_label,
+      },
+    };
+  });
+
+  return {
+    ...nh29FieldSensors,
+    features: updatedFeatures,
+  };
+}

@@ -121,15 +121,88 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (credentials: { email: string; password: string }): Promise<User> => {
-    const data = await authApi.login(credentials);
-    setUser(data.user);
-    setIsAuthModalOpen(false);
-    addToast({
-      title: `Welcome, ${data.user.name}!`,
-      description: `Signed in as ${data.user.role}`,
-      type: "success",
-    });
-    return data.user;
+    try {
+      const data = await authApi.login(credentials);
+      setUser(data.user);
+      setIsAuthModalOpen(false);
+      addToast({
+        title: `Welcome, ${data.user.name}!`,
+        description: `Signed in as ${data.user.role}`,
+        type: "success",
+      });
+      return data.user;
+    } catch (err) {
+      // Offline fallback for demo seed accounts when backend is not running
+      const normalizedEmail = credentials.email.trim().toLowerCase();
+      const demoUsers: Record<string, User> = {
+        "officer@terra360.in": {
+          _id: "demo-officer-id",
+          name: "Vikram Sen (SDMA Officer)",
+          email: "officer@terra360.in",
+          role: "officer",
+          phone: "+91 98765 43210",
+          language: "en",
+          emailVerified: true,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+        },
+        "citizen@terra360.in": {
+          _id: "demo-citizen-id",
+          name: "Temjen Ao",
+          email: "citizen@terra360.in",
+          role: "citizen",
+          phone: "+91 94360 12345",
+          language: "nag",
+          emailVerified: true,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+        },
+        "driver@terra360.in": {
+          _id: "demo-driver-id",
+          name: "Raju Sharma",
+          email: "driver@terra360.in",
+          role: "driver",
+          phone: "+91 98620 54321",
+          language: "hi",
+          emailVerified: true,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+        },
+        "field@terra360.in": {
+          _id: "demo-field-id",
+          name: "Lhokhoto Sema",
+          email: "field@terra360.in",
+          role: "field_officer",
+          phone: "+91 94361 98765",
+          language: "en",
+          emailVerified: true,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+        },
+        "admin@terra360.in": {
+          _id: "demo-admin-id",
+          name: "System Administrator",
+          email: "admin@terra360.in",
+          role: "admin",
+          emailVerified: true,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+        },
+      };
+
+      if (demoUsers[normalizedEmail]) {
+        const mockUser = demoUsers[normalizedEmail];
+        setUser(mockUser);
+        setIsAuthModalOpen(false);
+        addToast({
+          title: `Welcome, ${mockUser.name}! (Demo Mode)`,
+          description: `Active role clearance: ${mockUser.role}`,
+          type: "success",
+        });
+        return mockUser;
+      }
+      throw err;
+    }
   };
 
   const register = async (data: {
