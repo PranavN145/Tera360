@@ -68,7 +68,7 @@ function resolveMapCoordinates(
 }
 
 export default function RiskMapPage() {
-  const { openAlertModal, openReportModal } = useApp();
+  const { openAlertModal, openReportModal, addToast } = useApp();
   const [selectedState, setSelectedState] = useState("All States");
   const [selectedSeverity, setSelectedSeverity] = useState("All");
   const [search, setSearch] = useState("");

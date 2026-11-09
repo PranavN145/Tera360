@@ -442,23 +442,6 @@ export default function RiskMapSection() {
             )}
           </div>
 
-          {/* Error Banner */}
-          {error && (
-            <div className="my-4 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5 text-xs sm:text-sm">
-                <span>⚠️</span>
-                <span>{error}</span>
-              </div>
-              <button
-                type="button"
-                onClick={loadData}
-                className="px-3 py-1.5 rounded-full bg-[#173D32] text-[#F6F4EC] text-xs font-bold hover:bg-[#1f4e40] transition-colors cursor-pointer"
-              >
-                Retry
-              </button>
-            </div>
-          )}
-
           {/* Interactive Mapbox GL JS 3D Risk Map Canvas */}
           {viewMode === "map" ? (
             <div

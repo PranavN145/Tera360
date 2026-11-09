@@ -135,6 +135,10 @@ export function formatRelativeTime(dateInput?: string | Date | null): string {
     const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
     if (isNaN(date.getTime())) return 'Recently';
 
+    if (typeof window === 'undefined') {
+      return 'Recently';
+    }
+
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     if (diffMs < 0) return 'Just now';
