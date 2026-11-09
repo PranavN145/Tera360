@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import SectionBackground from "@/components/ui/SectionBackground";
+import RiskMap from "@/components/RiskMap";
 import { useApp } from "@/context/AppContext";
 import { publicApi } from "@/lib/api";
 import {
@@ -402,36 +403,13 @@ export default function RiskMapSection() {
             </div>
           )}
 
-          {/* Interactive Simulated Radar Map Canvas Area */}
+          {/* Interactive Mapbox GL JS 3D Risk Map Canvas */}
           {viewMode === "map" ? (
             <div
-              className="relative flex-1 w-full my-4 rounded-2xl overflow-hidden flex items-center justify-center transition-transform duration-300 min-h-[360px]"
-              style={{ transform: `scale(${zoomLevel})` }}
+              className="relative flex-1 w-full my-4 rounded-2xl overflow-hidden flex items-center justify-center min-h-[460px] lg:min-h-[520px] bg-[#EEF3EA]"
             >
-              {/* Topographic Background Contour Grid Lines */}
-              <svg
-                className={`absolute inset-0 w-full h-full pointer-events-none transition-opacity duration-500 ${
-                  activeLayer === "rainfall" ? "opacity-25" : "opacity-45"
-                }`}
-                viewBox="0 0 1000 600"
-                preserveAspectRatio="none"
-                fill="none"
-              >
-                <path
-                  d="M 50,300 Q 250,150 450,280 T 850,220"
-                  stroke="#173D32"
-                  strokeWidth="1.5"
-                  strokeDasharray="6 6"
-                />
-                <path d="M 120,400 Q 320,250 520,380 T 920,320" stroke="#173D32" strokeWidth="1" />
-                <path d="M 200,180 Q 400,80 600,200 T 980,140" stroke="#173D32" strokeWidth="1.2" />
-                <path
-                  d="M 30,520 Q 230,370 430,500 T 830,440"
-                  stroke="#173D32"
-                  strokeWidth="1.5"
-                  strokeDasharray="8 4"
-                />
-              </svg>
+              {/* Standalone 3D Mapbox GL Canvas */}
+              <RiskMap className="absolute inset-0 w-full h-full" />
 
               {/* Rainfall overlay simulated radar bands */}
               {activeLayer === "rainfall" && (

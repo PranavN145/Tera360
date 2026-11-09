@@ -10,6 +10,7 @@ interface PortalShellProps {
   subtitle: string;
   icon: string;
   badgeColor?: string;
+  maxWidth?: string;
   children?: React.ReactNode;
 }
 
@@ -18,6 +19,7 @@ export default function PortalShell({
   subtitle,
   icon,
   badgeColor = "bg-[#DCE8D4] text-[#173D32]",
+  maxWidth = "max-w-4xl",
   children,
 }: PortalShellProps) {
   const { user, logout } = useApp();
@@ -30,7 +32,7 @@ export default function PortalShell({
 
   return (
     <div className="min-h-[85vh] bg-[#FAF8F2] py-10 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
+      <div className={`${maxWidth} mx-auto`}>
         {/* Top Header Card */}
         <div className="bg-[#F6F4EC] border border-[#173D32]/15 rounded-3xl p-6 sm:p-8 shadow-sm mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#173D32]/10">
