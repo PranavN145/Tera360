@@ -3,6 +3,10 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import PortalLayout from "@/components/portal/PortalLayout";
+import PortalMetricGrid from "@/components/portal/PortalMetricGrid";
+import PortalMetricCard from "@/components/portal/PortalMetricCard";
+import PortalFilterBar from "@/components/portal/PortalFilterBar";
+import StatusBadge from "@/components/ui/StatusBadge";
 import { publicApi } from "@/lib/api";
 import { PublicRoadStatusItem } from "@/types/public";
 
@@ -76,6 +80,7 @@ export default function OfficerRoadsPage() {
     );
   });
 
+  const totalCount = roads.length;
   const blockedCount = roads.filter((r) => r.status === "blocked").length;
   const cautionCount = roads.filter((r) => r.status === "caution" || r.status === "partial").length;
   const openCount = roads.filter((r) => r.status === "open").length;
@@ -89,9 +94,10 @@ export default function OfficerRoadsPage() {
         <div className="flex items-center gap-2">
           <Link
             href="/officer/alerts"
-            className="px-3.5 py-1.5 rounded-full bg-[#D6A65D] hover:bg-[#c9984e] text-[#173D32] text-xs font-bold shadow-xs transition-all flex items-center gap-1.5"
+            className="px-3.5 py-1.5 rounded-full bg-[#D6A65D] hover:bg-[#c9984e] text-[#173D32] text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
           >
-            <span>📢</span> Broadcast Alert
+            <span>📢</span>
+            <span>Broadcast Alert</span>
           </Link>
           <Link
             href="/officer/dashboard"
@@ -102,184 +108,193 @@ export default function OfficerRoadsPage() {
         </div>
       }
     >
-      {/* Top Metric Cards */}
-      <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-[#FAF8F2] border border-[#173D32]/12 rounded-2xl p-4 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[10px] uppercase font-bold text-red-700 tracking-wider block">
-              Blocked Corridors
-            </span>
-            <span className="text-2xl font-black text-red-700 mt-0.5 block">
-              {isLoading ? "..." : blockedCount}
-            </span>
-          </div>
-          <span className="text-2xl">🚫</span>
-        </div>
-
-        <div className="bg-[#FAF8F2] border border-[#173D32]/12 rounded-2xl p-4 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[10px] uppercase font-bold text-amber-700 tracking-wider block">
-              Under Caution / Restricted
-            </span>
-            <span className="text-2xl font-black text-amber-700 mt-0.5 block">
-              {isLoading ? "..." : cautionCount}
-            </span>
-          </div>
-          <span className="text-2xl">⚠️</span>
-        </div>
-
-        <div className="bg-[#FAF8F2] border border-[#173D32]/12 rounded-2xl p-4 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[10px] uppercase font-bold text-emerald-800 tracking-wider block">
-              Open / Normal Transit
-            </span>
-            <span className="text-2xl font-black text-emerald-800 mt-0.5 block">
-              {isLoading ? "..." : openCount}
-            </span>
-          </div>
-          <span className="text-2xl">✅</span>
-        </div>
-      </div>
-
-      {/* Filter and Search Bar */}
-      <div className="mb-6 bg-[#FAF8F2] border border-[#173D32]/12 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
-        {/* Status Filter Tabs */}
-        <div className="flex items-center gap-1.5 w-full md:w-auto">
-          {STATUS_FILTERS.map((status) => (
-            <button
-              key={status}
-              type="button"
-              onClick={() => setSelectedStatus(status)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all capitalize cursor-pointer ${
-                selectedStatus === status
-                  ? "bg-[#173D32] text-[#F6F4EC] shadow-xs"
-                  : "text-[#173D32]/75 hover:bg-[#173D32]/5"
-              }`}
-            >
-              {status === "All" ? "All Corridors" : status}
-            </button>
-          ))}
-        </div>
-
-        {/* State Dropdown & Search Input */}
-        <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-          <select
-            value={selectedState}
-            onChange={(e) => setSelectedState(e.target.value)}
-            className="h-9 px-3 rounded-xl bg-[#F6F4EC] border border-[#173D32]/20 text-xs font-bold text-[#173D32] focus:outline-none cursor-pointer"
-          >
-            {STATES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-
-          <input
-            type="text"
-            placeholder="Search code, name, stretch..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-9 px-3.5 rounded-xl bg-[#F6F4EC] border border-[#173D32]/20 text-xs text-[#173D32] placeholder:text-[#173D32]/50 focus:outline-none focus:ring-1 focus:ring-[#173D32] w-full sm:w-56"
+      <div className="space-y-6 sm:space-y-8 w-full">
+        {/* ── 1. Top Metric Cards (4 columns) ── */}
+        <PortalMetricGrid columns={4} ariaLabel="Highway Clearance Metrics">
+          <PortalMetricCard
+            id="metric-total-corridors"
+            title="Monitored Corridors"
+            value={totalCount}
+            unit="Highway Stretches"
+            icon="🛣️"
+            badge="Arterial Grid"
+            badgeColor="bg-[#173D32]/10 text-[#173D32] border-[#173D32]/20"
+            detail="Strategic mountain transport links under BRO & NHIDCL"
+            isLoading={isLoading}
           />
-        </div>
-      </div>
 
-      {/* Error Banner */}
-      {error && (
-        <div className="mb-6 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-900 flex items-center justify-between text-xs font-semibold">
-          <span>⚠️ {error}</span>
-          <button
-            type="button"
-            onClick={handleRetry}
-            className="px-3 py-1 rounded-full bg-red-700 text-white font-bold"
-          >
-            Retry
-          </button>
-        </div>
-      )}
+          <PortalMetricCard
+            id="metric-blocked-corridors"
+            title="Blocked Corridors"
+            value={blockedCount}
+            unit="Passes Severed"
+            icon="🚫"
+            badge={blockedCount > 0 ? "Blocked" : "Clear"}
+            badgeVariant={blockedCount > 0 ? "blocked" : "open"}
+            detail="Debris slides requiring heavy earthmover clearance"
+            pulse={blockedCount > 0}
+            isLoading={isLoading}
+          />
 
-      {/* Loading Skeletons */}
-      {isLoading && (
-        <div className="space-y-3">
-          {[1, 2, 3].map((n) => (
-            <div key={n} className="h-24 bg-[#FAF8F2] border border-[#173D32]/10 rounded-2xl animate-pulse" />
-          ))}
-        </div>
-      )}
+          <PortalMetricCard
+            id="metric-caution-corridors"
+            title="Under Caution"
+            value={cautionCount}
+            unit="Restricted Lane"
+            icon="⚠️"
+            badge="Caution Stage"
+            badgeVariant="caution"
+            detail="Single-lane pilot convoy or wet shoulder restriction"
+            isLoading={isLoading}
+          />
 
-      {/* Empty State */}
-      {!isLoading && !error && filteredRoads.length === 0 && (
-        <div className="text-center py-16 bg-[#FAF8F2] border border-[#173D32]/10 rounded-3xl p-6">
-          <span className="text-3xl block mb-2">🌿</span>
-          <h4 className="text-base font-extrabold text-[#173D32]">No Corridors Match Filters</h4>
-          <p className="text-xs text-[#173D32]/70 mt-1">
-            Try adjusting your state tab, clearance status, or search query.
-          </p>
-        </div>
-      )}
+          <PortalMetricCard
+            id="metric-open-corridors"
+            title="Open to Transit"
+            value={openCount}
+            unit="Normal Traffic"
+            icon="✅"
+            badge="Open"
+            badgeVariant="open"
+            detail="Clear passage with nominal geotechnical stability"
+            isLoading={isLoading}
+          />
+        </PortalMetricGrid>
 
-      {/* Corridor Cards List */}
-      {!isLoading && !error && filteredRoads.length > 0 && (
-        <div className="space-y-3.5">
-          {filteredRoads.map((road) => (
-            <div
-              key={road.id}
-              className="p-5 rounded-2xl bg-[#FAF8F2] border border-[#173D32]/12 hover:border-[#173D32]/25 shadow-xs transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
-            >
-              <div className="space-y-1.5 flex-1">
-                <div className="flex items-center gap-2.5">
-                  <span className="px-2.5 py-0.5 rounded-lg bg-[#173D32] text-[#F6F4EC] text-xs font-black tracking-wider">
-                    {road.code}
-                  </span>
-                  <h3 className="font-extrabold text-sm sm:text-base text-[#173D32]">
-                    {road.name}
-                  </h3>
-                  <span className="text-xs font-bold text-[#173D32]/60">· {road.state}</span>
-                </div>
-
-                <p className="text-xs text-[#173D32]/80 font-medium">
-                  📍 Stretch: <span className="font-bold text-[#173D32]">{road.stretch}</span>
-                </p>
-
-                {road.statusReason && (
-                  <p className="text-xs text-[#173D32]/75 italic mt-1">
-                    &ldquo;{road.statusReason}&rdquo;
-                  </p>
-                )}
-              </div>
-
-              {/* Status and Action Badge */}
-              <div className="flex items-center gap-3 shrink-0 self-start md:self-center">
-                <div className="text-right">
-                  <span
-                    className={`inline-block px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider ${
-                      road.status === "blocked"
-                        ? "bg-red-100 text-red-800 border border-red-200"
-                        : road.status === "caution" || road.status === "partial"
-                        ? "bg-amber-100 text-amber-800 border border-amber-200"
-                        : "bg-emerald-100 text-emerald-800 border border-emerald-200"
-                    }`}
-                  >
-                    {road.status}
-                  </span>
-                  <span className="block text-[11px] font-bold text-[#173D32]/60 mt-0.5">
-                    Risk: {road.riskLevel}
-                  </span>
-                </div>
-
-                <Link
-                  href={`/officer/map`}
-                  className="px-3.5 py-1.5 rounded-xl bg-[#173D32]/10 hover:bg-[#173D32]/15 text-[#173D32] text-xs font-bold transition-colors"
+        {/* ── 2. Filter and Search Bar ── */}
+        <PortalFilterBar
+          left={
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {STATUS_FILTERS.map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => setSelectedStatus(status)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all capitalize cursor-pointer ${
+                    selectedStatus === status
+                      ? "bg-[#173D32] text-[#F6F4EC] shadow-xs"
+                      : "text-[#173D32]/75 hover:bg-[#173D32]/5"
+                  }`}
                 >
-                  Locate on Map →
-                </Link>
-              </div>
+                  {status === "All" ? "All Corridors" : status}
+                </button>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          }
+          right={
+            <div className="flex items-center gap-2.5 w-full md:w-auto">
+              <select
+                value={selectedState}
+                onChange={(e) => setSelectedState(e.target.value)}
+                className="h-9 px-3 rounded-xl bg-[#F6F4EC] border border-[#173D32]/20 text-xs font-bold text-[#173D32] focus:outline-none cursor-pointer"
+              >
+                {STATES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+
+              <input
+                type="text"
+                placeholder="Search code, name, stretch..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-9 px-3.5 rounded-xl bg-[#F6F4EC] border border-[#173D32]/20 text-xs text-[#173D32] placeholder:text-[#173D32]/50 focus:outline-none focus:ring-1 focus:ring-[#173D32] w-full sm:w-56"
+              />
+            </div>
+          }
+        />
+
+        {/* Error Banner */}
+        {error && (
+          <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-900 flex items-center justify-between text-xs font-semibold">
+            <span>⚠️ {error}</span>
+            <button
+              type="button"
+              onClick={handleRetry}
+              className="px-3 py-1 rounded-full bg-red-700 text-white font-bold cursor-pointer"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {/* Loading Skeletons */}
+        {isLoading && (
+          <div className="space-y-3">
+            {[1, 2, 3].map((n) => (
+              <div
+                key={n}
+                className="h-24 bg-[#FAF8F2] border border-[#173D32]/10 rounded-2xl animate-pulse"
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!isLoading && !error && filteredRoads.length === 0 && (
+          <div className="text-center py-16 bg-[#FAF8F2] border border-[#173D32]/12 rounded-3xl p-6">
+            <span className="text-3xl block mb-2">🌿</span>
+            <h4 className="text-base font-extrabold text-[#173D32]">No Corridors Match Filters</h4>
+            <p className="text-xs text-[#173D32]/70 mt-1">
+              Try adjusting your state tab, clearance status, or search query.
+            </p>
+          </div>
+        )}
+
+        {/* ── 3. Corridor Cards List (Full available width, stacked vertically) ── */}
+        {!isLoading && !error && filteredRoads.length > 0 && (
+          <div className="space-y-3.5">
+            {filteredRoads.map((road) => (
+              <div
+                key={road.id}
+                className="p-5 sm:p-6 rounded-2xl bg-[#FAF8F2] border border-[#173D32]/12 hover:border-[#173D32]/25 shadow-xs transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+              >
+                <div className="space-y-1.5 flex-1 min-w-0">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <span className="px-2.5 py-0.5 rounded-lg bg-[#173D32] text-[#F6F4EC] text-xs font-black tracking-wider">
+                      {road.code}
+                    </span>
+                    <h3 className="font-extrabold text-base text-[#173D32] truncate">
+                      {road.name}
+                    </h3>
+                    <span className="text-xs font-bold text-[#173D32]/60">· {road.state}</span>
+                  </div>
+
+                  <p className="text-xs text-[#173D32]/80 font-medium">
+                    📍 Stretch: <span className="font-bold text-[#173D32]">{road.stretch}</span>
+                  </p>
+
+                  {road.statusReason && (
+                    <p className="text-xs text-[#173D32]/75 italic mt-1 bg-[#173D32]/5 p-2.5 rounded-xl border border-[#173D32]/8">
+                      &ldquo;{road.statusReason}&rdquo;
+                    </p>
+                  )}
+                </div>
+
+                {/* Status and Action Badge */}
+                <div className="flex items-center gap-3 shrink-0 self-start md:self-center">
+                  <div className="text-right">
+                    <StatusBadge status={road.status} size="sm" pulse={road.status === "blocked"} />
+                    <span className="block text-[11px] font-bold text-[#173D32]/60 mt-1">
+                      Risk: {road.riskLevel}
+                    </span>
+                  </div>
+
+                  <Link
+                    href="/officer/map"
+                    className="px-3.5 py-2 rounded-xl bg-[#173D32]/10 hover:bg-[#173D32]/15 text-[#173D32] text-xs font-bold transition-colors inline-flex items-center gap-1.5"
+                  >
+                    <span>Locate on Map</span>
+                    <span>→</span>
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </PortalLayout>
   );
 }
-

@@ -17,6 +17,7 @@ import {
 import { MONITORED_VILLAGES } from "@/data/villagesData";
 import VillageOverviewCards from "@/components/officer/VillageOverviewCards";
 import VillageDetailPanel from "@/components/officer/VillageDetailPanel";
+import PortalSplitLayout from "@/components/portal/PortalSplitLayout";
 
 type SortOption =
   | "risk-desc"
@@ -364,7 +365,8 @@ export default function OfficerVillagesPage() {
         </div>
       }
     >
-      {/* ── 1. Village Overview Summary Cards ─────────────────────────── */}
+      <div className="space-y-6 sm:space-y-8 w-full">
+        {/* ── 1. Village Overview Summary Cards ─────────────────────────── */}
       <VillageOverviewCards metrics={overviewMetrics} isLoading={isLoading} />
 
       {/* ── Error Banner if Telemetry Sync Fails ──────────────────────── */}
@@ -546,9 +548,11 @@ export default function OfficerVillagesPage() {
       </div>
 
       {/* ── Main Workspace: Directory (Left) + Detail Panel (Right) ───── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Village Directory Table / List (7 cols) */}
-        <div className="lg:col-span-7 space-y-4">
+      <PortalSplitLayout
+        leftSpan={7}
+        stickyRight={true}
+        left={
+          <div className="space-y-4">
           {/* Loading Skeleton */}
           {isLoading && (
             <div className="space-y-3">
@@ -904,16 +908,16 @@ export default function OfficerVillagesPage() {
                 })}
               </div>
             )}
-        </div>
-
-        {/* Right Column: Village Details Panel (5 cols, Sticky) */}
-        <div className="lg:col-span-5 sticky top-6">
+          </div>
+        }
+        right={
           <VillageDetailPanel
             village={selectedVillage}
             activeAlerts={selectedVillageAlerts}
             reportedIssues={selectedVillageReports}
           />
-        </div>
+        }
+      />
       </div>
     </PortalLayout>
   );
