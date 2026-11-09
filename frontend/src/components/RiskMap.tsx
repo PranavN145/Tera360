@@ -16,7 +16,7 @@ import {
 const MAPBOX_ACCESS_TOKEN: string =
   process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ||
   (typeof import.meta !== "undefined" &&
-  (import.meta as Record<string, any>)?.env?.VITE_MAPBOX_ACCESS_TOKEN
+    (import.meta as Record<string, any>)?.env?.VITE_MAPBOX_ACCESS_TOKEN
     ? (import.meta as Record<string, any>).env.VITE_MAPBOX_ACCESS_TOKEN
     : "");
 
@@ -593,8 +593,8 @@ export default function RiskMap({
           statusLower === "critical"
             ? "#FF0000"
             : statusLower === "warning"
-            ? "#FFA500"
-            : "#00E676";
+              ? "#FFA500"
+              : "#00E676";
 
         const popupHTML = `
           <div style="font-family: system-ui, -apple-system, sans-serif; padding: 6px; min-width: 250px; color: #173D32;">
@@ -615,9 +615,8 @@ export default function RiskMap({
               <div><strong style="color: #173D32;">Tilt Rate:</strong> ${tiltRate}</div>
             </div>
 
-            ${
-              isRedOrOrange
-                ? `
+            ${isRedOrOrange
+            ? `
               <button
                 id="dispatch-rescue-btn"
                 type="button"
@@ -644,8 +643,8 @@ export default function RiskMap({
                 <span>🚑</span> Dispatch Rescue Unit to Detour
               </button>
             `
-                : ""
-            }
+            : ""
+          }
           </div>
         `;
 
@@ -1099,13 +1098,12 @@ export default function RiskMap({
             <div className="space-y-2 mt-3 mb-3.5">
               {/* 1. Active Corridor Alert Badge */}
               <div
-                className={`p-2.5 rounded-xl border flex items-start gap-2 shadow-2xs transition-colors ${
-                  isPorePressureCritical
+                className={`p-2.5 rounded-xl border flex items-start gap-2 shadow-2xs transition-colors ${isPorePressureCritical
                     ? "bg-red-50/95 border-red-300"
                     : targetProps.status === "warning"
-                    ? "bg-amber-50/95 border-amber-200"
-                    : "bg-emerald-50/95 border-emerald-200"
-                }`}
+                      ? "bg-amber-50/95 border-amber-200"
+                      : "bg-emerald-50/95 border-emerald-200"
+                  }`}
               >
                 <span className="text-sm mt-0.5 shrink-0" aria-hidden="true">
                   {isPorePressureCritical ? "⛔" : targetProps.status === "warning" ? "⚠️" : "✅"}
@@ -1113,40 +1111,37 @@ export default function RiskMap({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-1">
                     <span
-                      className={`text-[10px] font-bold uppercase tracking-wider ${
-                        isPorePressureCritical
+                      className={`text-[10px] font-bold uppercase tracking-wider ${isPorePressureCritical
                           ? "text-red-800"
                           : targetProps.status === "warning"
-                          ? "text-amber-800"
-                          : "text-emerald-800"
-                      }`}
+                            ? "text-amber-800"
+                            : "text-emerald-800"
+                        }`}
                     >
                       Active Corridor Alert
                     </span>
                     <span
-                      className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded text-white ${
-                        isPorePressureCritical
+                      className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded text-white ${isPorePressureCritical
                           ? "bg-red-600 animate-pulse"
                           : targetProps.status === "warning"
-                          ? "bg-amber-500"
-                          : "bg-emerald-600"
-                      }`}
+                            ? "bg-amber-500"
+                            : "bg-emerald-600"
+                        }`}
                     >
                       {isPorePressureCritical
                         ? "BLOCKED"
                         : targetProps.status === "warning"
-                        ? "WARNING"
-                        : "PASSABLE"}
+                          ? "WARNING"
+                          : "PASSABLE"}
                     </span>
                   </div>
                   <p
-                    className={`text-xs font-bold mt-0.5 leading-snug ${
-                      isPorePressureCritical
+                    className={`text-xs font-bold mt-0.5 leading-snug ${isPorePressureCritical
                         ? "text-red-950"
                         : targetProps.status === "warning"
-                        ? "text-amber-950"
-                        : "text-emerald-950"
-                    }`}
+                          ? "text-amber-950"
+                          : "text-emerald-950"
+                      }`}
                   >
                     NH-29 Pherima Segment - {isPorePressureCritical ? "BLOCKED" : targetProps.status === "warning" ? "CAUTION" : "NORMAL TRANSIT"}
                   </p>
@@ -1171,8 +1166,8 @@ export default function RiskMap({
                     {isPorePressureCritical
                       ? "Extreme Saturation (Doppler Peak)"
                       : rainfallIntensity >= 45
-                      ? "Heavy Monsoon Downpour"
-                      : "Light Baseline Drizzle"}
+                        ? "Heavy Monsoon Downpour"
+                        : "Light Baseline Drizzle"}
                   </p>
                 </div>
               </div>
@@ -1222,14 +1217,12 @@ export default function RiskMap({
                     <div
                       role="switch"
                       aria-checked={terrainEnabled}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        terrainEnabled ? "bg-[#173D32]" : "bg-gray-300"
-                      }`}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${terrainEnabled ? "bg-[#173D32]" : "bg-gray-300"
+                        }`}
                     >
                       <span
-                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                          terrainEnabled ? "translate-x-4" : "translate-x-0"
-                        }`}
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${terrainEnabled ? "translate-x-4" : "translate-x-0"
+                          }`}
                       />
                     </div>
                   </label>
@@ -1252,14 +1245,12 @@ export default function RiskMap({
                     <div
                       role="switch"
                       aria-checked={riskHeatmapEnabled}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        riskHeatmapEnabled ? "bg-[#173D32]" : "bg-gray-300"
-                      }`}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${riskHeatmapEnabled ? "bg-[#173D32]" : "bg-gray-300"
+                        }`}
                     >
                       <span
-                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                          riskHeatmapEnabled ? "translate-x-4" : "translate-x-0"
-                        }`}
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${riskHeatmapEnabled ? "translate-x-4" : "translate-x-0"
+                          }`}
                       />
                     </div>
                   </label>
@@ -1282,14 +1273,12 @@ export default function RiskMap({
                     <div
                       role="switch"
                       aria-checked={rescueRouteEnabled}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        rescueRouteEnabled ? "bg-[#00B0FF]" : "bg-gray-300"
-                      }`}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${rescueRouteEnabled ? "bg-[#00B0FF]" : "bg-gray-300"
+                        }`}
                     >
                       <span
-                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                          rescueRouteEnabled ? "translate-x-4" : "translate-x-0"
-                        }`}
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${rescueRouteEnabled ? "translate-x-4" : "translate-x-0"
+                          }`}
                       />
                     </div>
                   </label>
@@ -1312,14 +1301,12 @@ export default function RiskMap({
                     <div
                       role="switch"
                       aria-checked={fieldSensorsEnabled}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        fieldSensorsEnabled ? "bg-[#173D32]" : "bg-gray-300"
-                      }`}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${fieldSensorsEnabled ? "bg-[#173D32]" : "bg-gray-300"
+                        }`}
                     >
                       <span
-                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                          fieldSensorsEnabled ? "translate-x-4" : "translate-x-0"
-                        }`}
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${fieldSensorsEnabled ? "translate-x-4" : "translate-x-0"
+                          }`}
                       />
                     </div>
                   </label>
@@ -1375,11 +1362,10 @@ export default function RiskMap({
           <button
             type="button"
             onClick={() => setIsPlaying(!isPlaying)}
-            className={`h-9 px-3.5 rounded-xl font-extrabold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer shrink-0 ${
-              isPlaying
+            className={`h-9 px-3.5 rounded-xl font-extrabold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer shrink-0 ${isPlaying
                 ? "bg-amber-500 hover:bg-amber-600 text-white"
                 : "bg-[#173D32] hover:bg-[#1f4e40] text-[#F6F4EC]"
-            }`}
+              }`}
             aria-label={isPlaying ? "Pause Simulation" : "Play Simulation"}
           >
             <span className="text-sm">{isPlaying ? "⏸" : "▶"}</span>

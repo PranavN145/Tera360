@@ -8,12 +8,15 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "type-check": "tsc --noEmit",
+    "type-check:tests": "tsc --project tsconfig.test.json --noEmit",
     "seed": "tsx src/scripts/seed.ts",
     "init:collections": "tsx src/scripts/init-collections.ts",
     "test": "tsx src/tests/auth.test.ts",
+    "test:e2e": "tsx src/tests/portal-audit-e2e.test.ts",
     "test:models": "tsx src/tests/models.test.ts",
     "test:public": "tsx src/tests/public.test.ts",
     "test:write": "tsx src/tests/public-write.test.ts",
+    "test:all": "tsx src/tests/auth.test.ts && tsx src/tests/models.test.ts && tsx src/tests/public.test.ts && tsx src/tests/public-write.test.ts",
     "test:postman": "npx --yes newman run postman/collection.json -e postman/environment.json"
   },
   "dependencies": {

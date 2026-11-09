@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { User, UserRole, UpdateProfilePayload } from "@/types/auth";
-import { authApi, usersApi } from "@/lib/api";
+import { authApi, usersApi, setAuthRestorationPromise } from "@/lib/api";
 
 export type { User, UserRole };
 
@@ -76,44 +76,52 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [selectedAlert, setSelectedAlert] = useState<AlertDetail | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
+  const removeToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
   const addToast = useCallback((toast: Omit<ToastMessage, "id">) => {
     const id = Math.random().toString(36).substring(2, 9);
     setToasts((prev) => [...prev, { ...toast, id }]);
     setTimeout(() => {
-      removeToast(id);
+      setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 4500);
-  }, []);
-
-  const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
   // Restore session silently on initial load or refresh via HttpOnly refresh cookie
   useEffect(() => {
     let isMounted = true;
 
-    async function restoreSession() {
+    const restorePromise = (async (): Promise<boolean> => {
       try {
         const token = await authApi.refresh();
-        if (token && isMounted) {
+        if (token) {
           const profile = await authApi.getMe();
           if (isMounted) {
             setUser(profile);
           }
+          return true;
+        } else {
+          if (isMounted) {
+            setUser(null);
+          }
+          return false;
         }
       } catch {
         // Not authenticated or refresh token expired
         if (isMounted) {
           setUser(null);
         }
+        return false;
       } finally {
         if (isMounted) {
           setIsLoadingAuth(false);
         }
+        setAuthRestorationPromise(null);
       }
-    }
+    })();
 
-    restoreSession();
+    setAuthRestorationPromise(restorePromise);
 
     return () => {
       isMounted = false;
@@ -152,9 +160,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           email: "citizen@terra360.in",
           role: "citizen",
           phone: "+91 94360 12345",
-          language: "nag",
+          language: "en",
           emailVerified: true,
           isActive: true,
+          village: {
+            state: "Nagaland",
+            district: "Kohima",
+            villageName: "Phesama",
+          },
+          familyContacts: [
+            {
+              name: "Arenla Ao",
+              phone: "+91 94360 98765",
+              relationship: "Spouse",
+            },
+          ],
+          alertPreferences: {
+            ivrs: true,
+            sms: true,
+            app: true,
+          },
           createdAt: new Date().toISOString(),
         },
         "driver@terra360.in": {

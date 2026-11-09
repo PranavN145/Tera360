@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Footer from "../components/layout/Footer";
+import PublicFooter from "../components/layout/PublicFooter";
 import { AppProvider } from "../context/AppContext";
 import ReportModal from "../components/modals/ReportModal";
 import AuthModal from "../components/modals/AuthModal";
@@ -43,7 +43,7 @@ export default function RootLayout({
           <div className="flex-1 flex flex-col">
             {children}
           </div>
-          <Footer />
+          <PublicFooter />
           <ReportModal />
           <AuthModal />
           <AlertDetailsModal />

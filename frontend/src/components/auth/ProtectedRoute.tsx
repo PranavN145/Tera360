@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useApp } from "@/context/AppContext";
 import { UserRole } from "@/types/auth";
 import { getRolePortalPath } from "@/lib/api";
+import PortalLoadingShell from "@/components/portal/PortalLoadingShell";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -28,25 +29,19 @@ export default function ProtectedRoute({
   }, [user, isLoadingAuth, router, pathname]);
 
   if (isLoadingAuth) {
-    return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-10 h-10 border-3 border-[#173D32]/20 border-t-[#173D32] rounded-full animate-spin mb-4" />
-        <p className="text-sm font-semibold text-[#173D32]/80">
-          Verifying security clearance...
-        </p>
-      </div>
-    );
+    return <PortalLoadingShell />;
   }
 
   if (!user) {
-    return null;
+    // Waiting for redirect to /login
+    return <PortalLoadingShell />;
   }
 
   // Check role authorization
   if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
     const authorizedPath = getRolePortalPath(user.role);
     return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center max-w-lg mx-auto">
+      <div className="min-h-screen bg-[#F6F4EC] flex flex-col items-center justify-center p-6 text-center max-w-lg mx-auto">
         <div className="w-14 h-14 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-2xl mb-4 font-bold">
           !
         </div>
@@ -78,4 +73,3 @@ export default function ProtectedRoute({
 
   return <>{children}</>;
 }
-
