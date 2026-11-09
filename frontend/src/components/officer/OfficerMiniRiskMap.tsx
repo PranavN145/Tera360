@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import RiskMap from "@/components/RiskMap";
 import { PublicRiskMapItem } from "@/types/public";
 
 interface OfficerMiniRiskMapProps {
@@ -224,88 +225,14 @@ export default function OfficerMiniRiskMap({
       {/* Active Hotspot Radar Canvas */}
       {!isLoading && !error && (
         <div className="space-y-4">
-          <div className="relative rounded-2xl overflow-hidden bg-[#123128] text-[#F6F4EC] border border-[#173D32]/30 shadow-inner h-[240px] sm:h-[260px] flex items-center justify-center">
-            {/* Topographic Background Grid */}
-            <div
-              className="absolute inset-0 opacity-15 pointer-events-none"
-              style={{
-                backgroundImage: "radial-gradient(#DCE8D4 1px, transparent 1px)",
-                backgroundSize: "22px 22px",
-              }}
-              aria-hidden="true"
+          {/* High-Fidelity 3D Terrain Mini Map */}
+          <div className="relative rounded-2xl overflow-hidden border border-[#173D32]/20 shadow-xs h-[250px] sm:h-[270px] bg-[#EEF4EB]">
+            <RiskMap
+              variant="mini"
+              showPlayback={false}
+              showControls={false}
+              className="w-full h-full"
             />
-
-            {/* Simulated Radar Circular Sweep Rings */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-56 h-56 rounded-full border border-[#DCE8D4]/10" />
-              <div className="w-36 h-36 rounded-full border border-[#DCE8D4]/15" />
-              <div className="w-16 h-16 rounded-full border border-[#DCE8D4]/20" />
-              {/* Radar crosshairs */}
-              <div className="absolute w-full h-[1px] bg-[#DCE8D4]/10" />
-              <div className="absolute h-full w-[1px] bg-[#DCE8D4]/10" />
-            </div>
-
-            {/* State Bounds Labels */}
-            <span className="absolute top-3 left-4 text-[9px] font-mono uppercase tracking-widest text-[#DCE8D4]/40 select-none">
-              Sikkim Sector (NW)
-            </span>
-            <span className="absolute top-3 right-4 text-[9px] font-mono uppercase tracking-widest text-[#DCE8D4]/40 select-none">
-              Arunachal / Nagaland (NE)
-            </span>
-            <span className="absolute bottom-3 left-4 text-[9px] font-mono uppercase tracking-widest text-[#DCE8D4]/40 select-none">
-              Meghalaya / Assam
-            </span>
-            <span className="absolute bottom-3 right-4 text-[9px] font-mono uppercase tracking-widest text-[#DCE8D4]/40 select-none">
-              Manipur / Mizoram
-            </span>
-
-            {/* Interactive Hotspot Markers */}
-            {filteredHotspots.map((hotspot) => {
-              const isSelected = activeHotspot?.id === hotspot.id;
-              const markerColor = getMarkerColor(hotspot.riskLevel, hotspot.status);
-
-              return (
-                <button
-                  key={hotspot.id}
-                  type="button"
-                  onClick={() => setActiveHotspotId(hotspot.id)}
-                  style={{
-                    left: `${hotspot.x}%`,
-                    top: `${hotspot.y}%`,
-                    transform: "translate(-50%, -50%)",
-                  }}
-                  className={`absolute group cursor-pointer focus:outline-none transition-transform z-20 ${
-                    isSelected ? "scale-125 z-30" : "hover:scale-115"
-                  }`}
-                  aria-label={`Hotspot ${hotspot.code}: ${hotspot.name} (${hotspot.riskLevel} Risk)`}
-                >
-                  {/* Ping Ring for Critical */}
-                  {(hotspot.riskLevel === "Critical" || hotspot.status === "blocked") && (
-                    <span
-                      className="absolute -inset-2 rounded-full animate-ping opacity-60 pointer-events-none"
-                      style={{ backgroundColor: markerColor }}
-                    />
-                  )}
-
-                  {/* Marker Pin Icon */}
-                  <span
-                    className={`relative flex items-center justify-center w-6 h-6 rounded-full border-2 text-[10px] font-black shadow-lg transition-all ${
-                      isSelected
-                        ? "border-white ring-2 ring-[#D6A65D] ring-offset-1 ring-offset-[#173D32]"
-                        : "border-white/80"
-                    }`}
-                    style={{ backgroundColor: markerColor, color: "#FFFFFF" }}
-                  >
-                    {hotspot.status === "blocked" ? "✕" : "!"}
-                  </span>
-
-                  {/* Tooltip Label */}
-                  <span className="absolute left-1/2 -bottom-5 -translate-x-1/2 whitespace-nowrap px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-xs text-[9px] font-mono font-bold text-white shadow-xs pointer-events-none">
-                    {hotspot.code}
-                  </span>
-                </button>
-              );
-            })}
           </div>
 
           {/* Active Hotspot Telemetry Card */}

@@ -30,3 +30,4 @@ export default function RelativeTime({
 
   return <span className={className}>{displayText}</span>;
 }
+

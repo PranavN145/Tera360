@@ -30,16 +30,31 @@ const hasValidToken = Boolean(
  * RiskMap — High-fidelity 3D Mapbox GL JS map for Terra360
  */
 export default function RiskMap({
+  variant = "full",
   center = [94.02, 25.72],
   zoom = 13.5,
   pitch = 60,
   bearing = -20,
   selectedState,
+  showHud,
+  showPlayback,
+  showControls = true,
+  onSelectCorridor,
   className = "",
   onMapLoaded,
 }) {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
+
+  const effectiveShowHud =
+    showHud !== undefined
+      ? showHud
+      : variant !== "mini" && variant !== "simple";
+
+  const effectiveShowPlayback =
+    showPlayback !== undefined
+      ? showPlayback
+      : variant === "full";
 
   // Layer visibility toggle states
   const [terrainEnabled, setTerrainEnabled] = useState(true);
@@ -128,10 +143,12 @@ export default function RiskMap({
     }
 
     // Add navigation controls (top-right)
-    map.addControl(
-      new mapboxgl.NavigationControl({ visualizePitch: true }),
-      "top-right"
-    );
+    if (showControls) {
+      map.addControl(
+        new mapboxgl.NavigationControl({ visualizePitch: true }),
+        "top-right"
+      );
+    }
 
     map.on("style.load", () => {
       // 1. Add 3D Mountain Terrain (mapbox-dem raster-dem with 1.5 exaggeration)
@@ -624,6 +641,10 @@ export default function RiskMap({
           </div>
         `;
 
+        if (onSelectCorridor) {
+          onSelectCorridor(props.id || "nh29", props);
+        }
+
         new mapboxgl.Popup({ offset: 12, closeButton: true, maxWidth: "320px" })
           .setLngLat(e.lngLat)
           .setHTML(popupHTML)
@@ -1047,7 +1068,8 @@ export default function RiskMap({
       )}
 
       {/* Floating Top-Left Dashboard Overlay Card */}
-      <div className="absolute top-3.5 left-3.5 sm:top-4 sm:left-4 z-20 max-w-[315px] sm:max-w-[340px] w-full bg-[#FAF8F2]/95 backdrop-blur-md rounded-2xl border border-[#173D32]/15 shadow-[0_12px_32px_rgba(23,61,50,0.14)] p-3.5 sm:p-4 text-[#173D32] select-none transition-all">
+      {effectiveShowHud && (
+        <div className="absolute top-3.5 left-3.5 sm:top-4 sm:left-4 z-20 max-w-[315px] sm:max-w-[340px] w-full bg-[#FAF8F2]/95 backdrop-blur-md rounded-2xl border border-[#173D32]/15 shadow-[0_12px_32px_rgba(23,61,50,0.14)] p-3.5 sm:p-4 text-[#173D32] select-none transition-all">
         {/* Card Header with Status Beacon & Collapse Toggle */}
         <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-[#173D32]/10">
           <div className="flex items-center gap-2">
@@ -1311,8 +1333,21 @@ export default function RiskMap({
           </>
         )}
       </div>
+      )}
+
+      {/* Mini variant badge if HUD is hidden */}
+      {!effectiveShowHud && variant === "mini" && (
+        <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#FAF8F2]/90 backdrop-blur-xs border border-[#173D32]/20 shadow-xs text-[#173D32] text-[11px] font-black uppercase tracking-wider select-none">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-600" />
+          </span>
+          <span>3D GIS · NH-29</span>
+        </div>
+      )}
 
       {/* ── Bottom Anchored Monsoon Simulation Playback Control Bar ── */}
+      {effectiveShowPlayback && (
       <div className="absolute bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 z-20 w-[95%] max-w-2xl bg-[#FAF8F2]/95 backdrop-blur-md rounded-2xl border border-[#173D32]/20 shadow-[0_12px_36px_rgba(23,61,50,0.18)] p-3 sm:p-4 text-[#173D32] transition-all select-none">
         {/* Bar Header: Title, Time Badge, Peak Warning Indicator */}
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2 pb-2 border-b border-[#173D32]/10">
@@ -1439,6 +1474,7 @@ export default function RiskMap({
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import PortalLayout from "@/components/portal/PortalLayout";
+import RiskMap from "@/components/RiskMap";
 import { publicApi } from "@/lib/api";
 import { PublicRoadStatusItem, PublicAlertItem } from "@/types/public";
 
@@ -98,6 +99,27 @@ export default function CitizenMyAreaPage() {
                 Monitored Corridor: {selectedRegion.corridor}
               </span>
             </div>
+          </div>
+
+          {/* Standardized 3D Topographic Terrain View */}
+          <div className="mt-6 mb-6 w-full h-[300px] sm:h-[350px] rounded-2xl overflow-hidden border border-[#173D32]/15 bg-[#EEF4EB] shadow-xs">
+            <RiskMap
+              variant="mini"
+              selectedState={
+                selectedRegion.id === "nagaland"
+                  ? "Nagaland"
+                  : selectedRegion.id === "assam"
+                  ? "Assam"
+                  : selectedRegion.id === "sikkim"
+                  ? "Sikkim"
+                  : selectedRegion.id === "meghalaya"
+                  ? "Meghalaya"
+                  : undefined
+              }
+              showPlayback={false}
+              showControls={false}
+              className="w-full h-full"
+            />
           </div>
 
           {/* Area Metrics */}

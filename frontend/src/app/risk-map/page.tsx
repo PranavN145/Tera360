@@ -356,245 +356,30 @@ export default function RiskMapPage() {
           </div>
         </div>
 
-        {/* Spatial Radar Map Canvas inside Full Risk Engine */}
-        <div className="mb-10 relative w-full min-h-[480px] lg:min-h-[540px] rounded-[28px] bg-gradient-to-b from-[#EEF4EB] via-[#E4EDE0] to-[#DAE6D5] border border-[#173D32]/15 shadow-[0_12px_36px_rgba(23,61,50,0.08)] overflow-hidden flex flex-col justify-between p-4 sm:p-7 transition-all select-none">
-          {/* Corner Crosshairs */}
-          <span className="absolute top-3 left-3 text-[12px] font-mono text-[#173D32]/35 select-none pointer-events-none">+</span>
-          <span className="absolute top-3 right-3 text-[12px] font-mono text-[#173D32]/35 select-none pointer-events-none">+</span>
-          <span className="absolute bottom-3 left-3 text-[12px] font-mono text-[#173D32]/35 select-none pointer-events-none">+</span>
-          <span className="absolute bottom-3 right-3 text-[12px] font-mono text-[#173D32]/35 select-none pointer-events-none">+</span>
+        {/* Unified 3D GIS Workstation matching Screenshot 3 standard */}
+        <div className="mb-8 relative w-full h-[540px] sm:h-[640px] lg:h-[720px] rounded-[28px] overflow-hidden border border-[#173D32]/15 shadow-[0_12px_36px_rgba(23,61,50,0.08)] bg-[#EEF4EB]">
+          <RiskMap
+            variant="full"
+            selectedState={selectedState}
+            className="w-full h-full"
+            onSelectCorridor={(corridorId) => {
+              const matched = corridors.find(
+                (c) =>
+                  c.code.toLowerCase().includes(corridorId.toLowerCase()) ||
+                  corridorId.toLowerCase().includes(c.code.toLowerCase())
+              );
+              if (matched) {
+                openAlertModal(roadStatusItemToAlertDetail(matched));
+              }
+            }}
+          />
 
-          {/* Top Control Bar: Layer Selector */}
-          <div className="relative z-30 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-black uppercase tracking-wider text-[#173D32] bg-[#FAF8F2]/90 px-3.5 py-1.5 rounded-full border border-[#173D32]/12 shadow-2xs">
-                Spatial GIS Engine
-              </span>
+          {/* Doppler Rainfall Radar Sweep Overlay */}
+          {activeLayer === "rainfall" && (
+            <div className="absolute inset-0 bg-gradient-to-tr from-cyan-900/15 via-blue-800/10 to-teal-900/20 pointer-events-none animate-pulse z-10">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(6,182,212,0.15),transparent_70%)] animate-radar-pulse" />
             </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveLayer("topo");
-                  addToast({
-                    title: "Layer: Topographic Relief",
-                    description: "Geotechnical slope and elevation contours active.",
-                    type: "info",
-                  });
-                }}
-                className={`inline-flex items-center gap-2 backdrop-blur-md rounded-full px-4 py-2 text-xs font-bold shadow-xs transition-all cursor-pointer ${
-                  activeLayer === "topo"
-                    ? "bg-[#173D32] text-[#F6F4EC] border border-[#173D32]"
-                    : "bg-[#FAF8F2]/90 text-[#173D32] border border-[#173D32]/15 hover:bg-[#FAF8F2]"
-                }`}
-              >
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    activeLayer === "topo" ? "bg-[#D6A65D]" : "bg-[#173D32]/40"
-                  }`}
-                />
-                <span>Topographic Relief</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveLayer("rainfall");
-                  addToast({
-                    title: "Layer: Doppler Rainfall Radar",
-                    description: "Precipitation cloud density and moisture overlay enabled.",
-                    type: "info",
-                  });
-                }}
-                className={`inline-flex items-center gap-2 backdrop-blur-md rounded-full px-4 py-2 text-xs font-bold shadow-xs transition-all cursor-pointer ${
-                  activeLayer === "rainfall"
-                    ? "bg-[#173D32] text-[#F6F4EC] border border-[#173D32]"
-                    : "bg-[#FAF8F2]/90 text-[#173D32] border border-[#173D32]/15 hover:bg-[#FAF8F2]"
-                }`}
-              >
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    activeLayer === "rainfall" ? "bg-cyan-400 animate-ping" : "bg-[#173D32]/40"
-                  }`}
-                />
-                <span>Doppler Rainfall</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Interactive Map Area */}
-          <div
-            className="relative flex-1 w-full my-4 rounded-2xl overflow-hidden flex items-center justify-center transition-transform duration-300 min-h-[340px]"
-            style={{ transform: `scale(${zoomLevel})` }}
-          >
-            {/* Topographic Relief Map Watermark Texture */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-20 mix-blend-multiply">
-              <Image
-                src="/images/map.png"
-                alt="Northeast India Relief Map"
-                fill
-                sizes="1000px"
-                className="object-contain p-6"
-              />
-            </div>
-
-            {/* Topographic Contour Lines */}
-            <svg
-              className={`absolute inset-0 w-full h-full pointer-events-none transition-opacity duration-500 ${
-                activeLayer === "rainfall" ? "opacity-25" : "opacity-45"
-              }`}
-              viewBox="0 0 1000 600"
-              preserveAspectRatio="none"
-              fill="none"
-            >
-              <path
-                d="M 50,300 Q 250,150 450,280 T 850,220"
-                stroke="#173D32"
-                strokeWidth="1.5"
-                strokeDasharray="6 6"
-              />
-              <path d="M 120,400 Q 320,250 520,380 T 920,320" stroke="#173D32" strokeWidth="1" />
-              <path d="M 200,180 Q 400,80 600,200 T 980,140" stroke="#173D32" strokeWidth="1.2" />
-              <path
-                d="M 30,520 Q 230,370 430,500 T 830,440"
-                stroke="#173D32"
-                strokeWidth="1.5"
-                strokeDasharray="8 4"
-              />
-            </svg>
-
-            {/* Doppler Overlay */}
-            {activeLayer === "rainfall" && (
-              <div className="absolute inset-0 bg-gradient-to-tr from-cyan-900/15 via-blue-800/10 to-teal-900/20 pointer-events-none animate-pulse">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(6,182,212,0.15),transparent_70%)] animate-radar-pulse" />
-              </div>
-            )}
-
-            {/* Compass Rose */}
-            <div className="absolute top-4 right-4 pointer-events-none opacity-40 hidden sm:flex flex-col items-center">
-              <span className="text-[10px] font-black tracking-widest text-[#173D32]">N</span>
-              <div className="w-0.5 h-6 bg-[#173D32] my-0.5" />
-              <div className="w-2 h-2 rotate-45 border-t border-l border-[#173D32]" />
-            </div>
-
-            {/* Geographic Watermark */}
-            <div className="absolute text-center select-none pointer-events-none opacity-30">
-              <span className="text-3xl sm:text-5xl font-black tracking-[0.2em] text-[#173D32]/25 uppercase">
-                Northeast India
-              </span>
-              <p className="text-[11px] sm:text-xs font-semibold text-[#173D32] tracking-widest mt-1">
-                SECTOR 4 · 8-STATE MONITORING GRID
-              </p>
-            </div>
-
-            {/* Hotspots */}
-            <div className="absolute inset-0 z-10">
-              {roads.map((road, idx) => {
-                const coords = resolveMapCoordinates(road, idx);
-                const risk = road.riskLevel.toLowerCase();
-                const isCritical = risk === "critical" || road.status === "blocked";
-                const isWarning =
-                  risk === "high" ||
-                  risk === "warning" ||
-                  risk === "moderate" ||
-                  road.status === "caution";
-                const isWatch = risk === "watch";
-
-                const colorClass = isCritical
-                  ? "bg-red-600 ring-red-300"
-                  : isWarning
-                  ? "bg-amber-500 ring-amber-300"
-                  : isWatch
-                  ? "bg-[#D6A65D] ring-amber-200"
-                  : "bg-emerald-600 ring-emerald-300";
-
-                return (
-                  <button
-                    key={road.id}
-                    type="button"
-                    onClick={() => openAlertModal(riskMapItemToAlertDetail(road))}
-                    style={{ left: `${coords.x}%`, top: `${coords.y}%` }}
-                    className="absolute -translate-x-1/2 -translate-y-1/2 group cursor-pointer focus:outline-none"
-                    aria-label={`View details for ${road.name} (${road.riskLevel})`}
-                  >
-                    <span
-                      className={`absolute -inset-3 rounded-full opacity-70 animate-ping ${
-                        isCritical
-                          ? "bg-red-500"
-                          : isWarning
-                          ? "bg-amber-400"
-                          : "bg-[#D6A65D]/60"
-                      }`}
-                    />
-                    <div
-                      className={`relative w-5 h-5 sm:w-6 sm:h-6 rounded-full ${colorClass} ring-4 ring-white/80 shadow-lg flex items-center justify-center text-[10px] text-white font-black transition-transform duration-200 group-hover:scale-125`}
-                    >
-                      !
-                    </div>
-
-                    <div className="absolute left-1/2 -translate-x-1/2 top-8 hidden group-hover:flex flex-col items-center z-40 pointer-events-none min-w-[210px]">
-                      <div className="bg-[#FAF8F2] text-[#173D32] text-xs p-3.5 rounded-2xl shadow-2xl border border-[#173D32]/20 flex flex-col gap-1 text-left">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-mono text-[10px] font-black bg-[#173D32] px-2 py-0.5 rounded text-[#F6F4EC]">
-                            {road.code}
-                          </span>
-                          <span
-                            className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                              isCritical
-                                ? "bg-red-100 text-red-800"
-                                : isWarning
-                                ? "bg-amber-100 text-amber-800"
-                                : "bg-emerald-100 text-emerald-800"
-                            }`}
-                          >
-                            {road.riskLevel}
-                          </span>
-                        </div>
-                        <span className="font-extrabold text-[13px] text-[#173D32] leading-tight mt-0.5">
-                          {road.name}
-                        </span>
-                        <span className="text-[11px] text-[#173D32]/75">
-                          {road.stretch} · {road.state}
-                        </span>
-                      </div>
-                      <div className="w-2.5 h-2.5 bg-[#FAF8F2] rotate-45 -mt-1.5 border-t border-l border-[#173D32]/20" />
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Bottom Zoom Control */}
-          <div className="relative z-30 flex items-center justify-end">
-            <div className="flex items-center gap-1 bg-[#FAF8F2]/95 backdrop-blur-md border border-[#173D32]/15 rounded-xl p-1 shadow-sm">
-              <button
-                type="button"
-                onClick={() => handleZoom(0.2)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-[#173D32] hover:bg-[#173D32]/10 transition-colors font-bold text-lg select-none cursor-pointer"
-                aria-label="Zoom in"
-                title="Zoom in"
-              >
-                +
-              </button>
-              <div className="w-px h-5 bg-[#173D32]/15" />
-              <button
-                type="button"
-                onClick={() => handleZoom(-0.2)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-[#173D32] hover:bg-[#173D32]/10 transition-colors font-bold text-lg select-none cursor-pointer"
-                aria-label="Zoom out"
-                title="Zoom out"
-              >
-                −
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Full-Screen 3D Interactive Risk Map Container */}
-        <div className="relative w-full h-[500px] sm:h-[620px] lg:h-[720px] rounded-3xl overflow-hidden border border-[#173D32]/15 shadow-xl mb-8 bg-[#FAF8F2]">
-          <RiskMap className="w-full h-full" selectedState={selectedState} />
+          )}
         </div>
 
         {/* Filter Controls Bar */}

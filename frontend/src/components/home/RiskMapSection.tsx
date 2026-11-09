@@ -445,124 +445,30 @@ export default function RiskMapSection() {
           {/* Interactive Mapbox GL JS 3D Risk Map Canvas */}
           {viewMode === "map" ? (
             <div
-              className="relative flex-1 w-full my-4 rounded-2xl overflow-hidden flex items-center justify-center min-h-[460px] lg:min-h-[520px] bg-[#EEF3EA]"
+              className="relative flex-1 w-full my-4 rounded-2xl overflow-hidden flex items-center justify-center min-h-[500px] lg:min-h-[560px] bg-[#EEF3EA]"
             >
-              {/* Standalone 3D Mapbox GL Canvas */}
-              <RiskMap className="absolute inset-0 w-full h-full" />
+              {/* Standalone 3D Mapbox GL Canvas with 3D terrain and Live HUD matching design standard */}
+              <RiskMap
+                variant="full"
+                className="absolute inset-0 w-full h-full"
+                onSelectCorridor={(corridorId) => {
+                  const matched = roads.find(
+                    (r) =>
+                      r.code.toLowerCase().includes(corridorId.toLowerCase()) ||
+                      corridorId.toLowerCase().includes(r.code.toLowerCase())
+                  );
+                  if (matched) {
+                    openAlertModal(riskMapItemToAlertDetail(matched));
+                  }
+                }}
+              />
 
               {/* Doppler Rainfall Radar Sweep Overlay */}
               {activeLayer === "rainfall" && (
-                <div className="absolute inset-0 bg-gradient-to-tr from-cyan-900/15 via-blue-800/10 to-teal-900/20 pointer-events-none animate-pulse">
+                <div className="absolute inset-0 bg-gradient-to-tr from-cyan-900/15 via-blue-800/10 to-teal-900/20 pointer-events-none animate-pulse z-10">
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(6,182,212,0.15),transparent_70%)] animate-radar-pulse" />
                 </div>
               )}
-
-              {/* Cartographic Compass Rose in Corner */}
-              <div className="absolute top-4 right-4 pointer-events-none opacity-40 hidden sm:flex flex-col items-center">
-                <span className="text-[10px] font-black tracking-widest text-[#173D32]">N</span>
-                <div className="w-0.5 h-6 bg-[#173D32] my-0.5" />
-                <div className="w-2 h-2 rotate-45 border-t border-l border-[#173D32]" />
-              </div>
-
-              {/* Scale Bar in Bottom Left */}
-              <div className="absolute bottom-4 left-4 pointer-events-none opacity-40 hidden sm:flex items-center gap-2">
-                <div className="w-16 h-1 bg-[#173D32]" />
-                <span className="text-[10px] font-mono font-bold text-[#173D32]">50 km</span>
-              </div>
-
-              {/* Centered Geographic Watermark */}
-              <div className="absolute text-center select-none pointer-events-none opacity-30">
-                <span className="text-3xl sm:text-5xl font-black tracking-[0.2em] text-[#173D32]/25 uppercase">
-                  Northeast India
-                </span>
-                <p className="text-[11px] sm:text-xs font-semibold text-[#173D32] tracking-widest mt-1">
-                  SECTOR 4 · 8-STATE MONITORING GRID
-                </p>
-              </div>
-
-              {/* Interactive Hazard Hotspots with Sonar Beacons */}
-              <div className="absolute inset-0 z-10">
-                {filteredRoads.map((road, idx) => {
-                  const coords = resolveMapCoordinates(road, idx);
-                  const risk = road.riskLevel.toLowerCase();
-                  const isCritical = risk === "critical" || road.status === "blocked";
-                  const isWarning =
-                    risk === "high" ||
-                    risk === "warning" ||
-                    risk === "moderate" ||
-                    road.status === "caution";
-                  const isWatch = risk === "watch";
-
-                  const colorClass = isCritical
-                    ? "bg-red-600 ring-red-300"
-                    : isWarning
-                    ? "bg-amber-500 ring-amber-300"
-                    : isWatch
-                    ? "bg-[#D6A65D] ring-amber-200"
-                    : "bg-emerald-600 ring-emerald-300";
-
-                  return (
-                    <button
-                      key={road.id}
-                      type="button"
-                      onClick={() => openAlertModal(riskMapItemToAlertDetail(road))}
-                      style={{ left: `${coords.x}%`, top: `${coords.y}%` }}
-                      className="absolute -translate-x-1/2 -translate-y-1/2 group cursor-pointer focus:outline-none"
-                      aria-label={`View details for ${road.name} (${road.riskLevel})`}
-                    >
-                      {/* Pulsing Sonar Ring */}
-                      <span
-                        className={`absolute -inset-3 rounded-full opacity-70 animate-ping ${
-                          isCritical
-                            ? "bg-red-500"
-                            : isWarning
-                            ? "bg-amber-400"
-                            : "bg-[#D6A65D]/60"
-                        }`}
-                      />
-
-                      {/* Node Core */}
-                      <div
-                        className={`relative w-5 h-5 sm:w-6 sm:h-6 rounded-full ${colorClass} ring-4 ring-white/80 shadow-lg flex items-center justify-center text-[10px] text-white font-black transition-transform duration-200 group-hover:scale-125`}
-                      >
-                        !
-                      </div>
-
-                      {/* Rich Floating Hover Tooltip Card */}
-                      <div className="absolute left-1/2 -translate-x-1/2 top-8 hidden group-hover:flex flex-col items-center z-40 pointer-events-none min-w-[210px]">
-                        <div className="bg-[#FAF8F2] text-[#173D32] text-xs p-3.5 rounded-2xl shadow-2xl border border-[#173D32]/20 flex flex-col gap-1 text-left">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-mono text-[10px] font-black bg-[#173D32] px-2 py-0.5 rounded text-[#F6F4EC]">
-                              {road.code}
-                            </span>
-                            <span
-                              className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                                isCritical
-                                  ? "bg-red-100 text-red-800"
-                                  : isWarning
-                                  ? "bg-amber-100 text-amber-800"
-                                  : "bg-emerald-100 text-emerald-800"
-                              }`}
-                            >
-                              {road.riskLevel}
-                            </span>
-                          </div>
-                          <span className="font-extrabold text-[13px] text-[#173D32] leading-tight mt-0.5">
-                            {road.name}
-                          </span>
-                          <span className="text-[11px] text-[#173D32]/75">
-                            {road.stretch} · {road.state}
-                          </span>
-                          <span className="text-[10px] font-bold text-[#D6A65D] mt-1">
-                            Click to view telemetry →
-                          </span>
-                        </div>
-                        <div className="w-2.5 h-2.5 bg-[#FAF8F2] rotate-45 -mt-1.5 border-t border-l border-[#173D32]/20" />
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
             </div>
           ) : (
             /* Upgraded Corridor Status Cards View with 3-Column Micro-Stats */
@@ -673,31 +579,6 @@ export default function RiskMapSection() {
                 })}
               </div>
             </div>
-
-            {/* Zoom Controls */}
-            {viewMode === "map" && (
-              <div className="flex flex-col gap-1 bg-[#FAF8F2]/95 backdrop-blur-md border border-[#173D32]/15 rounded-xl p-1 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => handleZoom(0.2)}
-                  className="w-9 h-9 rounded-lg flex items-center justify-center text-[#173D32] hover:bg-[#173D32]/10 transition-colors font-bold text-xl select-none cursor-pointer"
-                  aria-label="Zoom in"
-                  title="Zoom in (+20%)"
-                >
-                  +
-                </button>
-                <div className="h-px bg-[#173D32]/15 mx-1" />
-                <button
-                  type="button"
-                  onClick={() => handleZoom(-0.2)}
-                  className="w-9 h-9 rounded-lg flex items-center justify-center text-[#173D32] hover:bg-[#173D32]/10 transition-colors font-bold text-xl select-none cursor-pointer"
-                  aria-label="Zoom out"
-                  title="Zoom out (-20%)"
-                >
-                  −
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>
