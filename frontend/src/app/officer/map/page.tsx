@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import PortalLayout from "@/components/portal/PortalLayout";
+import RiskMap from "@/components/RiskMap";
 import { publicApi } from "@/lib/api";
 import { PublicRiskMapItem } from "@/types/public";
 
@@ -94,96 +95,23 @@ export default function OfficerMapPage() {
       {/* Main Map Workspace: 2-Columns */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* Left: Interactive Spatial Radar Canvas (7 Cols) */}
-        <div className="lg:col-span-7 bg-[#173D32] text-[#F6F4EC] rounded-3xl p-6 shadow-sm border border-[#173D32]/20 flex flex-col justify-between min-h-[460px] relative overflow-hidden">
-          {/* Subtle Grid Lines Overlay */}
-          <div className="absolute inset-0 bg-[radial-gradient(#DCE8D4_1px,transparent_1px)] [background-size:24px_24px] opacity-10 pointer-events-none" />
-
-          {/* Radar Header */}
-          <div className="relative z-10 flex items-center justify-between pb-4 border-b border-white/10">
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-[#DCE8D4]">
-                GIS Spatial Hotspot Visualizer
-              </span>
-              <h3 className="text-base font-extrabold text-[#F6F4EC] mt-0.5">
-                Northeast Arterial Corridor Grid
-              </h3>
-            </div>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              Live GIS
-            </span>
-          </div>
-
-          {/* Spatial Pins Center Area */}
-          <div className="relative z-10 my-auto py-8">
-            {isLoading && (
-              <div className="text-center py-12">
-                <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-3" />
-                <p className="text-xs text-[#DCE8D4]/80">Loading GIS coordinates...</p>
-              </div>
-            )}
-
-            {!isLoading && corridors.length === 0 && (
-              <div className="text-center py-12 text-[#DCE8D4]/70 text-xs">
-                <span>No corridors registered for {selectedState}.</span>
-              </div>
-            )}
-
-            {!isLoading && corridors.length > 0 && (
-              <div className="space-y-3">
-                {corridors.map((c) => {
-                  const isSelected = selectedCorridor?.id === c.id;
-                  return (
-                    <div
-                      key={c.id}
-                      onClick={() => setSelectedCorridor(c)}
-                      className={`p-4 rounded-2xl transition-all cursor-pointer border ${
-                        isSelected
-                          ? "bg-[#FAF8F2] text-[#173D32] border-[#D6A65D] shadow-md"
-                          : "bg-white/5 hover:bg-white/10 text-white border-white/10"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                          <span
-                            className={`w-3 h-3 rounded-full ${
-                              c.status === "blocked"
-                                ? "bg-red-500"
-                                : c.status === "caution"
-                                ? "bg-amber-400"
-                                : "bg-emerald-400"
-                            }`}
-                          />
-                          <span className="font-black text-sm">
-                            {c.code} — {c.name}
-                          </span>
-                        </div>
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
-                            isSelected
-                              ? "bg-[#173D32] text-white"
-                              : "bg-white/20 text-white"
-                          }`}
-                        >
-                          {c.status}
-                        </span>
-                      </div>
-                      <p className={`text-xs mt-1.5 ${isSelected ? "text-[#173D32]/80" : "text-[#DCE8D4]/80"}`}>
-                        {c.stretch} · {c.state}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Radar Footer */}
-          <div className="relative z-10 pt-4 border-t border-white/10 flex items-center justify-between text-xs text-[#DCE8D4]/80">
-            <span>Projection: WGS84 EPSG:4326</span>
-            <span>2dsphere Geospatial Index</span>
-          </div>
+        {/* Left: Interactive 3D GIS Mapbox Workstation (7 Cols) */}
+        <div className="lg:col-span-7 rounded-3xl overflow-hidden shadow-sm border border-[#173D32]/20 min-h-[520px] lg:min-h-[580px] relative bg-[#EEF4EB]">
+          <RiskMap
+            variant="dashboard"
+            selectedState={selectedState}
+            className="w-full h-full min-h-[520px]"
+            onSelectCorridor={(corridorId) => {
+              const matched = corridors.find(
+                (c) =>
+                  c.code.toLowerCase().includes(corridorId.toLowerCase()) ||
+                  corridorId.toLowerCase().includes(c.code.toLowerCase())
+              );
+              if (matched) {
+                setSelectedCorridor(matched);
+              }
+            }}
+          />
         </div>
 
         {/* Right: Selected Corridor Geotechnical Inspection (5 Cols) */}

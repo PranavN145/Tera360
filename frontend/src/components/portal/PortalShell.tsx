@@ -28,7 +28,7 @@ export default function PortalShell({
 
   return (
     <PortalLayout
-      allowedRoles={allowedRoles || (user?.role ? [user.role] : ["officer", "citizen", "field_officer"])}
+      allowedRoles={allowedRoles || (user?.role ? [user.role] : ["officer", "citizen", "field_officer", "driver", "admin"])}
       title={title}
       subtitle={subtitle}
     >

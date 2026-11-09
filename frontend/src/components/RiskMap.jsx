@@ -20,20 +20,41 @@ const MAPBOX_ACCESS_TOKEN =
     ? import.meta.env.VITE_MAPBOX_ACCESS_TOKEN
     : "");
 
+const hasValidToken = Boolean(
+  MAPBOX_ACCESS_TOKEN &&
+  MAPBOX_ACCESS_TOKEN.trim().length > 0 &&
+  !MAPBOX_ACCESS_TOKEN.includes("your_mapbox_access_token")
+);
+
 /**
  * RiskMap — High-fidelity 3D Mapbox GL JS map for Terra360
  */
 export default function RiskMap({
+  variant = "full",
   center = [94.02, 25.72],
   zoom = 13.5,
   pitch = 60,
   bearing = -20,
   selectedState,
+  showHud,
+  showPlayback,
+  showControls = true,
+  onSelectCorridor,
   className = "",
   onMapLoaded,
 }) {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
+
+  const effectiveShowHud =
+    showHud !== undefined
+      ? showHud
+      : variant !== "mini" && variant !== "simple";
+
+  const effectiveShowPlayback =
+    showPlayback !== undefined
+      ? showPlayback
+      : variant === "full";
 
   // Layer visibility toggle states
   const [terrainEnabled, setTerrainEnabled] = useState(true);
@@ -95,6 +116,13 @@ export default function RiskMap({
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
+    if (!hasValidToken) {
+      console.warn(
+        "Mapbox Access Token is missing. Set NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN in Vercel environment variables to enable 3D terrain and interactive telemetry."
+      );
+      return;
+    }
+
     // Securely set Mapbox access token
     mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
 
@@ -115,10 +143,12 @@ export default function RiskMap({
     }
 
     // Add navigation controls (top-right)
-    map.addControl(
-      new mapboxgl.NavigationControl({ visualizePitch: true }),
-      "top-right"
-    );
+    if (showControls) {
+      map.addControl(
+        new mapboxgl.NavigationControl({ visualizePitch: true }),
+        "top-right"
+      );
+    }
 
     map.on("style.load", () => {
       // 1. Add 3D Mountain Terrain (mapbox-dem raster-dem with 1.5 exaggeration)
@@ -611,6 +641,10 @@ export default function RiskMap({
           </div>
         `;
 
+        if (onSelectCorridor) {
+          onSelectCorridor(props.id || "nh29", props);
+        }
+
         new mapboxgl.Popup({ offset: 12, closeButton: true, maxWidth: "320px" })
           .setLngLat(e.lngLat)
           .setHTML(popupHTML)
@@ -1011,8 +1045,31 @@ export default function RiskMap({
         className="absolute inset-0 w-full h-full"
       />
 
+      {!hasValidToken && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#173D32]/85 backdrop-blur-xs p-6 text-center select-none">
+          <div className="max-w-md w-full p-6 sm:p-8 rounded-3xl bg-[#FAF8F2]/95 border border-[#173D32]/15 shadow-2xl flex flex-col items-center text-[#173D32]">
+            <div className="w-14 h-14 rounded-2xl bg-[#D6A65D]/20 border border-[#D6A65D]/40 flex items-center justify-center text-2xl mb-4 shadow-xs">
+              🗺️
+            </div>
+            <h3 className="text-lg sm:text-xl font-black tracking-tight text-[#173D32] mb-2">
+              Mapbox Access Token Required
+            </h3>
+            <p className="text-xs sm:text-sm text-[#173D32]/80 mb-4 leading-relaxed font-normal">
+              Interactive 3D mountain terrain, slope telemetry, and corridor risk heatmaps require an active Mapbox access token.
+            </p>
+            <div className="w-full text-[11px] sm:text-xs font-mono font-semibold bg-[#173D32]/10 border border-[#173D32]/20 rounded-xl p-2.5 text-[#173D32] break-all select-all mb-4 text-center">
+              NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
+            </div>
+            <p className="text-[11px] text-[#173D32]/60">
+              Add this key in your Vercel Project Environment Variables and redeploy.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Floating Top-Left Dashboard Overlay Card */}
-      <div className="absolute top-3.5 left-3.5 sm:top-4 sm:left-4 z-20 max-w-[315px] sm:max-w-[340px] w-full bg-[#FAF8F2]/95 backdrop-blur-md rounded-2xl border border-[#173D32]/15 shadow-[0_12px_32px_rgba(23,61,50,0.14)] p-3.5 sm:p-4 text-[#173D32] select-none transition-all">
+      {effectiveShowHud && (
+        <div className="absolute top-3.5 left-3.5 sm:top-4 sm:left-4 z-20 max-w-[315px] sm:max-w-[340px] w-full bg-[#FAF8F2]/95 backdrop-blur-md rounded-2xl border border-[#173D32]/15 shadow-[0_12px_32px_rgba(23,61,50,0.14)] p-3.5 sm:p-4 text-[#173D32] select-none transition-all">
         {/* Card Header with Status Beacon & Collapse Toggle */}
         <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-[#173D32]/10">
           <div className="flex items-center gap-2">
@@ -1276,8 +1333,21 @@ export default function RiskMap({
           </>
         )}
       </div>
+      )}
+
+      {/* Mini variant badge if HUD is hidden */}
+      {!effectiveShowHud && variant === "mini" && (
+        <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#FAF8F2]/90 backdrop-blur-xs border border-[#173D32]/20 shadow-xs text-[#173D32] text-[11px] font-black uppercase tracking-wider select-none">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-600" />
+          </span>
+          <span>3D GIS · NH-29</span>
+        </div>
+      )}
 
       {/* ── Bottom Anchored Monsoon Simulation Playback Control Bar ── */}
+      {effectiveShowPlayback && (
       <div className="absolute bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 z-20 w-[95%] max-w-2xl bg-[#FAF8F2]/95 backdrop-blur-md rounded-2xl border border-[#173D32]/20 shadow-[0_12px_36px_rgba(23,61,50,0.18)] p-3 sm:p-4 text-[#173D32] transition-all select-none">
         {/* Bar Header: Title, Time Badge, Peak Warning Indicator */}
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2 pb-2 border-b border-[#173D32]/10">
@@ -1404,6 +1474,7 @@ export default function RiskMap({
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

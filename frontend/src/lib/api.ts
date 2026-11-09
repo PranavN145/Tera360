@@ -97,11 +97,22 @@ export async function refreshAccessToken(): Promise<string | null> {
 
   const executeRefresh = async (): Promise<string | null> => {
     try {
+      const fallbackToken =
+        typeof window !== 'undefined'
+          ? localStorage.getItem('terra360_refresh_token')
+          : null;
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (fallbackToken) {
+        headers['x-refresh-token'] = fallbackToken;
+      }
+
       const res = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
+        body: fallbackToken ? JSON.stringify({ refreshToken: fallbackToken }) : undefined,
         credentials: 'include',
       });
 
@@ -114,6 +125,10 @@ export async function refreshAccessToken(): Promise<string | null> {
           return offlineToken;
         }
         setAccessToken(null);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('terra360_refresh_token');
+          localStorage.removeItem('terra360_has_session');
+        }
         return null;
       }
 
@@ -121,10 +136,20 @@ export async function refreshAccessToken(): Promise<string | null> {
       if (json.success && json.data?.accessToken) {
         demoDataManager.markBackendOffline(false);
         setAccessToken(json.data.accessToken);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('terra360_has_session', 'true');
+          if (json.data.refreshToken) {
+            localStorage.setItem('terra360_refresh_token', json.data.refreshToken);
+          }
+        }
         return json.data.accessToken;
       }
 
       setAccessToken(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('terra360_refresh_token');
+        localStorage.removeItem('terra360_has_session');
+      }
       return null;
     } catch {
       // Backend unreachable (network failure / connection refused)
@@ -317,6 +342,12 @@ export const authApi = {
         setAccessToken(data.accessToken);
       }
       demoDataManager.setActiveDemoUser(data.user);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('terra360_has_session', 'true');
+        if (data.refreshToken) {
+          localStorage.setItem('terra360_refresh_token', data.refreshToken);
+        }
+      }
       return data;
     } catch (err: unknown) {
       if (err instanceof ApiClientError && err.code === 'NETWORK_ERROR') {
@@ -326,6 +357,9 @@ export const authApi = {
           const offlineToken = 'demo-offline-token';
           setAccessToken(offlineToken);
           demoDataManager.setActiveDemoUser(demoUser);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('terra360_has_session', 'true');
+          }
           return {
             user: demoUser,
             accessToken: offlineToken,
@@ -347,8 +381,14 @@ export const authApi = {
 
   async logout(): Promise<MessageSuccessData> {
     try {
+      const fallbackToken =
+        typeof window !== 'undefined'
+          ? localStorage.getItem('terra360_refresh_token')
+          : null;
       return await apiClient<MessageSuccessData>('/api/v1/auth/logout', {
         method: 'POST',
+        headers: fallbackToken ? { 'x-refresh-token': fallbackToken } : undefined,
+        body: fallbackToken ? JSON.stringify({ refreshToken: fallbackToken }) : undefined,
         retryOnAuthError: false,
       });
     } catch {
@@ -356,6 +396,10 @@ export const authApi = {
     } finally {
       demoDataManager.setActiveDemoUser(null);
       setAccessToken(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('terra360_refresh_token');
+        localStorage.removeItem('terra360_has_session');
+      }
     }
   },
 

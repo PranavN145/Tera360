@@ -20,7 +20,21 @@ const MAPBOX_ACCESS_TOKEN: string =
     ? (import.meta as Record<string, any>).env.VITE_MAPBOX_ACCESS_TOKEN
     : "");
 
+const hasValidToken = Boolean(
+  MAPBOX_ACCESS_TOKEN &&
+  MAPBOX_ACCESS_TOKEN.trim().length > 0 &&
+  !MAPBOX_ACCESS_TOKEN.includes("your_mapbox_access_token")
+);
+
 export interface RiskMapProps {
+  /**
+   * Layout presentation variant:
+   * - "full": Full GIS interactive workstation with HUD, simulation playback, controls, popups (Default)
+   * - "dashboard": Operational portal map with collapsible HUD & navigation controls
+   * - "mini": Compact embedded widget for dashboard cards (Officer Dashboard Mini Map, Citizen My Area)
+   * - "simple": Clean map canvas without floating overlays
+   */
+  variant?: "full" | "dashboard" | "mini" | "simple";
   /** Center coordinates [longitude, latitude]. Defaults to NH-29 Dimapur–Kohima Corridor, Nagaland [94.02, 25.72] */
   center?: [number, number];
   /** Initial zoom level. Defaults to 13.5 */
@@ -31,6 +45,14 @@ export interface RiskMapProps {
   bearing?: number;
   /** Optional state filter to trigger camera fly-to */
   selectedState?: string;
+  /** Override visibility of top-left Live Corridor HUD (defaults to true for 'full' and 'dashboard', false for 'mini') */
+  showHud?: boolean;
+  /** Override visibility of bottom Monsoon Simulation Playback bar (defaults to true for 'full', false for 'mini' and 'dashboard') */
+  showPlayback?: boolean;
+  /** Override visibility of Mapbox Navigation Controls (defaults to true) */
+  showControls?: boolean;
+  /** Optional corridor click callback */
+  onSelectCorridor?: (corridorId: string, properties: Record<string, any>) => void;
   /** Optional container CSS class name */
   className?: string;
   /** Optional callback triggered once map style has loaded */
@@ -54,16 +76,31 @@ export interface RiskMapProps {
  *     - Layer visibility toggle switches: 3D Terrain Hillshade, Hazard Risk Heatmap, Emergency Rescue Reroute
  */
 export default function RiskMap({
+  variant = "full",
   center = [94.02, 25.72],
   zoom = 13.5,
   pitch = 60,
   bearing = -20,
   selectedState,
+  showHud,
+  showPlayback,
+  showControls = true,
+  onSelectCorridor,
   className = "",
   onMapLoaded,
 }: RiskMapProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<mapboxgl.Map | null>(null);
+
+  const effectiveShowHud =
+    showHud !== undefined
+      ? showHud
+      : variant !== "mini" && variant !== "simple";
+
+  const effectiveShowPlayback =
+    showPlayback !== undefined
+      ? showPlayback
+      : variant === "full";
 
   // Layer visibility toggle states
   const [terrainEnabled, setTerrainEnabled] = useState<boolean>(true);
@@ -125,6 +162,13 @@ export default function RiskMap({
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
+    if (!hasValidToken) {
+      console.warn(
+        "Mapbox Access Token is missing. Set NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN in Vercel environment variables to enable 3D terrain and interactive telemetry."
+      );
+      return;
+    }
+
     // Securely set Mapbox access token
     mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
 
@@ -145,10 +189,12 @@ export default function RiskMap({
     }
 
     // Add navigation controls (top-right)
-    map.addControl(
-      new mapboxgl.NavigationControl({ visualizePitch: true }),
-      "top-right"
-    );
+    if (showControls) {
+      map.addControl(
+        new mapboxgl.NavigationControl({ visualizePitch: true }),
+        "top-right"
+      );
+    }
 
     map.on("style.load", () => {
       // 1. Add 3D Mountain Terrain (mapbox-dem raster-dem with 1.5 exaggeration)
@@ -566,6 +612,10 @@ export default function RiskMap({
         if (!e.features || !e.features[0]) return;
         const feature = e.features[0] as any;
         const props = (feature.properties || {}) as Record<string, any>;
+
+        if (onSelectCorridor) {
+          onSelectCorridor(props.id || props.segment_name || "corridor", props);
+        }
 
         const segmentName = props.segment_name || props.name || "NH-29 Pherima Slide Cut";
         const status = props.status || props.riskStatus || "critical";
@@ -1063,34 +1113,73 @@ export default function RiskMap({
         className="absolute inset-0 w-full h-full"
       />
 
-      {/* Floating Top-Left Dashboard Overlay Card */}
-      <div className="absolute top-3.5 left-3.5 sm:top-4 sm:left-4 z-20 max-w-[315px] sm:max-w-[340px] w-full bg-[#FAF8F2]/95 backdrop-blur-md rounded-2xl border border-[#173D32]/15 shadow-[0_12px_32px_rgba(23,61,50,0.14)] p-3.5 sm:p-4 text-[#173D32] select-none transition-all">
-        {/* Card Header with Status Beacon & Collapse Toggle */}
-        <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-[#173D32]/10">
-          <div className="flex items-center gap-2">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-600" />
-            </span>
-            <span className="text-[11px] font-black uppercase tracking-wider text-[#173D32]">
-              Live Corridor HUD
-            </span>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#173D32]/10 text-[#173D32]">
-              NH-29
-            </span>
-            <button
-              type="button"
-              onClick={() => setIsHudCollapsed(!isHudCollapsed)}
-              className="text-xs text-[#173D32]/60 hover:text-[#173D32] p-0.5 cursor-pointer font-bold"
-              aria-label={isHudCollapsed ? "Expand HUD" : "Collapse HUD"}
-            >
-              {isHudCollapsed ? "＋" : "－"}
-            </button>
+      {!hasValidToken && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#173D32]/85 backdrop-blur-xs p-6 text-center select-none">
+          <div className="max-w-md w-full p-6 sm:p-8 rounded-3xl bg-[#FAF8F2]/95 border border-[#173D32]/15 shadow-2xl flex flex-col items-center text-[#173D32]">
+            <div className="w-14 h-14 rounded-2xl bg-[#D6A65D]/20 border border-[#D6A65D]/40 flex items-center justify-center text-2xl mb-4 shadow-xs">
+              🗺️
+            </div>
+            <h3 className="text-lg sm:text-xl font-black tracking-tight text-[#173D32] mb-2">
+              Mapbox Access Token Required
+            </h3>
+            <p className="text-xs sm:text-sm text-[#173D32]/80 mb-4 leading-relaxed font-normal">
+              Interactive 3D mountain terrain, slope telemetry, and corridor risk heatmaps require an active Mapbox access token.
+            </p>
+            <div className="w-full text-[11px] sm:text-xs font-mono font-semibold bg-[#173D32]/10 border border-[#173D32]/20 rounded-xl p-2.5 text-[#173D32] break-all select-all mb-4 text-center">
+              NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
+            </div>
+            <p className="text-[11px] text-[#173D32]/60">
+              Add this key in your Vercel Project Environment Variables and redeploy.
+            </p>
           </div>
         </div>
+      )}
+
+      {/* Floating Top-Left Dashboard Overlay Card */}
+      {effectiveShowHud && (
+        <div className={`absolute top-3.5 left-3.5 sm:top-4 sm:left-4 z-20 ${
+          variant === "mini"
+            ? "max-w-[200px] p-2 rounded-xl"
+            : "max-w-[315px] sm:max-w-[340px] p-3.5 sm:p-4 rounded-2xl"
+        } w-full bg-[#FAF8F2]/95 backdrop-blur-md border border-[#173D32]/15 shadow-[0_12px_32px_rgba(23,61,50,0.14)] text-[#173D32] select-none transition-all`}>
+          {variant === "mini" ? (
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-600" />
+              </span>
+              <span className="text-[10px] font-black uppercase tracking-wider text-[#173D32]">
+                3D GIS · NH-29
+              </span>
+            </div>
+          ) : (
+            <>
+              {/* Card Header with Status Beacon & Collapse Toggle */}
+              <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-[#173D32]/10">
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-600" />
+                  </span>
+                  <span className="text-[11px] font-black uppercase tracking-wider text-[#173D32]">
+                    Live Corridor HUD
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#173D32]/10 text-[#173D32]">
+                    NH-29
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsHudCollapsed(!isHudCollapsed)}
+                    className="text-xs text-[#173D32]/60 hover:text-[#173D32] p-0.5 cursor-pointer font-bold"
+                    aria-label={isHudCollapsed ? "Expand HUD" : "Collapse HUD"}
+                  >
+                    {isHudCollapsed ? "＋" : "－"}
+                  </button>
+                </div>
+              </div>
 
         {!isHudCollapsed && (
           <>
@@ -1315,9 +1404,13 @@ export default function RiskMap({
             </div>
           </>
         )}
-      </div>
+      </>
+    )}
+  </div>
+)}
 
       {/* ── Bottom Anchored Monsoon Simulation Playback Control Bar ── */}
+      {effectiveShowPlayback && (
       <div className="absolute bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 z-20 w-[95%] max-w-2xl bg-[#FAF8F2]/95 backdrop-blur-md rounded-2xl border border-[#173D32]/20 shadow-[0_12px_36px_rgba(23,61,50,0.18)] p-3 sm:p-4 text-[#173D32] transition-all select-none">
         {/* Bar Header: Title, Time Badge, Peak Warning Indicator */}
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2 pb-2 border-b border-[#173D32]/10">
@@ -1443,6 +1536,7 @@ export default function RiskMap({
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

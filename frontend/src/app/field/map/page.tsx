@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import PortalLayout from "@/components/portal/PortalLayout";
+import RiskMap from "@/components/RiskMap";
 import { publicApi } from "@/lib/api";
 import { PublicRoadStatusItem } from "@/types/public";
 
@@ -94,6 +95,23 @@ export default function FieldMapPage() {
                 Full GIS Map ↗
               </Link>
             </div>
+          </div>
+
+          {/* Standardized 3D Mountain Terrain Visualizer */}
+          <div className="mt-5 mb-6 w-full h-[380px] sm:h-[440px] rounded-2xl overflow-hidden border border-[#173D32]/15 bg-[#EEF4EB] shadow-xs">
+            <RiskMap
+              variant="dashboard"
+              selectedState={
+                selectedSector.includes("Nagaland")
+                  ? "Nagaland"
+                  : selectedSector.includes("Assam")
+                  ? "Assam"
+                  : selectedSector.includes("Sikkim")
+                  ? "Sikkim"
+                  : undefined
+              }
+              className="w-full h-full"
+            />
           </div>
 
           {/* Monitored Corridors & Geotechnical Stations */}

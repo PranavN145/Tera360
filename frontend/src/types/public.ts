@@ -135,6 +135,10 @@ export function formatRelativeTime(dateInput?: string | Date | null): string {
     const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
     if (isNaN(date.getTime())) return 'Recently';
 
+    if (typeof window === 'undefined') {
+      return 'Recently';
+    }
+
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     if (diffMs < 0) return 'Just now';
@@ -174,7 +178,7 @@ export function alertItemToAlertDetail(item: PublicAlertItem): AlertDetail {
     location: item.location || item.title || `${item.corridor} (${item.state})`,
     state: item.state || 'Northeast Region',
     corridor: item.corridor || 'Regional Highway',
-    timestamp: formatRelativeTime(item.publishedAt || item.createdAt),
+    timestamp: item.publishedAt || item.createdAt || 'Recently',
     description: item.description || 'Active landslide advisory issued by monitoring authorities.',
     coordinates: item.coordinatesText || (item.coordinates?.coordinates ? `${item.coordinates.coordinates[1]}° N, ${item.coordinates.coordinates[0]}° E` : 'Coordinates on file'),
     rainfall24h: item.rainfall24h || 'Monitored',
@@ -213,7 +217,7 @@ export function riskMapItemToAlertDetail(road: PublicRiskMapItem): AlertDetail {
     location: `${road.name} (${road.code})`,
     state: road.state,
     corridor: road.stretch,
-    timestamp: formatRelativeTime(road.lastUpdated),
+    timestamp: road.lastUpdated || 'Recently',
     description:
       road.statusReason ||
       `Monitored highway stretch on ${road.code}. Current risk level evaluated as ${road.riskLevel}.`,
