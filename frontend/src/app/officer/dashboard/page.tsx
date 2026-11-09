@@ -156,10 +156,10 @@ export default function OfficerDashboardPage() {
         </div>
       }
     >
-      <div className="space-y-6 sm:space-y-8">
+      <div className="flex flex-col space-y-6 sm:space-y-8 w-full">
         {/* Error Banner */}
         {error && (
-          <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-900 flex items-center justify-between gap-4">
+          <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-900 flex items-center justify-between gap-4 w-full">
             <div className="flex items-center gap-2.5 text-xs sm:text-sm font-semibold">
               <span className="text-base select-none">⚠️</span>
               <span>{error}</span>
@@ -174,41 +174,43 @@ export default function OfficerDashboardPage() {
           </div>
         )}
 
-        {/* ── 1. Summary Cards (Critical zones, High-risk roads, Active alerts, Villages at risk, Pending field reports) ── */}
-        <OfficerSummaryCards metrics={metrics} isLoading={isLoading} />
+        {/* ── 1. Operational Summary Metrics ── */}
+        <section aria-label="Operational Summary Metrics" className="w-full">
+          <OfficerSummaryCards metrics={metrics} isLoading={isLoading} />
+        </section>
 
-        {/* ── 2, 3, 4: Main Operations Grid ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
-          {/* Left Column (7 cols): Mini Risk Map showing current hotspots & Recent AI Risk Updates */}
-          <div className="lg:col-span-7 space-y-6 sm:space-y-8">
-            {/* 2. Mini Risk Map showing current hotspots */}
-            <OfficerMiniRiskMap
-              corridors={riskMapCorridors.length > 0 ? riskMapCorridors : (roads as unknown as PublicRiskMapItem[])}
-              isLoading={isLoading}
-              error={error}
-              onRetry={handleManualRefresh}
-            />
+        {/* ── 2. Risk Hotspots, Corridors & 3D Terrain Mini Map ── */}
+        <section aria-label="Risk Hotspots & Corridors" className="w-full">
+          <OfficerMiniRiskMap
+            corridors={riskMapCorridors.length > 0 ? riskMapCorridors : (roads as unknown as PublicRiskMapItem[])}
+            isLoading={isLoading}
+            error={error}
+            onRetry={handleManualRefresh}
+          />
+        </section>
 
-            {/* 3. Recent AI Risk Updates */}
-            <OfficerAiRiskUpdates alerts={alerts} isLoading={isLoading} />
-          </div>
+        {/* ── 3. Recent AI Risk Updates ── */}
+        <section aria-label="Recent AI Risk Updates" className="w-full">
+          <OfficerAiRiskUpdates alerts={alerts} isLoading={isLoading} />
+        </section>
 
-          {/* Right Column (5 cols): 4. Priority Action List for the Officer */}
-          <div className="lg:col-span-5 space-y-6 sm:space-y-8">
-            <OfficerPriorityActions
-              reports={reports}
-              alerts={alerts}
-              isLoading={isLoading}
-            />
-          </div>
-        </div>
+        {/* ── 4. Priority Action List ── */}
+        <section aria-label="Priority Action List" className="w-full">
+          <OfficerPriorityActions
+            reports={reports}
+            alerts={alerts}
+            isLoading={isLoading}
+          />
+        </section>
 
-        {/* ── 5. Rainfall and SAR-Data Status ── */}
-        <OfficerDataStatus
-          lastUpdated={lastRefreshed}
-          isLoading={isLoading}
-          onRefresh={handleManualRefresh}
-        />
+        {/* ── 5. Rainfall & SAR-Data Status ── */}
+        <section aria-label="Rainfall & SAR-Data Status" className="w-full">
+          <OfficerDataStatus
+            lastUpdated={lastRefreshed}
+            isLoading={isLoading}
+            onRefresh={handleManualRefresh}
+          />
+        </section>
       </div>
     </PortalLayout>
   );

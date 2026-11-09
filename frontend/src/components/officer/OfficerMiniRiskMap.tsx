@@ -226,7 +226,7 @@ export default function OfficerMiniRiskMap({
       {!isLoading && !error && (
         <div className="space-y-4">
           {/* High-Fidelity 3D Terrain Mini Map */}
-          <div className="relative rounded-2xl overflow-hidden border border-[#173D32]/20 shadow-xs h-[250px] sm:h-[270px] bg-[#EEF4EB]">
+          <div className="relative rounded-2xl overflow-hidden border border-[#173D32]/20 shadow-xs h-[280px] sm:h-[340px] lg:h-[380px] bg-[#EEF4EB]">
             <RiskMap
               variant="mini"
               showPlayback={false}
