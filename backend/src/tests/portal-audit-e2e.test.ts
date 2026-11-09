@@ -2,6 +2,41 @@ import assert from 'assert';
 
 const API_BASE = 'http://localhost:5000/api/v1';
 
+interface ApiSuccessResponse<T> {
+  success: boolean;
+  data: T;
+  message?: string;
+}
+
+interface ApiErrorResponse {
+  success: boolean;
+  error: {
+    code: string;
+    message: string;
+    details?: unknown;
+  };
+}
+
+interface UserPayload {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
+interface LoginData {
+  user: UserPayload;
+  accessToken: string;
+}
+
+interface UserMeData {
+  user: UserPayload;
+}
+
+interface RefreshData {
+  accessToken: string;
+}
+
 async function runE2EAudit() {
   console.log('\n========================================================');
   console.log('🧪 TERRA360 PORTAL AUTHENTICATION & PERSISTENCE AUDIT');
@@ -15,9 +50,10 @@ async function runE2EAudit() {
       await fn();
       console.log(`  ✓ ${name}`);
       passed++;
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
       console.error(`  ✗ ${name}`);
-      console.error(`    Error: ${err.message}`);
+      console.error(`    Error: ${message}`);
       failed++;
     }
   }
@@ -39,7 +75,7 @@ async function runE2EAudit() {
     });
 
     assert.strictEqual(res.status, 200, `Expected 200, got ${res.status}`);
-    const body = await res.json();
+    const body = (await res.json()) as ApiSuccessResponse<LoginData>;
     assert.strictEqual(body.success, true);
     assert.ok(body.data.accessToken, 'Access token missing in login response');
     assert.strictEqual(body.data.user.role, 'officer');
@@ -68,7 +104,7 @@ async function runE2EAudit() {
     });
 
     assert.strictEqual(res.status, 200);
-    const body = await res.json();
+    const body = (await res.json()) as ApiSuccessResponse<UserMeData>;
     assert.strictEqual(body.success, true);
     assert.strictEqual(body.data.user.email, 'officer@terra360.in');
   });
@@ -103,7 +139,7 @@ async function runE2EAudit() {
     });
 
     assert.strictEqual(res.status, 200);
-    const body = await res.json();
+    const body = (await res.json()) as ApiSuccessResponse<RefreshData>;
     assert.strictEqual(body.success, true);
     assert.ok(body.data.accessToken);
     newAccessToken = body.data.accessToken;
@@ -113,6 +149,22 @@ async function runE2EAudit() {
     const match = setCookie.match(/refreshToken=([^;]+)/);
     assert.ok(match);
     rotatedRefreshTokenCookie = `refreshToken=${match[1]}`;
+
+    // Verify rotation changed the token
+    assert.notStrictEqual(
+      rotatedRefreshTokenCookie,
+      refreshTokenCookie,
+      'Rotated refresh token must differ from old refresh token'
+    );
+
+    // Verify the newly rotated access token authenticates successfully
+    const verifyRes = await fetch(`${API_BASE}/users/me`, {
+      headers: {
+        Authorization: `Bearer ${newAccessToken}`,
+        Origin: 'http://localhost:3000',
+      },
+    });
+    assert.strictEqual(verifyRes.status, 200, 'Rotated access token must authorize requests');
   });
 
   await test('5. Old refresh token reuse detection triggers revocation (Security PRD §13.8)', async () => {
@@ -126,7 +178,7 @@ async function runE2EAudit() {
     });
 
     assert.strictEqual(res.status, 401, 'Old token reuse must return 401');
-    const body = await res.json();
+    const body = (await res.json()) as ApiErrorResponse;
     assert.strictEqual(body.error.code, 'TOKEN_REUSE_DETECTED');
   });
 
@@ -138,7 +190,7 @@ async function runE2EAudit() {
     });
 
     assert.strictEqual(res.status, 401);
-    const body = await res.json();
+    const body = (await res.json()) as ApiErrorResponse;
     assert.strictEqual(body.error.code, 'UNAUTHORIZED');
   });
 
@@ -188,7 +240,7 @@ async function runE2EAudit() {
       body: JSON.stringify({ email: 'citizen@terra360.in', password: 'Password123!' }),
     });
     assert.strictEqual(citizenLogin.status, 200);
-    const citizenData = await citizenLogin.json();
+    const citizenData = (await citizenLogin.json()) as ApiSuccessResponse<LoginData>;
     const citizenToken = citizenData.data.accessToken;
 
     // Attempt to access officer reports endpoint with citizen token
@@ -198,7 +250,7 @@ async function runE2EAudit() {
       },
     });
     assert.strictEqual(officerEndpointRes.status, 403, 'Citizen must receive 403 FORBIDDEN on officer routes');
-    const errBody = await officerEndpointRes.json();
+    const errBody = (await officerEndpointRes.json()) as ApiErrorResponse;
     assert.strictEqual(errBody.error.code, 'FORBIDDEN');
   });
 
@@ -209,7 +261,7 @@ async function runE2EAudit() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'officer@terra360.in', password: 'Password123!' }),
     });
-    const data = await loginRes.json();
+    const data = (await loginRes.json()) as ApiSuccessResponse<LoginData>;
     const token = data.data.accessToken;
 
     // Dispatch 5 concurrent protected requests
@@ -242,7 +294,7 @@ async function runE2EAudit() {
   }
 }
 
-runE2EAudit().catch((err) => {
+runE2EAudit().catch((err: unknown) => {
   console.error('Fatal audit failure:', err);
   process.exit(1);
 });
