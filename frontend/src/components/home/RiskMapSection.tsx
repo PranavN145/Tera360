@@ -136,7 +136,7 @@ export default function RiskMapSection() {
         </div>
 
         {/* Live Platform Stats Telemetry Band */}
-        <div className="mb-7 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+        <div className="mb-7 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
           {/* Monitored Corridors */}
           <div className="bg-[#FAF8F2] border border-[#173D32]/12 rounded-[20px] p-4 shadow-[0_2px_12px_rgba(23,61,50,0.04)] hover:shadow-md hover:-translate-y-0.5 transition-all">
             <div className="flex items-center justify-between">
@@ -224,7 +224,7 @@ export default function RiskMapSection() {
           </div>
 
           {/* Open Corridors */}
-          <div className="hidden lg:block bg-[#FAF8F2] border border-[#173D32]/12 rounded-[20px] p-4 shadow-[0_2px_12px_rgba(23,61,50,0.04)] hover:shadow-md hover:-translate-y-0.5 transition-all">
+          <div className="col-span-2 sm:col-span-1 bg-[#FAF8F2] border border-[#173D32]/12 rounded-[20px] p-4 shadow-[0_2px_12px_rgba(23,61,50,0.04)] hover:shadow-md hover:-translate-y-0.5 transition-all">
             <div className="flex items-center justify-between">
               <span className="text-[11px] uppercase font-bold text-emerald-800/80 tracking-wider">
                 Open Corridors
@@ -248,7 +248,7 @@ export default function RiskMapSection() {
         {/* Dedicated 3D GIS Workstation & Corridor Canvas Container */}
         {viewMode === "map" ? (
           /* Unified 3D GIS Workstation matching Screenshot 3 standard */
-          <div className="relative w-full h-[540px] sm:h-[640px] lg:h-[720px] rounded-[28px] overflow-hidden border border-[#173D32]/15 shadow-[0_12px_36px_rgba(23,61,50,0.08)] bg-[#EEF4EB]">
+          <div className="relative w-full h-[460px] sm:h-[600px] lg:h-[720px] rounded-[28px] overflow-hidden border border-[#173D32]/15 shadow-[0_12px_36px_rgba(23,61,50,0.08)] bg-[#EEF4EB]">
             <RiskMap
               variant="full"
               className="w-full h-full"

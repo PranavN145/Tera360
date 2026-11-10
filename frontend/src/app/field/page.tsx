@@ -646,7 +646,7 @@ export default function FieldOfficerPortalPage() {
       {/* ── 1. LIVE TOAST NOTIFICATION ─────────────────────────────────────── */}
       {notificationBanner && (
         <div
-          className={`fixed top-20 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-xl font-semibold text-xs shadow-md border flex items-center gap-2 ${
+          className={`fixed top-20 left-1/2 -translate-x-1/2 z-50 max-w-[calc(100vw-2rem)] px-4 sm:px-5 py-2.5 rounded-xl font-semibold text-xs shadow-md border flex items-center gap-2 ${
             notificationBanner.type === "warning"
               ? "bg-amber-50 text-amber-900 border-amber-300"
               : notificationBanner.type === "info"
@@ -876,7 +876,7 @@ export default function FieldOfficerPortalPage() {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <div className="flex items-center gap-1 text-xs">
                     <span className="text-[#173D32]/60 font-medium">Status:</span>
                     <select
@@ -1024,7 +1024,7 @@ export default function FieldOfficerPortalPage() {
 
                         {/* Action Buttons Bar */}
                         <div className="pt-3 border-t border-[#173D32]/10 flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             {task.status !== "In_Progress" && !isCompleted && (
                               <button
                                 type="button"
@@ -1101,7 +1101,7 @@ export default function FieldOfficerPortalPage() {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white/70 border border-[#173D32]/15">
+                <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-white/70 border border-[#173D32]/15">
                   <button
                     type="button"
                     onClick={() => setMapLayer("topo")}
@@ -1138,7 +1138,7 @@ export default function FieldOfficerPortalPage() {
               {/* Spatial Interactive View Canvas */}
               <div className="bg-[#173D32] text-[#F8F4EC] rounded-2xl p-5 shadow-xs border border-[#173D32]/20 relative overflow-hidden">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#DCE8D4]/20 mb-4">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Compass className="w-4 h-4 text-[#D6A65D]" />
                     <span className="text-xs font-bold uppercase tracking-wider text-[#DCE8D4]">
                       Sector 4 Corridors Navigation Grid
@@ -1166,7 +1166,7 @@ export default function FieldOfficerPortalPage() {
                 </div>
 
                 {/* Spatial Map Simulation Screen */}
-                <div className="h-64 sm:h-80 rounded-xl bg-[#122e26] border border-[#DCE8D4]/20 p-4 relative flex flex-col justify-between overflow-hidden">
+                <div className="min-h-64 sm:min-h-80 rounded-xl bg-[#122e26] border border-[#DCE8D4]/20 p-4 relative flex flex-col justify-between gap-4 overflow-hidden">
                   {/* Grid Lines Pattern */}
                   <div
                     className="absolute inset-0 opacity-15 pointer-events-none"
@@ -1494,7 +1494,7 @@ export default function FieldOfficerPortalPage() {
 
                         {/* Action Buttons Bar */}
                         <div className="pt-3 mt-3 border-t border-[#173D32]/10 flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             {isPending && (
                               <>
                                 <button
@@ -1647,7 +1647,7 @@ export default function FieldOfficerPortalPage() {
                     return (
                       <div key={item.id} className="py-2.5 flex items-start justify-between gap-3">
                         <div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <span className="font-bold text-[#173D32]">{item.stretchName}</span>
                             <span
                               className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.2 rounded border ${badge.classes}`}
@@ -1841,8 +1841,8 @@ export default function FieldOfficerPortalPage() {
       {/* 5. ACTION & DETAIL MODALS                                      */}
       {/* ════════════════════════════════════════════════════════════════ */}
       {modalType && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#FAF8F2] text-[#173D32] rounded-2xl shadow-xl border border-[#173D32]/20 max-w-lg w-full p-6 space-y-4">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-[#FAF8F2] text-[#173D32] rounded-2xl shadow-xl border border-[#173D32]/20 max-w-lg w-full max-h-[calc(100dvh-2rem)] overflow-y-auto p-5 sm:p-6 space-y-4">
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-3 border-b border-[#173D32]/10">
               <h3 className="font-bold text-base text-[#173D32] flex items-center gap-2">
@@ -1971,7 +1971,7 @@ export default function FieldOfficerPortalPage() {
                   <label className="block text-[11px] font-bold text-[#173D32]/70 uppercase mb-1">
                     Attach Photo Evidence
                   </label>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#173D32]/20 bg-white text-xs font-semibold cursor-pointer hover:bg-black/5">
                       <Camera className="w-4 h-4 text-[#173D32]/70" />
                       <span>{photoAttachment ? "Change Photo" : "Upload Photo"}</span>

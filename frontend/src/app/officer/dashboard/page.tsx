@@ -144,7 +144,7 @@ export default function OfficerDashboardPage() {
       title={`Operations Dashboard — ${user?.name || "Officer"}`}
       subtitle="Regional landslide early warning, corridor clearance tracking, and emergency incident supervision."
       headerActions={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="hidden sm:inline-block text-[11px] font-semibold text-[#173D32]/60">
             Updated:{" "}
             {lastRefreshed

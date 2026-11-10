@@ -106,7 +106,7 @@ export default function FieldReportsPage() {
       title="Field Hazard Reports & Ground Truth"
       subtitle="Crowd-sourced incident submissions, field sensor anomalies, and ground verifications."
       headerActions={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Link
             href="/report"
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#D6A65D] hover:bg-[#c9984e] text-[#173D32] text-xs font-bold shadow-xs transition-all"

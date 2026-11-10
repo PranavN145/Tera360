@@ -315,7 +315,7 @@ export default function RiskMapPage() {
         </div>
 
         {/* Live Operational Stats Strip */}
-        <div className="mb-8 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+        <div className="mb-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
           <div className="bg-[#FAF8F2]/90 backdrop-blur-md border border-[#173D32]/12 rounded-[20px] p-4 shadow-[0_2px_12px_rgba(23,61,50,0.04)] hover:shadow-md hover:-translate-y-0.5 transition-all">
             <div className="flex items-center justify-between">
               <span className="text-[11px] uppercase font-bold text-[#173D32]/60 tracking-wider">
@@ -398,7 +398,7 @@ export default function RiskMapPage() {
             </span>
           </div>
 
-          <div className="hidden lg:block bg-[#FAF8F2]/90 backdrop-blur-md border border-[#173D32]/12 rounded-[20px] p-4 shadow-[0_2px_12px_rgba(23,61,50,0.04)] hover:shadow-md hover:-translate-y-0.5 transition-all">
+          <div className="col-span-2 sm:col-span-1 bg-[#FAF8F2]/90 backdrop-blur-md border border-[#173D32]/12 rounded-[20px] p-4 shadow-[0_2px_12px_rgba(23,61,50,0.04)] hover:shadow-md hover:-translate-y-0.5 transition-all">
             <div className="flex items-center justify-between">
               <span className="text-[11px] uppercase font-bold text-emerald-800/80 tracking-wider">
                 Open Corridors
@@ -420,7 +420,7 @@ export default function RiskMapPage() {
         </div>
 
         {/* Unified 3D GIS Workstation matching Screenshot 3 standard */}
-        <div className="mb-8 relative w-full h-[540px] sm:h-[640px] lg:h-[720px] rounded-[28px] overflow-hidden border border-[#173D32]/15 shadow-[0_12px_36px_rgba(23,61,50,0.08)] bg-[#EEF4EB]">
+        <div className="mb-8 relative w-full h-[460px] sm:h-[600px] lg:h-[720px] rounded-[28px] overflow-hidden border border-[#173D32]/15 shadow-[0_12px_36px_rgba(23,61,50,0.08)] bg-[#EEF4EB]">
           <RiskMap
             variant="full"
             selectedState={selectedState}
@@ -445,7 +445,7 @@ export default function RiskMapPage() {
         {/* Filter Controls Bar */}
         <div className="bg-[#FAF8F2]/90 backdrop-blur-md border border-[#173D32]/12 rounded-[22px] p-4 sm:p-5 mb-8 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-4">
           {/* State Tabs */}
-          <div className="flex flex-wrap items-center gap-1.5 w-full lg:w-auto overflow-x-auto pb-1 lg:pb-0">
+          <div className="flex flex-wrap items-center gap-1.5 w-full lg:w-auto">
             {STATE_FILTERS.map((s) => (
               <button
                 key={s}
@@ -463,8 +463,8 @@ export default function RiskMapPage() {
           </div>
 
           {/* Search & Severity Filter */}
-          <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-end">
-            <div className="relative flex-1 sm:w-56">
+          <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-stretch sm:justify-end">
+            <div className="relative flex-1 min-w-[180px] sm:w-56">
               <input
                 id="risk-map-search"
                 name="risk-map-search"
@@ -559,8 +559,8 @@ export default function RiskMapPage() {
 
                 <div className="relative z-10">
                   {/* Top Row: Status pill & Highway Shield */}
-                  <div className="flex items-center justify-between gap-2 mb-4">
-                    <div className="flex items-center gap-1.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <span
                         className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
                           isBlocked
@@ -613,7 +613,7 @@ export default function RiskMapPage() {
                 </div>
 
                 {/* Card Bottom Action */}
-                <div className="relative z-10 mt-6 pt-4 border-t border-[#173D32]/10 flex items-center justify-between text-xs font-semibold">
+                <div className="relative z-10 mt-6 pt-4 border-t border-[#173D32]/10 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold">
                   <span className="text-[#173D32]/70">
                     Risk Level: <strong className="text-[#173D32] font-black">{corridor.riskLevel}</strong>
                   </span>

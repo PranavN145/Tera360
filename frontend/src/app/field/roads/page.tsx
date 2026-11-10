@@ -266,7 +266,7 @@ function FieldRoadsContent() {
 
           {/* Error Banner */}
           {error && (
-            <div className="mt-4 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-900 flex items-center justify-between gap-3 text-xs font-semibold">
+            <div className="mt-4 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-900 flex flex-wrap items-center justify-between gap-3 text-xs font-semibold">
               <span className="inline-flex items-center gap-2">
                 <AlertTriangle
                   className="w-4 h-4 text-red-600 shrink-0"
@@ -379,7 +379,7 @@ function FieldRoadsContent() {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between md:justify-end gap-5 sm:gap-7 shrink-0 pl-4 md:pl-0">
+                    <div className="flex flex-wrap items-center justify-between md:justify-end gap-3 sm:gap-7 md:shrink-0 pl-4 md:pl-0">
                       <div className="flex flex-col items-start md:items-center text-left md:text-center">
                         <StatusBadge
                           status={road.status}

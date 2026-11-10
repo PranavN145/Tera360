@@ -274,7 +274,7 @@ Disaster Helpline: 1070 | Police Emergency: 112 | BRO Highway Control: 1800-118-
       <div className="space-y-6 w-full">
         {/* ── 1. Corridor Selection Tabs Strip ──────────────────────────── */}
         <div>
-          <div className="flex items-center justify-between gap-3 mb-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 mb-2.5">
             <span className="text-[11px] font-bold uppercase tracking-wider text-[#173D32]/65">
               Major Northeast Highway Corridors
             </span>
@@ -455,8 +455,8 @@ Disaster Helpline: 1070 | Police Emergency: 112 | BRO Highway Control: 1800-118-
             </div>
 
             {/* Transit Times */}
-            <div className="flex items-center gap-3 shrink-0">
-              <div className="bg-white/90 rounded-2xl p-3 border border-current/12 text-center min-w-[100px]">
+            <div className="flex flex-wrap sm:flex-nowrap items-stretch gap-3 w-full sm:w-auto sm:shrink-0">
+              <div className="bg-white/90 rounded-2xl p-3 border border-current/12 text-center flex-1 sm:flex-initial min-w-[100px]">
                 <span className="text-[10px] uppercase font-bold opacity-70 block">
                   Normal Time
                 </span>
@@ -464,7 +464,7 @@ Disaster Helpline: 1070 | Police Emergency: 112 | BRO Highway Control: 1800-118-
                   {activeRoute.normalDuration}
                 </span>
               </div>
-              <div className="bg-white/90 rounded-2xl p-3 border border-current/12 text-center min-w-[120px]">
+              <div className="bg-white/90 rounded-2xl p-3 border border-current/12 text-center flex-1 sm:flex-initial min-w-[120px]">
                 <span className="text-[10px] uppercase font-bold opacity-70 block">
                   Current ETA
                 </span>

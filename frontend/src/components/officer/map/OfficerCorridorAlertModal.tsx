@@ -133,7 +133,7 @@ export default function OfficerCorridorAlertModal({
                 <span className="text-[11px] font-bold uppercase tracking-wider text-[#173D32]/70 block mb-2">
                   Alert Severity
                 </span>
-                <div className="grid grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   {(
                     [
                       {

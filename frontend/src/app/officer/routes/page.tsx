@@ -104,7 +104,7 @@ export default function OfficerRoutesPage() {
       title="Safe Routes & Emergency Bypasses"
       subtitle="Supervise certified emergency diversion corridors, clearance authorizations, and heavy transit restrictions."
       headerActions={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Link
             href="/officer/roads"
             className="px-3.5 py-1.5 rounded-full bg-white hover:bg-[#173D32]/5 border border-[#173D32]/15 text-[#173D32] text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-2xs"
@@ -223,7 +223,7 @@ export default function OfficerRoutesPage() {
                         />
 
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2 mb-1.5">
+                          <div className="flex flex-wrap items-start justify-between gap-2 mb-1.5">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="px-2 py-0.5 rounded-md bg-[#173D32] text-[#F6F4EC] text-[11px] font-black tracking-wide">
                                 {route.id}

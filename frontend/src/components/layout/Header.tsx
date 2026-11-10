@@ -224,11 +224,15 @@ export default function Header() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-50 pt-[16px] lg:pt-[20px] px-4 sm:px-6 pointer-events-none transition-all">
+      <header className="fixed top-0 left-0 right-0 z-50 pt-[14px] sm:pt-[16px] lg:pt-[20px] px-3 sm:px-6 pointer-events-none transition-all">
         {/* Sleek, compact floating capsule navbar */}
-        <div className="w-[94%] sm:w-[92%] max-w-[820px] mx-auto pointer-events-auto">
+        <div
+          className={`w-full sm:w-[94%] ${
+            user ? "max-w-[940px]" : "max-w-[820px]"
+          } mx-auto pointer-events-auto`}
+        >
           {/* Compact floating navbar: 54px-58px height, rounded-[36px], background #F6F4EC */}
-          <div className="relative w-full h-[54px] lg:h-[58px] bg-[#F6F4EC]/95 backdrop-blur-md rounded-[36px] px-4 sm:px-5 lg:px-6 border border-[#173D32]/10 shadow-[0_4px_25px_-4px_rgba(23,61,50,0.12)] flex items-center justify-between transition-all">
+          <div className="relative w-full h-[54px] lg:h-[58px] bg-[#F6F4EC]/95 backdrop-blur-md rounded-[36px] px-3.5 sm:px-5 lg:px-6 border border-[#173D32]/10 shadow-[0_4px_25px_-4px_rgba(23,61,50,0.12)] flex items-center justify-between gap-2 transition-all">
           
           {/* Left: Logo */}
           <div className="flex items-center shrink-0">
@@ -259,7 +263,9 @@ export default function Header() {
 
           {/* Center: Navigation Links centered directly between Logo on left and Login on right with equal space */}
           <nav
-            className="hidden lg:flex flex-1 items-center justify-center gap-5 xl:gap-7 px-2"
+            className={`hidden lg:flex flex-1 items-center justify-center ${
+              user ? "gap-3.5 xl:gap-6" : "gap-5 xl:gap-7"
+            } px-2`}
             aria-label="Main Navigation"
           >
             {NAV_ITEMS.map((item) => {
@@ -388,7 +394,7 @@ export default function Header() {
         {/* Mobile / Tablet Dropdown Menu */}
         {mobileMenuOpen && (
           <div
-            className="lg:hidden mt-2 bg-[#F6F4EC]/98 backdrop-blur-xl border border-[#173D32]/15 rounded-3xl p-5 shadow-xl transition-all"
+            className="lg:hidden mt-2 bg-[#F6F4EC]/98 backdrop-blur-xl border border-[#173D32]/15 rounded-3xl p-4 sm:p-5 shadow-xl transition-all max-h-[calc(100dvh-5.75rem)] overflow-y-auto"
             role="dialog"
             aria-modal="true"
             aria-label="Mobile Navigation Menu"
@@ -423,10 +429,10 @@ export default function Header() {
             <div className="border-t border-[#173D32]/10 mt-4 pt-4 flex flex-col sm:flex-row gap-3">
               {user ? (
                 <div className="w-full flex flex-col gap-2 p-3.5 rounded-2xl bg-[#DCE8D4]/50 border border-[#173D32]/10">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="block text-sm font-bold text-[#173D32]">{user.name}</span>
-                      <span className="block text-xs text-[#173D32]/70 capitalize">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="block text-sm font-bold text-[#173D32] truncate">{user.name}</span>
+                      <span className="block text-xs text-[#173D32]/70 capitalize truncate">
                         {user.role?.replace("_", " ")}
                       </span>
                     </div>
@@ -437,12 +443,12 @@ export default function Header() {
                         setMobileMenuOpen(false);
                         router.push("/");
                       }}
-                      className="px-3 py-1 rounded-full border border-[#173D32]/30 text-xs font-bold text-[#173D32] hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-colors cursor-pointer"
+                      className="px-3 py-1 rounded-full border border-[#173D32]/30 text-xs font-bold text-[#173D32] hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-colors cursor-pointer shrink-0"
                     >
                       Sign Out
                     </button>
                   </div>
-                  <div className="flex gap-2 pt-2 border-t border-[#173D32]/10">
+                  <div className="flex flex-wrap gap-2 pt-2 border-t border-[#173D32]/10">
                     <Link
                       href="/account"
                       onClick={() => setMobileMenuOpen(false)}

@@ -668,7 +668,7 @@ export default function OfficerMiniRiskMap({
             {/* Floating Left Map Layers Panel */}
             <aside
               aria-label="Map Layers and Risk Legend"
-              className="absolute top-3.5 left-3.5 z-20 w-[202px] sm:w-[238px] max-h-[calc(100%-28px)] flex flex-col bg-[#FAF8F2]/95 backdrop-blur-md border border-[#173D32]/15 rounded-2xl shadow-[0_10px_28px_rgba(23,61,50,0.18)] text-[#173D32]"
+              className="absolute top-3.5 left-3.5 z-20 w-[186px] sm:w-[238px] max-w-[calc(100%-120px)] sm:max-w-none max-h-[calc(100%-28px)] flex flex-col bg-[#FAF8F2]/95 backdrop-blur-md border border-[#173D32]/15 rounded-2xl shadow-[0_10px_28px_rgba(23,61,50,0.18)] text-[#173D32]"
             >
               <button
                 type="button"

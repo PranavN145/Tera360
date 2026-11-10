@@ -10,7 +10,7 @@ export default function Home() {
   return (
     <div className="relative w-full min-h-screen flex flex-col bg-[#F6F4EC]">
       {/* Hero Scene Section: 100% viewport scene */}
-      <div id="home" className="relative w-full min-h-screen lg:h-screen lg:max-h-screen flex flex-col justify-between overflow-hidden bg-[#F6F4EC] scroll-mt-20 sm:scroll-mt-24">
+      <div id="home" className="relative w-full min-h-screen flex flex-col justify-between overflow-hidden bg-[#F6F4EC] scroll-mt-20 sm:scroll-mt-24">
         {/* Landscape background image as full hero background */}
         <div className="absolute inset-0 z-0 pointer-events-none select-none">
           <Image
@@ -23,7 +23,7 @@ export default function Home() {
           />
           {/* Soft, luminous morning-mist warm-white gradient behind hero text for pristine readability */}
           <div
-            className="absolute inset-0 bg-gradient-to-r from-[#F6F4EC]/75 via-[#F6F4EC]/35 to-transparent max-w-[62%] pointer-events-none"
+            className="absolute inset-0 bg-gradient-to-r from-[#F6F4EC]/75 via-[#F6F4EC]/35 to-transparent max-w-full sm:max-w-[82%] lg:max-w-[62%] pointer-events-none"
             aria-hidden="true"
           />
           {/* Bottom subtle edge transition into #F6F4EC */}

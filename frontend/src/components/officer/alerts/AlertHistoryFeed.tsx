@@ -233,11 +233,11 @@ export default function AlertHistoryFeed({ onComposeClick }: AlertHistoryFeedPro
             </div>
 
             {/* Date Range Selector */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-[10px] font-bold text-[#173D32]/55 uppercase tracking-[0.1em]">
                 Window
               </span>
-              <div className="inline-flex items-center gap-0.5 rounded-full bg-[#F2EFE6] border border-[#173D32]/12 p-1 text-xs font-bold">
+              <div className="inline-flex flex-wrap items-center gap-0.5 rounded-2xl sm:rounded-full bg-[#F2EFE6] border border-[#173D32]/12 p-1 text-xs font-bold">
                 {DATE_RANGES.map((range) => (
                   <button
                     key={range.value}
@@ -324,7 +324,7 @@ export default function AlertHistoryFeed({ onComposeClick }: AlertHistoryFeedPro
 
         {/* Error State */}
         {error && (
-          <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-900 flex items-center justify-between gap-3 text-xs font-semibold">
+          <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-900 flex flex-wrap items-center justify-between gap-3 text-xs font-semibold">
             <span className="inline-flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
               <span>{error}</span>
@@ -418,7 +418,7 @@ export default function AlertHistoryFeed({ onComposeClick }: AlertHistoryFeedPro
                           )}
                         </div>
 
-                        <div className="flex items-center gap-2 text-xs text-[#173D32]/65 font-medium shrink-0">
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-[#173D32]/65 font-medium shrink-0">
                           <span className="inline-flex items-center gap-1">
                             <Clock className="w-3.5 h-3.5 text-[#173D32]/50" />
                             <span>

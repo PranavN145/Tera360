@@ -210,7 +210,7 @@ export default function AlertReviewModal({
 
             {/* Local Language Preview */}
             <div className="p-3.5 rounded-2xl bg-white border border-[#173D32]/10">
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex flex-wrap items-center justify-between gap-1.5 mb-1">
                 <span className="text-[10px] uppercase font-bold text-[#173D32]/65 tracking-[0.1em]">
                   Vernacular Preview ({draft.localLanguage})
                 </span>
@@ -253,7 +253,7 @@ export default function AlertReviewModal({
             <span>Multi-channel broadcast requires backend telecom gateway (M4)</span>
           </div>
 
-          <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
             <button
               type="button"
               onClick={onClose}

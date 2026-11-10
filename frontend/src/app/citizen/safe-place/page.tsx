@@ -643,7 +643,7 @@ District Disaster Line: 1077
                     <span>{shelter.address}</span>
                   </p>
 
-                  <div className="p-3 rounded-xl bg-white border border-[#173D32]/10 text-xs mb-3 flex items-center justify-between gap-2">
+                  <div className="p-3 rounded-xl bg-white border border-[#173D32]/10 text-xs mb-3 flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <span className="text-[10px] uppercase font-bold text-[#173D32]/55 block">
                         Capacity
@@ -719,7 +719,7 @@ District Disaster Line: 1077
             </a>
           }
         >
-          <div className="h-[340px] sm:h-[400px] w-full rounded-2xl overflow-hidden border border-[#173D32]/15 relative shadow-xs">
+          <div className="h-[300px] sm:h-[400px] w-full rounded-2xl overflow-hidden border border-[#173D32]/15 relative shadow-xs">
             <RiskMap
               variant="mini"
               className="w-full h-full"

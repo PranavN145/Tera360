@@ -17,7 +17,7 @@ export default function Hero() {
       aria-label="Terra360 — Landslide Early-Warning Platform for Northeast India"
     >
       {/* Container: balanced spacing between left text and right floating map */}
-      <div className="w-full h-full flex flex-col lg:flex-row items-center justify-between pl-6 sm:pl-10 lg:pl-[6%] pr-6 sm:pr-10 lg:pr-[5%] py-6 lg:py-0 gap-8 lg:gap-10 max-w-full min-w-0">
+      <div className="w-full h-full flex flex-col lg:flex-row items-center justify-between px-4 sm:px-10 lg:pl-[6%] lg:pr-[5%] py-6 lg:py-8 gap-8 lg:gap-10 max-w-full min-w-0">
         {/* Left Side: Hero Text Content (Compact scaled down by ~15-20%) */}
         <div className="w-full max-w-[580px] xl:max-w-[620px] flex flex-col items-start text-left z-10 min-w-0">
           {/* Headline: 58-64px on desktop, first line green #173D32, second line italic ochre #D6A65D */}
@@ -108,7 +108,7 @@ export default function Hero() {
         </div>
 
         {/* Right Side: Map Illustration FLOATING INDEPENDENTLY (decreased size by little & moved leftwards) */}
-        <div className="w-full lg:w-auto flex items-center justify-center lg:justify-end z-10 shrink-0 -translate-y-4 sm:-translate-y-6 lg:-translate-y-12 xl:-translate-y-14 lg:-translate-x-12 xl:-translate-x-16">
+        <div className="w-full lg:w-auto flex items-center justify-center lg:justify-end z-10 shrink-0 translate-y-0 lg:-translate-y-8 xl:-translate-y-12 lg:-translate-x-10 xl:-translate-x-16">
           <div className="relative w-[300px] sm:w-[370px] lg:w-[430px] xl:w-[455px] max-w-full aspect-[1414/1112] animate-float drop-shadow-[0_20px_35px_rgba(23,61,50,0.18)]">
             <Image
               src="/images/map.png"

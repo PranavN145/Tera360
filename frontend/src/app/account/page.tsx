@@ -716,13 +716,13 @@ function AccountDashboard() {
                           <Laptop className="w-4 h-4" aria-hidden="true" />
                         )}
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-xs sm:text-sm text-[#173D32]">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-bold text-xs sm:text-sm text-[#173D32] break-words">
                             {sess.userAgent}
                           </span>
                           {sess.isCurrent && (
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold shrink-0">
                               Current Session
                             </span>
                           )}
@@ -820,7 +820,7 @@ function AccountDashboard() {
             role="dialog"
             aria-modal="true"
           >
-            <div className="w-full max-w-md bg-[#FAF8F2] border border-red-300 rounded-3xl p-6 sm:p-8 shadow-2xl text-[#173D32]">
+            <div className="w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto bg-[#FAF8F2] border border-red-300 rounded-3xl p-6 sm:p-8 shadow-2xl text-[#173D32]">
               <div className="text-center mb-5">
                 <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-3">
                   <AlertTriangle className="w-6 h-6" aria-hidden="true" />

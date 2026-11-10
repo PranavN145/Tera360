@@ -623,7 +623,7 @@ export default function CitizenReportPage() {
                             Capture device location or enter latitude and longitude manually.
                           </p>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                           <button
                             type="button"
                             onClick={handleDetectGPS}
@@ -754,11 +754,11 @@ export default function CitizenReportPage() {
                                   className="w-full h-full object-cover"
                                 />
                               </div>
-                              <div className="flex items-center justify-between text-[10px] text-[#173D32]">
-                                <span className="font-semibold truncate max-w-[110px]">
+                              <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-[#173D32]">
+                                <span className="font-semibold truncate min-w-0 flex-1">
                                   {photo.name}
                                 </span>
-                                <span className="text-[#173D32]/60">{photo.sizeKb} KB</span>
+                                <span className="text-[#173D32]/60 shrink-0">{photo.sizeKb} KB</span>
                               </div>
                               <button
                                 type="button"
@@ -962,7 +962,7 @@ export default function CitizenReportPage() {
                         </p>
 
                         {report.coordinates && (
-                          <div className="p-2 rounded-xl bg-[#FAF8F2] border border-[#173D32]/10 text-[10px] font-mono text-[#173D32]/75 flex items-center justify-between">
+                          <div className="p-2 rounded-xl bg-[#FAF8F2] border border-[#173D32]/10 text-[10px] font-mono text-[#173D32]/75 flex flex-wrap items-center justify-between gap-1.5">
                             <span>WGS-84 Coordinates</span>
                             <span>
                               {report.coordinates.coordinates[1]}°N, {report.coordinates.coordinates[0]}°E

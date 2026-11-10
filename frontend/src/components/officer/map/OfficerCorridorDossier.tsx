@@ -94,7 +94,7 @@ export default function OfficerCorridorDossier({
   return (
     <section
       aria-label="Corridor Telemetry Dossier"
-      className="relative overflow-hidden bg-[#FAF8F2] border border-[#173D32]/12 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-[0_6px_24px_-6px_rgba(23,61,50,0.08)] flex flex-col justify-between min-h-[500px] lg:h-[620px]"
+      className="relative overflow-hidden bg-[#FAF8F2] border border-[#173D32]/12 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-[0_6px_24px_-6px_rgba(23,61,50,0.08)] flex flex-col justify-between min-h-[420px] lg:min-h-[620px]"
     >
       {/* Subtle decorative mountain silhouette in top-right corner */}
       <svg

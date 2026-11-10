@@ -365,7 +365,7 @@ export default function RiskMap({
   const [riskHeatmapEnabled, setRiskHeatmapEnabled] = useState<boolean>(true);
   const [rescueRouteEnabled, setRescueRouteEnabled] = useState<boolean>(true);
   const [fieldSensorsEnabled, setFieldSensorsEnabled] = useState<boolean>(true);
-  const [isHudCollapsed, setIsHudCollapsed] = useState<boolean>(false);
+  const [isHudCollapsed, setIsHudCollapsed] = useState<boolean | null>(null);
 
   const isControlledLayers = layerVisibility !== undefined;
   const effectiveLayers: RiskMapLayerVisibility = useMemo(
@@ -743,8 +743,8 @@ export default function RiskMap({
         closeButton: true,
         maxWidth: "260px",
       }).setHTML(`
-        <div style="font-family:system-ui,-apple-system,sans-serif;padding:4px 6px;color:#173D32;min-width:190px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;">
+        <div style="font-family:system-ui,-apple-system,sans-serif;padding:4px 6px;color:#173D32;min-width:min(190px,70vw);max-width:min(248px,80vw);box-sizing:border-box;">
+          <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px;">
             <strong style="font-size:12px;font-weight:800;color:#173D32;">${escapeHtml(hotspot.title)}</strong>
             <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:9999px;background:${badgeBg};color:${badgeText};white-space:nowrap;">
               ${escapeHtml(hotspot.severity === "Normal" ? "Safe" : hotspot.severity)}
@@ -1591,8 +1591,8 @@ export default function RiskMap({
           : "";
 
         const tooltipHTML = `
-          <div style="font-family: system-ui, -apple-system, sans-serif; padding: 7px 9px; min-width: 215px; color: #173D32;">
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 3px;">
+          <div style="font-family: system-ui, -apple-system, sans-serif; padding: 7px 9px; min-width: min(215px, 72vw); max-width: min(280px, 84vw); box-sizing: border-box; color: #173D32;">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 3px;">
               <span style="font-weight: 800; font-size: 11.5px; letter-spacing: 0.03em; color: #111827; display: flex; align-items: center; gap: 5px;">
                 <span style="display: inline-block; width: 7px; height: 7px; border-radius: 9999px; background-color: ${statusColor}; box-shadow: 0 0 6px ${statusColor};"></span>
                 ${id}
@@ -1691,8 +1691,8 @@ export default function RiskMap({
             : "#00E676";
 
         const popupHTML = `
-          <div style="font-family: system-ui, -apple-system, sans-serif; padding: 6px; min-width: 250px; color: #173D32;">
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; border-bottom: 1px solid rgba(23,61,50,0.15); padding-bottom: 6px;">
+          <div style="font-family: system-ui, -apple-system, sans-serif; padding: 6px; min-width: min(240px, 72vw); max-width: min(300px, 84vw); box-sizing: border-box; color: #173D32;">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 6px; border-bottom: 1px solid rgba(23,61,50,0.15); padding-bottom: 6px;">
               <div style="font-weight: 800; font-size: 13px; line-height: 1.3;">
                 ${segmentName}
               </div>
@@ -2325,7 +2325,7 @@ export default function RiskMap({
 
   return (
     <div
-      className={`relative w-full h-full min-h-[400px] overflow-hidden ${className}`}
+      className={`relative w-full h-full min-h-[240px] sm:min-h-[300px] overflow-hidden ${className}`}
       style={{ width: "100%", height: "100%" }}
     >
       {/* Dedicated clean container for Mapbox GL canvas */}
@@ -2358,10 +2358,10 @@ export default function RiskMap({
 
       {/* Floating Top-Left Dashboard Overlay Card */}
       {effectiveShowHud && (
-        <div className={`absolute top-3.5 left-3.5 sm:top-4 sm:left-4 z-20 ${
+        <div className={`absolute top-3 left-3 sm:top-4 sm:left-4 z-20 ${
           variant === "mini"
             ? "max-w-[200px] p-2 rounded-xl"
-            : "max-w-[calc(100%-1.75rem)] sm:max-w-[340px] max-h-[calc(100%-1.75rem)] overflow-y-auto p-3.5 sm:p-4 rounded-2xl"
+            : "max-w-[calc(100%-4.25rem)] sm:max-w-[340px] max-h-[calc(100%-1.5rem)] sm:max-h-[calc(100%-2rem)] overflow-y-auto p-3 sm:p-4 rounded-2xl"
         } w-full bg-[#FAF8F2]/95 backdrop-blur-md border border-[#173D32]/15 shadow-[0_12px_32px_rgba(23,61,50,0.14)] text-[#173D32] select-none transition-all`}>
           {variant === "mini" ? (
             <div className="flex items-center gap-2">
@@ -2417,17 +2417,34 @@ export default function RiskMap({
                   </span>
                   <button
                     type="button"
-                    onClick={() => setIsHudCollapsed(!isHudCollapsed)}
+                    onClick={() => {
+                      const currentlyCollapsed =
+                        isHudCollapsed !== null
+                          ? isHudCollapsed
+                          : typeof window !== "undefined"
+                            ? window.innerWidth < 640
+                            : false;
+                      setIsHudCollapsed(!currentlyCollapsed);
+                    }}
                     className="text-xs text-[#173D32]/60 hover:text-[#173D32] p-0.5 cursor-pointer font-bold"
-                    aria-label={isHudCollapsed ? "Expand HUD" : "Collapse HUD"}
+                    aria-label={isHudCollapsed === true ? "Expand HUD" : "Collapse HUD"}
                   >
-                    {isHudCollapsed ? "＋" : "－"}
+                    {isHudCollapsed === null ? (
+                      <>
+                        <span className="sm:hidden">＋</span>
+                        <span className="hidden sm:inline">－</span>
+                      </>
+                    ) : isHudCollapsed ? (
+                      "＋"
+                    ) : (
+                      "－"
+                    )}
                   </button>
                 </div>
               </div>
 
-        {!isHudCollapsed && (
-          <>
+        {isHudCollapsed !== true && (
+          <div className={isHudCollapsed === null ? "hidden sm:block" : "block"}>
             {/* Dynamic Status Badges */}
             <div className="space-y-2 mt-3 mb-3.5">
               {/* 1. Active Corridor Alert Badge */}
@@ -2719,7 +2736,7 @@ export default function RiskMap({
                 </div>
               </div>
             </div>
-          </>
+          </div>
         )}
       </>
     )}

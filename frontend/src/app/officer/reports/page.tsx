@@ -141,7 +141,7 @@ export default function OfficerReportsPage() {
       title="Field Reports & Ground Truth Verification"
       subtitle="Examine crowd-sourced danger reports submitted by local villagers, highway drivers, and frontline responders."
       headerActions={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Link
             href="/officer/dashboard"
             className="px-3.5 py-1.5 rounded-full bg-[#173D32] text-[#F6F4EC] text-xs font-bold hover:bg-[#1a4437] transition-all inline-flex items-center gap-1.5"
@@ -268,7 +268,7 @@ export default function OfficerReportsPage() {
 
         {/* Error State */}
         {error && (
-          <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-900 flex items-center justify-between gap-3 text-xs font-semibold">
+          <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-900 flex flex-wrap items-center justify-between gap-3 text-xs font-semibold">
             <span className="inline-flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
               <span>{error}</span>

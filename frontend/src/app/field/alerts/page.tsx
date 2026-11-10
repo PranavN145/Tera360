@@ -86,7 +86,7 @@ export default function FieldAlertsPage() {
       title="Field Alerts & Operational Bulletins"
       subtitle="Priority hazard broadcasts, precipitation warnings, and geotechnical landslide watches."
       headerActions={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Link
             href="/field/roads"
             className="px-3.5 py-1.5 rounded-full bg-[#173D32]/10 hover:bg-[#173D32]/15 text-[#173D32] text-xs font-bold transition-all inline-flex items-center gap-1.5"

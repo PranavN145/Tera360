@@ -323,7 +323,7 @@ export default function OfficerMapPage() {
       title="Live Risk Map & GIS Hotspots"
       subtitle="Spatial monitoring of geotechnical cut-slopes, drainage saturation, and highway clearances across the 8 Northeast states."
       headerActions={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Link
             href="/officer/roads"
             className="px-3.5 py-1.5 rounded-full bg-[#173D32]/10 hover:bg-[#173D32]/15 text-[#173D32] text-xs font-bold transition-all inline-flex items-center gap-1.5"
@@ -450,7 +450,7 @@ export default function OfficerMapPage() {
           leftSpan={7}
           stickyRight={true}
           left={
-            <div className="officer-live-map relative rounded-2xl sm:rounded-3xl overflow-hidden shadow-[0_10px_30px_rgba(23,61,50,0.08)] border border-[#173D32]/15 h-[500px] sm:h-[560px] lg:h-[620px] bg-[#0F3124]">
+            <div className="officer-live-map relative rounded-2xl sm:rounded-3xl overflow-hidden shadow-[0_10px_30px_rgba(23,61,50,0.08)] border border-[#173D32]/15 h-[440px] sm:h-[560px] lg:h-[620px] bg-[#0F3124]">
               <RiskMap
                 variant="dashboard"
                 center={NORTHEAST_MAP_CENTER}

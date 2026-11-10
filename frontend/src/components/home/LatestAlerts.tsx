@@ -174,7 +174,7 @@ export default function LatestAlerts() {
 
                 <div className="relative z-10">
                   {/* Top Badges Row: Severity Pill, 3-Bar Risk Meter & Highway Badge */}
-                  <div className="flex items-center justify-between gap-2.5 mb-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
                     {/* Live Severity Badge with pulsating beacon */}
                     <div className="flex items-center gap-2">
                       <span
@@ -221,13 +221,13 @@ export default function LatestAlerts() {
                     </div>
 
                     {/* Highway Shield & State Tag */}
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex flex-wrap items-center gap-1.5 min-w-0 max-w-full">
                       {item.corridor && (
-                        <span className="font-mono text-[11px] font-black text-[#F6F4EC] bg-[#173D32] px-2.5 py-0.5 rounded-md shadow-2xs">
+                        <span className="font-mono text-[11px] font-black text-[#F6F4EC] bg-[#173D32] px-2.5 py-0.5 rounded-md shadow-2xs max-w-full break-words">
                           {item.corridor}
                         </span>
                       )}
-                      <span className="text-[11px] font-bold text-[#173D32]/80 bg-[#DCE8D4]/70 border border-[#173D32]/10 px-2.5 py-0.5 rounded-full">
+                      <span className="text-[11px] font-bold text-[#173D32]/80 bg-[#DCE8D4]/70 border border-[#173D32]/10 px-2.5 py-0.5 rounded-full shrink-0">
                         {alert.state}
                       </span>
                     </div>
@@ -263,29 +263,29 @@ export default function LatestAlerts() {
                   </p>
 
                   {/* 3-Column Embedded Micro-Telemetry Box */}
-                  <div className="mt-4 grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-[#F6F4EC]/90 border border-[#173D32]/8 text-[11px]">
-                    <div className="flex flex-col">
+                  <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2 p-2.5 rounded-xl bg-[#F6F4EC]/90 border border-[#173D32]/8 text-[11px]">
+                    <div className="flex flex-col min-w-0">
                       <span className="text-[10px] text-[#173D32]/60 font-bold uppercase tracking-wider flex items-center gap-1">
                         <span>🌧️</span> Rain
                       </span>
-                      <span className="font-extrabold text-[#173D32] mt-0.5">
+                      <span className="font-extrabold text-[#173D32] mt-0.5 break-words">
                         {item.rainfall24h || "Monitored"}
                       </span>
                     </div>
-                    <div className="flex flex-col border-l border-[#173D32]/10 pl-2">
+                    <div className="flex flex-col min-w-0 border-l border-[#173D32]/10 pl-2">
                       <span className="text-[10px] text-[#173D32]/60 font-bold uppercase tracking-wider flex items-center gap-1">
                         <span>💧</span> Soil
                       </span>
-                      <span className="font-extrabold text-[#173D32] mt-0.5">
+                      <span className="font-extrabold text-[#173D32] mt-0.5 break-words">
                         {item.saturation || "Baseline"}
                       </span>
                     </div>
-                    <div className="flex flex-col border-l border-[#173D32]/10 pl-2">
+                    <div className="col-span-2 sm:col-span-1 flex flex-col min-w-0 border-t pt-2 sm:border-t-0 sm:pt-0 sm:border-l border-[#173D32]/10 sm:pl-2">
                       <span className="text-[10px] text-[#173D32]/60 font-bold uppercase tracking-wider flex items-center gap-1">
                         <span>🚗</span> Transit
                       </span>
                       <span
-                        className={`font-extrabold truncate mt-0.5 ${
+                        className={`font-extrabold sm:truncate mt-0.5 ${
                           alert.severity === "Critical"
                             ? "text-red-700"
                             : alert.severity === "Warning"
@@ -302,7 +302,7 @@ export default function LatestAlerts() {
                 </div>
 
                 {/* Card Action Footer */}
-                <div className="relative z-10 mt-6 pt-4 border-t border-[#173D32]/10 flex items-center justify-between">
+                <div className="relative z-10 mt-6 pt-4 border-t border-[#173D32]/10 flex flex-wrap items-center justify-between gap-2">
                   <span className="text-xs font-semibold text-[#173D32]/65 group-hover:text-[#173D32] transition-colors">
                     Geotechnical Advisory
                   </span>

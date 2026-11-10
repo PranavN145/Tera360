@@ -440,7 +440,7 @@ export default function CitizenMyAreaPage() {
               }
               icon={<MapPin className="w-4 h-4 text-[#173D32]" aria-hidden="true" />}
               actions={
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge status={derivedRisk.badgeVariant} size="xs" />
                   <Link
                     href="/risk-map"
@@ -452,7 +452,7 @@ export default function CitizenMyAreaPage() {
                 </div>
               }
             >
-              <div className="relative h-[400px] sm:h-[460px] w-full rounded-2xl overflow-hidden border border-[#173D32]/15 bg-[#EEF4EB]">
+              <div className="relative h-[320px] sm:h-[420px] lg:h-[460px] w-full rounded-2xl overflow-hidden border border-[#173D32]/15 bg-[#EEF4EB]">
                 <RiskMap
                   variant="mini"
                   selectedState={activeState}

@@ -105,7 +105,7 @@ export default function OfficerLiveCorridorHud({
   onSelectCorridor,
 }: OfficerLiveCorridorHudProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isMobileCollapsed, setIsMobileCollapsed] = useState(false);
+  const [isMobileCollapsed, setIsMobileCollapsed] = useState<boolean | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -175,7 +175,7 @@ export default function OfficerLiveCorridorHud({
   return (
     <aside
       aria-label="Live Corridor HUD"
-      className="absolute top-3 left-3 sm:top-4 sm:left-4 z-20 w-[calc(100%-24px)] max-w-[300px] sm:max-w-[318px] bg-[#FAF8F2]/95 backdrop-blur-md border border-[#173D32]/15 rounded-2xl shadow-[0_12px_32px_rgba(23,61,50,0.16)] p-3.5 sm:p-4 text-[#173D32] select-none transition-all"
+      className="absolute top-3 left-3 sm:top-4 sm:left-4 z-20 w-[calc(100%-56px)] max-w-[300px] sm:w-[318px] sm:max-w-[318px] max-h-[calc(100%-24px)] sm:max-h-[calc(100%-32px)] overflow-y-auto bg-[#FAF8F2]/95 backdrop-blur-md border border-[#173D32]/15 rounded-2xl shadow-[0_12px_32px_rgba(23,61,50,0.16)] p-3 sm:p-4 text-[#173D32] select-none transition-all"
     >
       {/* Card Header */}
       <div className="flex items-center justify-between gap-2">
@@ -217,7 +217,7 @@ export default function OfficerLiveCorridorHud({
               <div
                 role="listbox"
                 aria-label="Available highway corridors"
-                className="absolute right-0 mt-1.5 w-60 max-h-56 overflow-y-auto rounded-xl bg-[#FAF8F2] border border-[#173D32]/15 shadow-xl p-1 z-30"
+                className="absolute right-0 mt-1.5 w-60 max-w-[calc(100vw-3rem)] max-h-56 overflow-y-auto rounded-xl bg-[#FAF8F2] border border-[#173D32]/15 shadow-xl p-1 z-30"
               >
                 {corridors.map((c) => {
                   const isActive = selectedCorridor?.id === c.id;
@@ -270,22 +270,36 @@ export default function OfficerLiveCorridorHud({
           {/* Mobile-only collapse button */}
           <button
             type="button"
-            onClick={() => setIsMobileCollapsed((prev) => !prev)}
+            onClick={() =>
+              setIsMobileCollapsed((prev) => (prev === null ? false : !prev))
+            }
             className="sm:hidden p-1 rounded-lg hover:bg-[#173D32]/8 text-[#173D32]/75 cursor-pointer"
-            aria-label={isMobileCollapsed ? "Expand Live Corridor HUD" : "Collapse Live Corridor HUD"}
-            aria-expanded={!isMobileCollapsed}
+            aria-label={
+              isMobileCollapsed === false
+                ? "Collapse Live Corridor HUD"
+                : "Expand Live Corridor HUD"
+            }
+            aria-expanded={isMobileCollapsed === false}
           >
-            {isMobileCollapsed ? (
-              <ChevronDown className="w-4 h-4" />
-            ) : (
+            {isMobileCollapsed === false ? (
               <ChevronUp className="w-4 h-4" />
+            ) : (
+              <ChevronDown className="w-4 h-4" />
             )}
           </button>
         </div>
       </div>
 
-      {/* Collapsible Body (always open on sm+ desktop, toggleable on mobile) */}
-      <div className={`${isMobileCollapsed ? "hidden sm:block" : "block"}`}>
+      {/* Collapsible Body (always open on sm+ desktop, collapsed initially on mobile and toggleable) */}
+      <div
+        className={
+          isMobileCollapsed === null
+            ? "hidden sm:block"
+            : isMobileCollapsed
+            ? "hidden sm:block"
+            : "block"
+        }
+      >
         {/* 3 Dynamic Status Cards */}
         <div className="space-y-2 mt-3">
           {/* 1. Active Corridor Alert */}

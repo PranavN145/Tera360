@@ -210,7 +210,7 @@ export default function VillageDetailPanel({
         <div
           role="tablist"
           aria-label="Village Dossier Sections"
-          className="px-4 pt-3.5 pb-1 flex items-center justify-between gap-1 overflow-x-auto"
+          className="px-4 pt-3.5 pb-1 flex flex-wrap sm:flex-nowrap items-center justify-start sm:justify-between gap-1.5 overflow-x-auto"
         >
           <button
             type="button"
@@ -763,7 +763,7 @@ export default function VillageDetailPanel({
       </div>
 
       {/* ── Footer Navigation Bar ─────────────────────────────────────────── */}
-      <div className="px-5 py-3.5 border-t border-[#173D32]/10 bg-[#FAF8F2]/70 flex items-center justify-between text-xs">
+      <div className="px-5 py-3.5 border-t border-[#173D32]/10 bg-[#FAF8F2]/70 flex flex-wrap items-center justify-between gap-2 text-xs">
         <Link
           href="/officer/map"
           className="font-bold text-[#173D32] hover:underline inline-flex items-center gap-1.5"

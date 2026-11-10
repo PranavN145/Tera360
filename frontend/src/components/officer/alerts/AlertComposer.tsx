@@ -526,11 +526,11 @@ export default function AlertComposer() {
                 <label className="text-[11px] font-bold text-[#173D32]/80 block mb-1.5">
                   Target Category <span className="text-[#C52936]">*</span>
                 </label>
-                <div className="flex rounded-xl bg-white border border-[#173D32]/14 p-1 h-10 shadow-2xs">
+                <div className="flex rounded-xl bg-white border border-[#173D32]/14 p-1 min-h-10 gap-1 shadow-2xs">
                   <button
                     type="button"
                     onClick={() => handleTargetTypeChange('corridor')}
-                    className={`flex-1 rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center justify-center gap-1.5 ${
+                    className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center justify-center gap-1.5 ${
                       targetType === 'corridor'
                         ? 'bg-[#173D32] text-[#F6F4EC] shadow-2xs'
                         : 'text-[#173D32]/75 hover:text-[#173D32]'
@@ -542,7 +542,7 @@ export default function AlertComposer() {
                   <button
                     type="button"
                     onClick={() => handleTargetTypeChange('village')}
-                    className={`flex-1 rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center justify-center gap-1.5 ${
+                    className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center justify-center gap-1.5 ${
                       targetType === 'village'
                         ? 'bg-[#173D32] text-[#F6F4EC] shadow-2xs'
                         : 'text-[#173D32]/75 hover:text-[#173D32]'
@@ -634,7 +634,7 @@ export default function AlertComposer() {
                 </span>
               </span>
               <div className="flex flex-col gap-2.5">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <CustomCheckbox
                     checked={channels.includes('App Notification')}
                     onChange={() => toggleChannel('App Notification')}
@@ -645,7 +645,7 @@ export default function AlertComposer() {
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <CustomCheckbox
                     checked={channels.includes('SMS')}
                     onChange={() => toggleChannel('SMS')}
@@ -656,7 +656,7 @@ export default function AlertComposer() {
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <CustomCheckbox
                     checked={channels.includes('IVRS Voice Call')}
                     onChange={() => toggleChannel('IVRS Voice Call')}
@@ -774,7 +774,7 @@ export default function AlertComposer() {
 
           {/* Language Preview Card */}
           <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF8F2] border border-[#173D32]/12 shadow-xs space-y-3">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="inline-flex items-center gap-2 text-xs sm:text-[13px] font-extrabold text-[#173D32]">
                 <Globe className="w-4 h-4 text-[#173D32]" strokeWidth={2.2} aria-hidden="true" />
                 <span>Language Preview</span>
@@ -814,7 +814,7 @@ export default function AlertComposer() {
 
           {/* Broadcast Preview Card */}
           <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF8F2] border border-[#173D32]/12 shadow-xs space-y-3">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="inline-flex items-center gap-2 text-xs sm:text-[13px] font-extrabold text-[#173D32]">
                 <Radio className="w-4 h-4 text-[#173D32]" strokeWidth={2.2} aria-hidden="true" />
                 <span>Broadcast Preview</span>
@@ -869,15 +869,15 @@ export default function AlertComposer() {
             {/* SMS Preview */}
             {previewTab === 'sms' && (
               <div className="p-3.5 rounded-xl bg-white border border-[#173D32]/10 space-y-2 shadow-2xs">
-                <div className="flex items-center justify-between text-[10px] text-[#173D32]/60 pb-1.5 border-b border-[#173D32]/10 font-mono">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-[#173D32]/60 pb-1.5 border-b border-[#173D32]/10 font-mono">
                   <span>Sender: [GOV-TERRA360]</span>
                   <span>DLT Reg # 140226</span>
                 </div>
-                <p className="text-xs font-mono text-[#173D32]/90 leading-relaxed bg-[#FAF8F2] p-2.5 rounded-lg border border-[#173D32]/10">
+                <p className="text-xs font-mono text-[#173D32]/90 leading-relaxed bg-[#FAF8F2] p-2.5 rounded-lg border border-[#173D32]/10 break-words">
                   TERRA360 [{severity.toUpperCase()} ALERT]: {title}. Location: {targetLocation}.{' '}
                   {advisory}. Helplines: 1077.
                 </p>
-                <div className="text-[10px] text-[#173D32]/60 flex items-center justify-between font-medium">
+                <div className="text-[10px] text-[#173D32]/60 flex flex-wrap items-center justify-between gap-2 font-medium">
                   <span>Target: {audiences.join(', ') || 'None selected'}</span>
                   <span>
                     Estimated:{' '}
@@ -894,7 +894,7 @@ export default function AlertComposer() {
             {/* IVRS Voice Call Preview */}
             {previewTab === 'ivrs' && (
               <div className="p-3.5 rounded-xl bg-white border border-[#173D32]/10 space-y-2 shadow-2xs">
-                <div className="flex items-center justify-between text-[11px] font-bold text-[#173D32] bg-[#EAF0E6]/70 p-2 rounded-lg border border-[#173D32]/12">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-bold text-[#173D32] bg-[#EAF0E6]/70 p-2 rounded-lg border border-[#173D32]/12">
                   <span className="flex items-center gap-1.5">
                     <PhoneCall className="w-3.5 h-3.5" aria-hidden="true" />
                     <span>IVRS Vernacular TTS Script</span>

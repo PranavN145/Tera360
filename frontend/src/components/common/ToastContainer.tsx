@@ -10,7 +10,7 @@ export default function ToastContainer() {
 
   return (
     <div
-      className="fixed bottom-5 right-5 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none"
+      className="fixed bottom-4 inset-x-4 sm:inset-x-auto sm:bottom-5 sm:right-5 z-50 flex flex-col gap-2.5 sm:max-w-sm sm:w-full pointer-events-none"
       aria-live="polite"
     >
       {toasts.map((toast) => {

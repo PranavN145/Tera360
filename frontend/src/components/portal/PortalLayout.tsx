@@ -119,7 +119,7 @@ export default function PortalLayout({
             </div>
 
             {headerActions && (
-              <div className="flex items-center gap-2.5 shrink-0">
+              <div className="flex flex-wrap items-center gap-2.5 sm:shrink-0">
                 {headerActions}
               </div>
             )}
@@ -201,7 +201,7 @@ export default function PortalLayout({
                     </div>
 
                     {headerActions && (
-                      <div className="flex items-center gap-2.5 shrink-0">
+                      <div className="flex flex-wrap items-center gap-2.5 sm:shrink-0">
                         {headerActions}
                       </div>
                     )}

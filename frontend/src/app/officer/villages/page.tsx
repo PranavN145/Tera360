@@ -708,7 +708,115 @@ export default function OfficerVillagesPage() {
                 filteredAndSortedVillages.length > 0 &&
                 viewMode === "table" && (
                   <div className="bg-[#FCFBF8] border border-[#173D32]/12 rounded-2xl shadow-[0_2px_10px_-3px_rgba(23,61,50,0.06)] overflow-hidden">
-                    <div className="overflow-x-auto">
+                    {/* Mobile Accessible Table Rows (< 768px) preserving all columns without horizontal squeezing */}
+                    <div className="md:hidden divide-y divide-[#173D32]/10 text-xs">
+                      {filteredAndSortedVillages.map((village) => {
+                        const isSelected = selectedVillage?.id === village.id;
+                        const selectedTheme = getSelectedRowTheme(
+                          village.currentRiskLevel
+                        );
+
+                        return (
+                          <div
+                            key={village.id}
+                            role="button"
+                            tabIndex={0}
+                            aria-pressed={isSelected}
+                            onClick={() => setSelectedVillageId(village.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setSelectedVillageId(village.id);
+                              }
+                            }}
+                            className={`relative p-3.5 transition-colors cursor-pointer ${
+                              isSelected
+                                ? selectedTheme.rowBg
+                                : "bg-[#FCFBF8] hover:bg-[#F6F4EC]/75"
+                            }`}
+                          >
+                            {isSelected && (
+                              <span
+                                aria-hidden="true"
+                                className={`absolute left-0 top-2 bottom-2 w-1 rounded-r-full ${selectedTheme.barBg}`}
+                              />
+                            )}
+                            <div className="flex items-start justify-between gap-2.5">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <SettlementIcon
+                                  villageId={village.id}
+                                  villageName={village.name}
+                                  selectedBoxBg={
+                                    isSelected
+                                      ? selectedTheme.iconBoxBg
+                                      : undefined
+                                  }
+                                />
+                                <div className="min-w-0">
+                                  <span className="font-bold text-[13px] text-[#173D32] leading-snug block truncate">
+                                    {village.name}
+                                  </span>
+                                  <span className="text-[10.5px] font-medium text-[#173D32]/65 block mt-0.5">
+                                    {village.id} &bull; {village.corridor}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <VillageRiskBadge
+                                  level={village.currentRiskLevel}
+                                  compact
+                                />
+                                <ChevronRight
+                                  className="w-4 h-4 text-[#173D32]/50"
+                                  aria-hidden="true"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="mt-2.5 pt-2 border-t border-[#173D32]/8 grid grid-cols-2 gap-2 text-[11px]">
+                              <div>
+                                <span className="text-[#173D32]/55 block text-[10px] font-semibold uppercase">
+                                  District
+                                </span>
+                                <span className="font-semibold text-[#173D32]">
+                                  {village.district}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-[#173D32]/55 block text-[10px] font-semibold uppercase">
+                                  Population
+                                </span>
+                                <span className="font-bold text-[#173D32] tabular-nums inline-flex items-center gap-1">
+                                  <Users className="w-3 h-3 text-[#173D32]/65" aria-hidden="true" />
+                                  {village.populationEstimate.toLocaleString()}
+                                </span>
+                              </div>
+                              <div className="col-span-2">
+                                <span className="text-[#173D32]/55 block text-[10px] font-semibold uppercase">
+                                  Nearest Safe Shelter
+                                </span>
+                                {village.safeShelter ? (
+                                  <span className="font-semibold text-[#173D32] inline-flex items-center gap-1 flex-wrap">
+                                    <Home className="w-3 h-3 text-[#2E6041] shrink-0" aria-hidden="true" />
+                                    <span>{village.safeShelter.name}</span>
+                                    <span className="text-[#173D32]/60 font-medium">
+                                      ({village.safeShelter.distanceKm} km &bull; Cap:{" "}
+                                      {village.safeShelter.capacity})
+                                    </span>
+                                  </span>
+                                ) : (
+                                  <span className="text-[#173D32]/45 italic">
+                                    — Not designated
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="hidden md:block overflow-x-auto">
                       <table className="w-full text-left border-collapse text-xs">
                         <thead>
                           <tr className="bg-[#F5F2E9] border-b border-[#173D32]/10 text-[11px] font-semibold text-[#173D32]/85">

@@ -156,7 +156,7 @@ export default function FieldMapPage() {
           }
         >
           {/* Standardized 3D Mountain Terrain Visualizer */}
-          <div className="mb-6 w-full h-[380px] sm:h-[440px] rounded-2xl overflow-hidden border border-[#173D32]/15 bg-[#EEF4EB] shadow-xs">
+          <div className="mb-6 w-full h-[340px] sm:h-[440px] rounded-2xl overflow-hidden border border-[#173D32]/15 bg-[#EEF4EB] shadow-xs">
             <RiskMap
               variant="dashboard"
               selectedState={

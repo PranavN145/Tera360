@@ -91,16 +91,16 @@ export default function PortalHeader({
       </div>
 
       {/* Header Content Container */}
-      <div className="relative z-10 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-4">
+      <div className="relative z-10 w-full max-w-[1600px] mx-auto px-3.5 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-3 sm:gap-4">
         
         {/* Left: Mobile Menu Toggle & Brand Logo */}
-        <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+        <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
           {/* Mobile Sidebar Toggle Button */}
           {onToggleSidebar && (
             <button
               type="button"
               onClick={onToggleSidebar}
-              className="lg:hidden p-2 rounded-xl bg-white/80 hover:bg-white/95 border border-[#173D32]/15 text-[#173D32] shadow-xs backdrop-blur-sm transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-[#D6A65D]"
+              className="lg:hidden shrink-0 p-2 rounded-xl bg-white/80 hover:bg-white/95 border border-[#173D32]/15 text-[#173D32] shadow-xs backdrop-blur-sm transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-[#D6A65D]"
               aria-label={isSidebarOpen ? "Close menu" : "Open menu"}
               aria-expanded={isSidebarOpen}
             >
@@ -117,10 +117,10 @@ export default function PortalHeader({
           {/* Logo with link to portal home */}
           <Link
             href={portalConfig.homePath}
-            className="flex items-center gap-3 group focus-visible:outline-2 focus-visible:outline-[#D6A65D] rounded-lg"
+            className="flex items-center gap-3 group focus-visible:outline-2 focus-visible:outline-[#D6A65D] rounded-lg shrink-0"
             aria-label={`${portalConfig.portalName} Home`}
           >
-            <div className="relative w-[130px] sm:w-[155px] h-[34px] sm:h-[40px]">
+            <div className="relative w-[124px] sm:w-[140px] lg:w-[155px] h-[32px] sm:h-[36px] lg:h-[40px]">
               <Image
                 src="/images/header_logo.png"
                 alt="Terra360 Logo"
@@ -133,13 +133,13 @@ export default function PortalHeader({
           </Link>
 
           {/* Portal Role Badge & Dev Mode Pill */}
-          <div className="hidden sm:flex items-center gap-2 pl-3 border-l border-[#173D32]/20">
-            <span className="px-2.5 py-0.5 rounded-full bg-white/70 border border-[#173D32]/15 text-xs font-bold text-[#173D32] tracking-wide uppercase shadow-2xs backdrop-blur-xs">
+          <div className="hidden sm:flex items-center gap-2 pl-3 border-l border-[#173D32]/20 min-w-0">
+            <span className="px-2.5 py-0.5 rounded-full bg-white/70 border border-[#173D32]/15 text-xs font-bold text-[#173D32] tracking-wide uppercase shadow-2xs backdrop-blur-xs whitespace-nowrap truncate max-w-[165px] lg:max-w-none">
               {portalConfig.badgeLabel}
             </span>
             {isDemoMode && (
               <span
-                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-[11px] font-bold text-amber-900 shadow-2xs backdrop-blur-xs"
+                className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-[11px] font-bold text-amber-900 shadow-2xs backdrop-blur-xs shrink-0 whitespace-nowrap"
                 title="Frontend-First Mode: Local Demo Data Active (Backend Offline)"
               >
                 <Zap className="w-3 h-3 text-amber-700" aria-hidden="true" />
@@ -150,7 +150,7 @@ export default function PortalHeader({
         </div>
 
         {/* Right: Notification Bell & Profile Dropdown */}
-        <div className="flex items-center gap-2 sm:gap-4">
+        <div className="flex items-center gap-2 sm:gap-3 lg:gap-4 shrink-0">
           
           {/* Notification Bell */}
           <div className="relative">
@@ -246,8 +246,8 @@ export default function PortalHeader({
                 {userInitials}
               </div>
 
-              {/* Name & Role (Desktop) */}
-              <div className="hidden md:flex flex-col text-left">
+              {/* Name & Role (Desktop lg+ so tablet 768px stays compact) */}
+              <div className="hidden lg:flex flex-col text-left">
                 <span className="text-xs font-bold text-[#173D32] leading-tight truncate max-w-[130px]">
                   {user?.name || "Portal User"}
                 </span>

@@ -239,7 +239,7 @@ export default function FieldTasksPage() {
                   </p>
                 </div>
 
-                <div className="mt-5 pt-4 border-t border-[#173D32]/10 flex items-center justify-between gap-3">
+                <div className="mt-5 pt-4 border-t border-[#173D32]/10 flex flex-wrap items-center justify-between gap-3">
                   <Link
                     href="/field/alerts"
                     className="text-[11px] font-bold text-[#173D32]/70 hover:text-[#173D32] hover:underline"

@@ -197,7 +197,7 @@ export default function OfficerDataStatus({
           </h3>
         </div>
 
-        <div className="flex items-center gap-3 self-start sm:self-center shrink-0">
+        <div className="flex flex-wrap items-center gap-3 self-start sm:self-center">
           <span className="text-xs font-medium text-[#173D32]/75 tabular-nums">
             Last Sync: {formattedLastSync}
           </span>
@@ -279,7 +279,7 @@ export default function OfficerDataStatus({
                     aria-hidden="true"
                   />
                   <div className="min-w-0 leading-tight">
-                    <span className="block text-[10.5px] 2xl:text-[11px] font-semibold text-[#173D32]/85 whitespace-nowrap">
+                    <span className="block text-[10.5px] 2xl:text-[11px] font-semibold text-[#173D32]/85 break-words">
                       {pipe.lastIngestLabel}
                     </span>
                     <span className="block text-[10.5px] 2xl:text-[11px] font-medium text-[#173D32]/65 truncate mt-0.5">

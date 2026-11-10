@@ -457,7 +457,7 @@ export default function CitizenHomePage() {
                         </div>
                       )}
 
-                      <div className="pt-2 border-t border-[#173D32]/10 flex items-center justify-between gap-2">
+                      <div className="pt-2 border-t border-[#173D32]/10 flex flex-wrap items-center justify-between gap-2">
                         <span className="text-[10px] text-[#173D32]/60">
                           Dispatched via IVRS &amp; SMS
                         </span>
@@ -576,7 +576,7 @@ export default function CitizenHomePage() {
             </Link>
           }
         >
-          <div className="h-[340px] sm:h-[400px] w-full rounded-2xl overflow-hidden border border-[#173D32]/15 relative shadow-xs">
+          <div className="h-[300px] sm:h-[400px] w-full rounded-2xl overflow-hidden border border-[#173D32]/15 relative shadow-xs">
             <RiskMap variant="mini" className="w-full h-full" selectedState={citizenState} />
           </div>
 
@@ -661,7 +661,7 @@ export default function CitizenHomePage() {
               </div>
             )}
 
-            <div className="mt-4 pt-3 border-t border-[#173D32]/10 flex items-center justify-between gap-2 text-xs">
+            <div className="mt-4 pt-3 border-t border-[#173D32]/10 flex flex-wrap items-center justify-between gap-2 text-xs">
               <span className="text-[11px] text-[#173D32]/70">
                 Satellite comms &amp; water reserves available.
               </span>
