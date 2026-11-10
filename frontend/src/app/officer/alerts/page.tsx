@@ -2,7 +2,18 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Megaphone,
+  Radio,
+  ScrollText,
+  ShieldAlert,
+  Zap,
+} from 'lucide-react';
 import PortalLayout from '@/components/portal/PortalLayout';
+import PortalMetricGrid from '@/components/portal/PortalMetricGrid';
+import OfficerKpiCard from '@/components/officer/OfficerKpiCard';
 import AlertComposer from '@/components/officer/alerts/AlertComposer';
 import AlertHistoryFeed from '@/components/officer/alerts/AlertHistoryFeed';
 import { publicApi } from '@/lib/api';
@@ -19,7 +30,7 @@ export default function OfficerAlertsPage() {
     let mounted = true;
     async function loadMetrics() {
       try {
-        const res = await publicApi.getAlerts({ limit: 100 });
+        const res = await publicApi.getAlerts({ limit: 50 });
         if (mounted) {
           setAlerts(res.alerts);
         }
@@ -50,104 +61,119 @@ export default function OfficerAlertsPage() {
         <div className="flex items-center gap-2">
           <Link
             href="/officer/dashboard"
-            className="px-3.5 py-1.5 rounded-full bg-[#173D32] text-[#F6F4EC] text-xs font-bold hover:bg-[#1a4437] transition-all"
+            className="px-3.5 py-1.5 rounded-full bg-[#173D32] text-[#F6F4EC] text-xs font-bold hover:bg-[#1a4437] transition-all inline-flex items-center gap-1.5"
           >
-            ← Dashboard
+            <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Dashboard</span>
           </Link>
         </div>
       }
     >
-      {/* Top Metric Summary Cards */}
-      <div className="mb-6 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-        {/* Critical Card */}
-        <div className="bg-[#FAF8F2] border border-red-200/80 rounded-2xl p-4 shadow-2xs flex items-center justify-between">
-          <div>
-            <span className="text-[10px] uppercase font-extrabold text-red-700 tracking-wider block">
-              Critical (Evacuation / Red)
-            </span>
-            <span className="text-2xl font-black text-red-700 mt-0.5 block">
-              {isLoadingMetrics ? '...' : criticalCount}
-            </span>
-          </div>
-          <span className="text-2xl">🔴</span>
+      <div className="space-y-6 sm:space-y-8 w-full">
+        {/* ── 1. Top Metric Summary Cards (4-column responsive grid) ── */}
+        <PortalMetricGrid columns={4} ariaLabel="Alert Center Metric Summary">
+          <OfficerKpiCard
+            id="metric-critical-alerts"
+            variant="summary"
+            title="Critical Bulletins"
+            value={criticalCount}
+            unit="Evacuation / Red"
+            icon={ShieldAlert}
+            accent={criticalCount > 0 ? 'red' : 'green'}
+            badge="Red Alert"
+            badgeTone="red"
+            detail="Life-safety danger advisories and mandatory evacuation orders"
+            isLoading={isLoadingMetrics}
+          />
+
+          <OfficerKpiCard
+            id="metric-warning-alerts"
+            variant="summary"
+            title="Warning Advisories"
+            value={warningCount}
+            unit="Amber Stage"
+            icon={AlertTriangle}
+            accent={warningCount > 0 ? 'amber' : 'green'}
+            badge="Amber Notice"
+            badgeTone="amber"
+            detail="Highway transit restrictions and active slope clearance warnings"
+            isLoading={isLoadingMetrics}
+          />
+
+          <OfficerKpiCard
+            id="metric-watch-alerts"
+            variant="summary"
+            title="Watch State"
+            value={watchCount}
+            unit="Yellow Stage"
+            icon={Zap}
+            accent={watchCount > 0 ? 'amber' : 'green'}
+            badge="Yellow Watch"
+            badgeTone={watchCount > 0 ? 'amber' : 'green'}
+            detail="Early pore-water saturation and meteorological watch bulletins"
+            isLoading={isLoadingMetrics}
+          />
+
+          <OfficerKpiCard
+            id="metric-gateway-status"
+            variant="summary"
+            title="Telecom Gateway"
+            value="In-App Active"
+            icon={Radio}
+            accent="blue"
+            badge="Local Sync"
+            badgeTone="blue"
+            detail="Push notifications operational; cellular SMS/IVR running locally"
+            isLoading={false}
+          />
+        </PortalMetricGrid>
+
+        {/* ── 2. Tab Navigation Switcher ── */}
+        <div
+          role="tablist"
+          aria-label="Alert Center sections"
+          className="flex flex-wrap items-center gap-2.5"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'compose'}
+            onClick={() => setActiveTab('compose')}
+            className={`py-2 px-4 sm:px-5 rounded-full text-xs sm:text-[13px] font-bold transition-all cursor-pointer inline-flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'compose'
+                ? 'bg-[#173D32] text-[#F6F4EC] shadow-xs'
+                : 'bg-[#FAF8F2] text-[#173D32]/85 border border-[#173D32]/15 hover:bg-white hover:text-[#173D32]'
+            }`}
+          >
+            <Megaphone className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+            <span>Create &amp; Review Alert</span>
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'history'}
+            onClick={() => setActiveTab('history')}
+            className={`py-2 px-4 sm:px-5 rounded-full text-xs sm:text-[13px] font-bold transition-all cursor-pointer inline-flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'history'
+                ? 'bg-[#173D32] text-[#F6F4EC] shadow-xs'
+                : 'bg-[#FAF8F2] text-[#173D32]/85 border border-[#173D32]/15 hover:bg-white hover:text-[#173D32]'
+            }`}
+          >
+            <ScrollText className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+            <span>Alert History &amp; Logs</span>
+          </button>
         </div>
 
-        {/* Warning Card */}
-        <div className="bg-[#FAF8F2] border border-amber-200/80 rounded-2xl p-4 shadow-2xs flex items-center justify-between">
-          <div>
-            <span className="text-[10px] uppercase font-extrabold text-amber-800 tracking-wider block">
-              Warning Advisories (Amber)
-            </span>
-            <span className="text-2xl font-black text-amber-800 mt-0.5 block">
-              {isLoadingMetrics ? '...' : warningCount}
-            </span>
-          </div>
-          <span className="text-2xl">🟡</span>
-        </div>
-
-        {/* Watch Card */}
-        <div className="bg-[#FAF8F2] border border-yellow-200/80 rounded-2xl p-4 shadow-2xs flex items-center justify-between">
-          <div>
-            <span className="text-[10px] uppercase font-extrabold text-yellow-800 tracking-wider block">
-              Watch State (Yellow)
-            </span>
-            <span className="text-2xl font-black text-yellow-800 mt-0.5 block">
-              {isLoadingMetrics ? '...' : watchCount}
-            </span>
-          </div>
-          <span className="text-2xl">⚡</span>
-        </div>
-
-        {/* Gateway Telemetry Status Card */}
-        <div className="bg-[#FAF8F2] border border-[#173D32]/12 rounded-2xl p-4 shadow-2xs flex items-center justify-between">
-          <div>
-            <span className="text-[10px] uppercase font-extrabold text-[#173D32]/70 tracking-wider block">
-              Telecom Broadcast Gateway
-            </span>
-            <div className="flex items-center gap-1.5 mt-1">
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-              <span className="text-xs font-black text-amber-900 block">Offline (In-App Only)</span>
-            </div>
-          </div>
-          <span className="text-xl">📡</span>
+        {/* ── 3. Active Tab Viewport ── */}
+        <div className="w-full">
+          {activeTab === 'compose' ? (
+            <AlertComposer />
+          ) : (
+            <AlertHistoryFeed onComposeClick={() => setActiveTab('compose')} />
+          )}
         </div>
       </div>
-
-      {/* Main Tab Navigation Switcher */}
-      <div className="mb-6 flex rounded-2xl bg-[#FAF8F2] border border-[#173D32]/12 p-1.5 max-w-md shadow-2xs">
-        <button
-          type="button"
-          onClick={() => setActiveTab('compose')}
-          className={`flex-1 py-2 px-4 rounded-xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer flex items-center justify-center gap-2 ${
-            activeTab === 'compose'
-              ? 'bg-[#173D32] text-[#F6F4EC] shadow-xs'
-              : 'text-[#173D32]/75 hover:bg-[#173D32]/5'
-          }`}
-        >
-          <span>📢</span>
-          <span>Create & Review Alert</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('history')}
-          className={`flex-1 py-2 px-4 rounded-xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer flex items-center justify-center gap-2 ${
-            activeTab === 'history'
-              ? 'bg-[#173D32] text-[#F6F4EC] shadow-xs'
-              : 'text-[#173D32]/75 hover:bg-[#173D32]/5'
-          }`}
-        >
-          <span>📜</span>
-          <span>Alert History & Logs</span>
-        </button>
-      </div>
-
-      {/* Active Tab Viewport */}
-      {activeTab === 'compose' ? (
-        <AlertComposer />
-      ) : (
-        <AlertHistoryFeed onComposeClick={() => setActiveTab('compose')} />
-      )}
     </PortalLayout>
   );
 }
