@@ -4,11 +4,9 @@ import React, { useEffect, useRef, useState, useMemo } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import {
-  corridorRoutes,
   rescueRoute,
-  STATE_PRESETS,
+  getStatePreset,
   computeSimulatedCorridorRoutes,
-  nh29FieldSensors,
   computeSimulatedSensors,
 } from "../data/mockLandslideData.js";
 
@@ -45,6 +43,31 @@ export default function RiskMap({
 }) {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
+  const selectedStateRef = useRef(selectedState);
+
+  // Camera navigation helper with smooth flyTo animation across Northeast states
+  const navigateToState = React.useCallback(
+    (stateName, duration = 2000) => {
+      const map = mapInstanceRef.current;
+      if (!map) return;
+      const preset = getStatePreset(stateName || "All States");
+      if (!preset) return;
+
+      try {
+        map.flyTo({
+          center: preset.center,
+          zoom: preset.zoom,
+          pitch: preset.pitch ?? 60,
+          bearing: preset.bearing ?? 0,
+          essential: true,
+          duration,
+        });
+      } catch (err) {
+        console.warn("Map camera navigation error:", err);
+      }
+    },
+    []
+  );
 
   const effectiveShowHud =
     showHud !== undefined
@@ -58,10 +81,32 @@ export default function RiskMap({
   const [fieldSensorsEnabled, setFieldSensorsEnabled] = useState(true);
   const [isHudCollapsed, setIsHudCollapsed] = useState(false);
 
-  // Compute live simulated corridor routes GeoJSON along NH-29 Pherima slope (peak conditions)
+  // Compute live simulated corridor routes GeoJSON filtered by selectedState
   const simulatedCorridorData = useMemo(() => {
-    return computeSimulatedCorridorRoutes(14);
-  }, []);
+    const base = computeSimulatedCorridorRoutes(14);
+    const activeStateLower = (selectedState || "").trim().toLowerCase();
+    const isStateFiltered = Boolean(
+      activeStateLower &&
+      activeStateLower !== "all states" &&
+      activeStateLower !== "all" &&
+      activeStateLower !== "default"
+    );
+
+    const filteredFeatures = base.features.filter((feat) => {
+      if (!isStateFiltered) return true;
+      const featState = String(feat.properties?.state || "").toLowerCase().trim();
+      return (
+        featState === activeStateLower ||
+        activeStateLower.includes(featState) ||
+        featState.includes(activeStateLower)
+      );
+    });
+
+    return {
+      ...base,
+      features: filteredFeatures,
+    };
+  }, [selectedState]);
 
   // Compute live simulated field sensor telemetry along NH-29 Pherima slope
   const simulatedSensorsData = useMemo(() => {
@@ -81,6 +126,14 @@ export default function RiskMap({
   const isPorePressureCritical = (targetProps.pore_water_pressure_kpa || 0) >= 200;
   const rainfallIntensity = 84;
 
+  // Resolve initial camera position based on selectedState preset or passed center/zoom props
+  const statePreset = selectedState ? getStatePreset(selectedState) : null;
+  const isDefaultNagalandCenter = center[0] === 94.02 && center[1] === 25.72;
+  const initialCenter = (!isDefaultNagalandCenter || !statePreset) ? center : statePreset.center;
+  const initialZoom = (!isDefaultNagalandCenter || !statePreset) ? zoom : statePreset.zoom;
+  const initialPitch = statePreset?.pitch ?? pitch;
+  const initialBearing = statePreset?.bearing ?? bearing;
+
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
@@ -98,16 +151,17 @@ export default function RiskMap({
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
       style: "mapbox://styles/mapbox/light-v11",
-      center,
-      zoom,
-      pitch,
-      bearing,
+      center: initialCenter,
+      zoom: initialZoom,
+      pitch: initialPitch,
+      bearing: initialBearing,
       antialias: true,
     });
 
     mapInstanceRef.current = map;
     if (typeof window !== "undefined") {
       window.__riskMap = map;
+      window.__riskMapFlyToState = (stateName) => navigateToState(stateName);
     }
 
     // Add navigation controls (top-right)
@@ -744,6 +798,10 @@ export default function RiskMap({
         .setPopup(obstaclePopup)
         .addTo(map);
 
+      if (selectedStateRef.current || selectedState) {
+        navigateToState(selectedStateRef.current || selectedState, 1500);
+      }
+
       if (onMapLoaded) {
         onMapLoaded(map);
       }
@@ -753,11 +811,12 @@ export default function RiskMap({
     return () => {
       if (typeof window !== "undefined" && window.__riskMap === map) {
         delete window.__riskMap;
+        delete window.__riskMapFlyToState;
       }
       map.remove();
       mapInstanceRef.current = null;
     };
-  }, [center, zoom, pitch, bearing, onMapLoaded]);
+  }, [initialCenter, initialZoom, initialPitch, initialBearing, onMapLoaded, navigateToState, selectedState]);
 
   // Direct HUD Layer Toggle Handlers
   const handleToggleTerrain = (active) => {
@@ -938,21 +997,12 @@ export default function RiskMap({
 
   // React to selectedState fly-to triggers
   useEffect(() => {
+    selectedStateRef.current = selectedState;
     const map = mapInstanceRef.current;
-    if (!map || !selectedState) return;
+    if (!map) return;
 
-    const preset = STATE_PRESETS[selectedState];
-    if (preset) {
-      map.flyTo({
-        center: preset.center,
-        zoom: preset.zoom,
-        pitch: preset.pitch,
-        bearing: preset.bearing,
-        essential: true,
-        duration: 2200,
-      });
-    }
-  }, [selectedState]);
+    navigateToState(selectedState, 2000);
+  }, [selectedState, navigateToState]);
 
   // Dynamically update Mapbox source & trigger visual alert transition
   useEffect(() => {

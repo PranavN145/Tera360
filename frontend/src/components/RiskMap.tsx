@@ -4,11 +4,9 @@ import React, { useEffect, useRef, useState, useMemo } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import {
-  corridorRoutes,
   rescueRoute,
-  STATE_PRESETS,
+  getStatePreset,
   computeSimulatedCorridorRoutes,
-  nh29FieldSensors,
   computeSimulatedSensors,
 } from "../data/mockLandslideData.js";
 
@@ -69,6 +67,7 @@ const REGIONAL_CORRIDOR_ARCS = [
     id: "reg-nh29",
     code: "NH-29",
     name: "Dimapur – Kohima – Mao Highway",
+    state: "Nagaland",
     defaultRisk: "critical",
     coordinates: [
       [93.72, 25.91],
@@ -82,6 +81,7 @@ const REGIONAL_CORRIDOR_ARCS = [
     id: "reg-nh10",
     code: "NH-10",
     name: "Sevoke – Teesta Gorge – Gangtok Highway",
+    state: "Sikkim",
     defaultRisk: "warning",
     coordinates: [
       [88.43, 26.86],
@@ -94,6 +94,7 @@ const REGIONAL_CORRIDOR_ARCS = [
     id: "reg-nh27",
     code: "NH-27",
     name: "Guwahati – Haflong – Jatinga – Silchar Highway",
+    state: "Assam",
     defaultRisk: "warning",
     coordinates: [
       [91.78, 26.14],
@@ -107,6 +108,7 @@ const REGIONAL_CORRIDOR_ARCS = [
     id: "reg-nh6",
     code: "NH-6",
     name: "Shillong – Jowai – Sonapur – Silchar Highway",
+    state: "Meghalaya",
     defaultRisk: "warning",
     coordinates: [
       [91.89, 25.57],
@@ -114,6 +116,59 @@ const REGIONAL_CORRIDOR_ARCS = [
       [92.36, 25.105],
       [92.62, 24.92],
       [92.80, 24.83],
+    ],
+  },
+  {
+    id: "reg-nh415",
+    code: "NH-415",
+    name: "Banderdewa – Itanagar – Gohpur Expressway",
+    state: "Arunachal Pradesh",
+    defaultRisk: "safe",
+    coordinates: [
+      [93.75, 27.08],
+      [93.81, 27.12],
+      [93.95, 27.24],
+      [94.22, 27.65],
+      [94.7278, 28.2180],
+    ],
+  },
+  {
+    id: "reg-nh37",
+    code: "NH-37",
+    name: "Imphal – Noney – Tupul – Jiribam Highway",
+    state: "Manipur",
+    defaultRisk: "warning",
+    coordinates: [
+      [93.55, 24.81],
+      [93.63, 24.84],
+      [93.75, 24.80],
+      [93.9063, 24.6637],
+    ],
+  },
+  {
+    id: "reg-nh54",
+    code: "NH-54",
+    name: "Silchar – Vairengte – Kolasib – Aizawl Highway",
+    state: "Mizoram",
+    defaultRisk: "safe",
+    coordinates: [
+      [92.68, 24.30],
+      [92.72, 23.95],
+      [92.75, 23.73],
+      [92.8378, 23.1645],
+    ],
+  },
+  {
+    id: "reg-nh8",
+    code: "NH-8",
+    name: "Agartala – Teliamura – Udaipur National Highway",
+    state: "Tripura",
+    defaultRisk: "safe",
+    coordinates: [
+      [91.32, 23.85],
+      [91.55, 23.83],
+      [91.78, 23.78],
+      [91.9882, 23.7451],
     ],
   },
 ];
@@ -248,35 +303,44 @@ export default function RiskMap({
   const activeStyleUrlRef = useRef<string>(
     terrainMode ? TERRAIN_STYLE_MAP[terrainMode] : "mapbox://styles/mapbox/light-v11"
   );
-  const prevSelectedStateRef = useRef<string | undefined>(selectedState);
+  const selectedStateRef = useRef<string | undefined>(selectedState);
+
+  // Camera navigation helper with smooth flyTo animation across Northeast states
+  const navigateToState = React.useCallback(
+    (stateName?: string, duration = 2000) => {
+      const map = mapInstanceRef.current;
+      if (!map) return;
+      const preset = getStatePreset(stateName || "All States");
+      if (!preset) return;
+
+      try {
+        map.flyTo({
+          center: preset.center as [number, number],
+          zoom: preset.zoom,
+          pitch: preset.pitch ?? 60,
+          bearing: preset.bearing ?? 0,
+          essential: true,
+          duration,
+        });
+      } catch (err) {
+        console.warn("Map camera navigation error:", err);
+      }
+    },
+    []
+  );
 
   const effectiveShowHud =
     showHud !== undefined
       ? showHud
       : variant !== "mini" && variant !== "simple";
 
-<<<<<<< HEAD
-  // Layer visibility toggle states
-=======
-  const effectiveShowPlayback =
-    showPlayback !== undefined
-      ? showPlayback
-      : variant === "full";
-
   // Layer visibility toggle states (used by internal HUD when layerVisibility prop is not supplied)
->>>>>>> 9292949ba14fffa77dea0826286adf1f373c2c96
   const [terrainEnabled, setTerrainEnabled] = useState<boolean>(true);
   const [riskHeatmapEnabled, setRiskHeatmapEnabled] = useState<boolean>(true);
   const [rescueRouteEnabled, setRescueRouteEnabled] = useState<boolean>(true);
   const [fieldSensorsEnabled, setFieldSensorsEnabled] = useState<boolean>(true);
   const [isHudCollapsed, setIsHudCollapsed] = useState<boolean>(false);
 
-<<<<<<< HEAD
-  // Compute live simulated corridor routes GeoJSON along NH-29 Pherima slope (peak conditions)
-  const simulatedCorridorData = useMemo(() => {
-    return computeSimulatedCorridorRoutes(14);
-  }, []);
-=======
   const isControlledLayers = layerVisibility !== undefined;
   const effectiveLayers: RiskMapLayerVisibility = useMemo(
     () => ({
@@ -309,31 +373,32 @@ export default function RiskMap({
   const rescueRouteEnabledRef = useRef(rescueRouteEnabled);
   const fieldSensorsEnabledRef = useRef(fieldSensorsEnabled);
 
-  // ── Monsoon Simulation Playback State ─────────────────────────
-  const [simulationHour, setSimulationHour] = useState<number>(14); // 00:00 to 24:00 (default peak hour 14)
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const playbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Compute dynamic simulated corridor routes GeoJSON based on simulation hour (or sync live backend statuses when hotspots are supplied without playback)
+  // Compute dynamic simulated corridor routes GeoJSON along Northeast mountain passes
   const simulatedCorridorData = useMemo(() => {
-    const base = computeSimulatedCorridorRoutes(simulationHour);
-    if (effectiveShowPlayback || hotspots === undefined) {
-      return base;
-    }
+    const base = computeSimulatedCorridorRoutes(14);
 
     const activeStateLower = (selectedState || "").trim().toLowerCase();
-    const isStateFiltered = Boolean(activeStateLower && activeStateLower !== "all states");
+    const isStateFiltered = Boolean(
+      activeStateLower &&
+      activeStateLower !== "all states" &&
+      activeStateLower !== "all" &&
+      activeStateLower !== "default"
+    );
 
     const filteredFeatures = base.features
       .filter((feat: any) => {
         if (!isStateFiltered) return true;
-        const featState = String(feat.properties?.state || "").toLowerCase();
-        return featState === activeStateLower || activeStateLower.startsWith(featState);
+        const featState = String(feat.properties?.state || "").toLowerCase().trim();
+        return (
+          featState === activeStateLower ||
+          activeStateLower.includes(featState) ||
+          featState.includes(activeStateLower)
+        );
       })
       .map((feat: any) => {
         const props = feat.properties || {};
         const codeUpper = String(props.corridor || "").toUpperCase();
-        const matched = hotspots.find((h) => h.code.toUpperCase() === codeUpper);
+        const matched = hotspots?.find((h) => h.code.toUpperCase() === codeUpper);
         if (!matched) return feat;
 
         // Preserve NH-29's multi-segment hazard gradient when NH-29 is Critical
@@ -362,8 +427,7 @@ export default function RiskMap({
       ...base,
       features: filteredFeatures,
     };
-  }, [simulationHour, effectiveShowPlayback, hotspots, selectedState]);
->>>>>>> 9292949ba14fffa77dea0826286adf1f373c2c96
+  }, [hotspots, selectedState]);
 
   // Compute live simulated field sensor telemetry along NH-29 Pherima slope
   const simulatedSensorsData = useMemo(() => {
@@ -377,11 +441,25 @@ export default function RiskMap({
   const regionalCorridorsGeoJson = useMemo(() => {
     const list = hotspots || [];
     const activeStateLower = (selectedState || "").trim().toLowerCase();
-    const isStateFiltered = Boolean(activeStateLower && activeStateLower !== "all states");
+    const isStateFiltered = Boolean(
+      activeStateLower &&
+      activeStateLower !== "all states" &&
+      activeStateLower !== "all" &&
+      activeStateLower !== "default"
+    );
 
     // Include real LineString geometries from backend hotspots when present
     const customFeatures = list
-      .filter((h) => Array.isArray(h.routeCoordinates) && h.routeCoordinates.length >= 2)
+      .filter((h) => {
+        if (!Array.isArray(h.routeCoordinates) || h.routeCoordinates.length < 2) return false;
+        if (!isStateFiltered) return true;
+        const hState = String(h.state || "").toLowerCase().trim();
+        return (
+          hState === activeStateLower ||
+          activeStateLower.includes(hState) ||
+          hState.includes(activeStateLower)
+        );
+      })
       .map((h) => ({
         type: "Feature" as const,
         properties: {
@@ -394,6 +472,7 @@ export default function RiskMap({
               : h.severity === "Warning"
               ? "warning"
               : "safe",
+          state: h.state,
         },
         geometry: {
           type: "LineString" as const,
@@ -406,7 +485,12 @@ export default function RiskMap({
     const arcFeatures = REGIONAL_CORRIDOR_ARCS.filter((arc) => {
       if (customCodes.has(arc.code.toUpperCase())) return false;
       if (!isStateFiltered) return true;
-      return list.some((h) => h.code.toUpperCase() === arc.code.toUpperCase());
+      const arcState = String((arc as any).state || "").toLowerCase().trim();
+      const matchesState =
+        arcState === activeStateLower ||
+        activeStateLower.includes(arcState) ||
+        arcState.includes(activeStateLower);
+      return matchesState || list.some((h) => h.code.toUpperCase() === arc.code.toUpperCase());
     }).map((arc) => {
       const matched = list.find(
         (h) => h.code.toUpperCase() === arc.code.toUpperCase()
@@ -426,6 +510,7 @@ export default function RiskMap({
           code: arc.code,
           name: arc.name,
           riskLevel: risk,
+          state: (arc as any).state,
         },
         geometry: {
           type: "LineString" as const,
@@ -664,12 +749,25 @@ export default function RiskMap({
     });
   }, []);
 
-  // Helper: sync obstacle marker visibility (hide at low regional zoom when regional hotspots are active)
+  // Helper: sync obstacle marker visibility (hide when non-Nagaland state is selected or at low regional zoom)
   const syncObstacleMarkerVisibility = React.useCallback((map: mapboxgl.Map) => {
     const obstacleMarker = obstacleMarkerRef.current;
     if (!obstacleMarker) return;
     const el = obstacleMarker.getElement();
     if (!el) return;
+
+    const currentSelected = (selectedStateRef.current || "").toLowerCase().trim();
+    const isNagalandOrAll =
+      !currentSelected ||
+      currentSelected === "all states" ||
+      currentSelected === "all" ||
+      currentSelected === "default" ||
+      currentSelected.includes("nagaland");
+
+    if (!isNagalandOrAll) {
+      el.style.display = "none";
+      return;
+    }
 
     const hasRegionalHotspots = hotspotsRef.current !== undefined;
     const hotspotsVisible = effectiveLayersRef.current.hotspots;
@@ -845,8 +943,14 @@ export default function RiskMap({
   const isPorePressureCritical = (targetProps.pore_water_pressure_kpa || 0) >= 200;
   const rainfallIntensity = 84;
 
-  const initialCenterLng = center[0];
-  const initialCenterLat = center[1];
+  // Resolve initial camera position based on selectedState preset or passed center/zoom props
+  const statePreset = selectedState ? getStatePreset(selectedState) : null;
+  const isDefaultNagalandCenter = center[0] === 94.02 && center[1] === 25.72;
+  const initialCenterLng = (!isDefaultNagalandCenter || !statePreset) ? center[0] : statePreset.center[0];
+  const initialCenterLat = (!isDefaultNagalandCenter || !statePreset) ? center[1] : statePreset.center[1];
+  const initialZoom = (!isDefaultNagalandCenter || !statePreset) ? zoom : statePreset.zoom;
+  const initialPitch = statePreset?.pitch ?? pitch;
+  const initialBearing = statePreset?.bearing ?? bearing;
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -873,9 +977,9 @@ export default function RiskMap({
         container: mapContainerRef.current,
         style: initialStyle,
         center: [initialCenterLng, initialCenterLat],
-        zoom,
-        pitch,
-        bearing,
+        zoom: initialZoom,
+        pitch: initialPitch,
+        bearing: initialBearing,
         antialias: true,
       });
     } catch (err) {
@@ -891,6 +995,7 @@ export default function RiskMap({
     mapInstanceRef.current = map;
     if (typeof window !== "undefined") {
       (window as any).__riskMap = map;
+      (window as any).__riskMapFlyToState = (stateName: string) => navigateToState(stateName);
     }
 
     // Add navigation controls (top-right)
@@ -1759,6 +1864,12 @@ export default function RiskMap({
 
       syncAllLayersAndFilters(map);
 
+      // Ensure camera navigates cleanly to target state upon initial style load
+      const targetState = selectedStateRef.current || selectedState;
+      if (targetState) {
+        navigateToState(targetState, 1500);
+      }
+
       if (onMapLoadedRef.current) {
         onMapLoadedRef.current(map);
       }
@@ -1780,11 +1891,25 @@ export default function RiskMap({
 
       if (typeof window !== "undefined" && (window as any).__riskMap === map) {
         delete (window as any).__riskMap;
+        delete (window as any).__riskMapFlyToState;
       }
       map.remove();
       mapInstanceRef.current = null;
     };
-  }, [initialCenterLng, initialCenterLat, zoom, pitch, bearing, showControls, showScaleControl, scalePosition, syncAllLayersAndFilters, syncObstacleMarkerVisibility]);
+  }, [
+    initialCenterLng,
+    initialCenterLat,
+    initialZoom,
+    initialPitch,
+    initialBearing,
+    showControls,
+    showScaleControl,
+    scalePosition,
+    syncAllLayersAndFilters,
+    syncObstacleMarkerVisibility,
+    navigateToState,
+    selectedState,
+  ]);
 
   // React to controlled terrainMode changes (switching Mapbox style & 2D/3D pitch cleanly)
   useEffect(() => {
@@ -2049,26 +2174,15 @@ export default function RiskMap({
     }
   }, [fieldSensorsEnabled, isControlledLayers]);
 
-  // React to selectedState fly-to triggers
+  // React to selectedState fly-to triggers with smooth 2000ms animation
   useEffect(() => {
+    selectedStateRef.current = selectedState;
     const map = mapInstanceRef.current;
-    const prevState = prevSelectedStateRef.current;
-    prevSelectedStateRef.current = selectedState;
-    if (!map || !selectedState) return;
-    if (prevState === selectedState && selectedState === "All States") return;
+    if (!map) return;
 
-    const preset = STATE_PRESETS[selectedState as keyof typeof STATE_PRESETS];
-    if (preset) {
-      map.flyTo({
-        center: preset.center as [number, number],
-        zoom: preset.zoom,
-        pitch: preset.pitch,
-        bearing: preset.bearing,
-        essential: true,
-        duration: 2200,
-      });
-    }
-  }, [selectedState]);
+    navigateToState(selectedState, 2000);
+    syncObstacleMarkerVisibility(map);
+  }, [selectedState, navigateToState, syncObstacleMarkerVisibility]);
 
   // Dynamically update Mapbox source & trigger visual alert transition
   useEffect(() => {

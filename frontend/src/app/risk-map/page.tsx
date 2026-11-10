@@ -31,6 +31,17 @@ const STATE_FILTERS = [
   "Tripura",
 ];
 
+// Case-insensitive, alias-aware state filter matcher
+function matchesStateFilter(itemState?: string, filterState?: string): boolean {
+  if (!filterState || filterState === "All States" || filterState === "All" || filterState === "Default") return true;
+  if (!itemState) return false;
+  const a = itemState.toLowerCase().trim();
+  const b = filterState.toLowerCase().trim();
+  if (a === b) return true;
+  if (a.includes("arunachal") && b.includes("arunachal")) return true;
+  return a.includes(b) || b.includes(a);
+}
+
 // Deterministic coordinate resolver for Northeast states
 function resolveMapCoordinates(
   road: PublicRiskMapItem,
@@ -99,36 +110,30 @@ export default function RiskMapPage() {
         if (roadData && roadData.length > 0) {
           setCorridors(roadData);
         } else {
-          const fallback =
-            selectedState === "All States"
-              ? FALLBACK_ROAD_STATUS
-              : FALLBACK_ROAD_STATUS.filter(
-                  (r) => r.state.toLowerCase() === selectedState.toLowerCase()
-                );
+          const fallback = FALLBACK_ROAD_STATUS.filter((r) =>
+            matchesStateFilter(r.state, selectedState)
+          );
           setCorridors(fallback);
         }
 
         if (riskData && riskData.length > 0) {
           setRoads(riskData);
         } else {
-          const fallbackRoads =
-            selectedState === "All States"
-              ? FALLBACK_ROADS
-              : FALLBACK_ROADS.filter(
-                  (r) => r.state.toLowerCase() === selectedState.toLowerCase()
-                );
+          const fallbackRoads = FALLBACK_ROADS.filter((r) =>
+            matchesStateFilter(r.state, selectedState)
+          );
           setRoads(fallbackRoads);
         }
       } catch {
         if (!isMounted) return;
-        const fallback =
-          selectedState === "All States"
-            ? FALLBACK_ROAD_STATUS
-            : FALLBACK_ROAD_STATUS.filter(
-                (r) => r.state.toLowerCase() === selectedState.toLowerCase()
-              );
+        const fallback = FALLBACK_ROAD_STATUS.filter((r) =>
+          matchesStateFilter(r.state, selectedState)
+        );
+        const fallbackRoads = FALLBACK_ROADS.filter((r) =>
+          matchesStateFilter(r.state, selectedState)
+        );
         setCorridors(fallback);
-        setRoads(FALLBACK_ROADS);
+        setRoads(fallbackRoads);
       }
     }
 
@@ -138,6 +143,14 @@ export default function RiskMapPage() {
       isMounted = false;
     };
   }, [selectedState]);
+
+  const handleSelectState = (s: string) => {
+    setSelectedState(s);
+    // Directly invoke map camera navigation for responsive feedback
+    if (typeof window !== "undefined" && typeof (window as any).__riskMapFlyToState === "function") {
+      (window as any).__riskMapFlyToState(s);
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -187,7 +200,9 @@ export default function RiskMapPage() {
       c.stretch.toLowerCase().includes(query) ||
       c.state.toLowerCase().includes(query);
 
-    return matchesSeverity && matchesSearch;
+    const matchesState = matchesStateFilter(c.state, selectedState);
+
+    return matchesSeverity && matchesSearch && matchesState;
   });
 
   return (
@@ -390,7 +405,7 @@ export default function RiskMapPage() {
               <button
                 key={s}
                 type="button"
-                onClick={() => setSelectedState(s)}
+                onClick={() => handleSelectState(s)}
                 className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer ${
                   selectedState === s
                     ? "bg-[#173D32] text-[#F6F4EC] shadow-xs"

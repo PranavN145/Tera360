@@ -9,7 +9,10 @@ export interface PublicRiskMapItem {
   status: 'open' | 'caution' | 'partial' | 'blocked' | string;
   riskLevel: 'Low' | 'Moderate' | 'High' | 'Critical' | string;
   statusReason?: string | null;
-  geometry?: unknown;
+  geometry?: {
+    type?: string;
+    coordinates?: any;
+  } | null;
   coordinatesText?: string | null;
   mapCoordinates?: { x: number; y: number } | null;
   lastUpdated: string;
