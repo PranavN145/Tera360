@@ -24,6 +24,25 @@ export interface IRefreshTokenSession {
   replacedByTokenHash?: string;
 }
 
+export interface IUserVillage {
+  state?: string;
+  district?: string;
+  villageName?: string;
+}
+
+export interface IFamilyContact {
+  _id?: mongoose.Types.ObjectId;
+  name: string;
+  phone: string;
+  relationship?: string;
+}
+
+export interface IAlertPreferences {
+  ivrs: boolean;
+  sms: boolean;
+  app: boolean;
+}
+
 export interface IUser extends Document {
   _id: mongoose.Types.ObjectId;
   name: string;
@@ -33,6 +52,9 @@ export interface IUser extends Document {
   phone?: string;
   language: string;
   emailVerified: boolean;
+  village?: IUserVillage;
+  familyContacts?: IFamilyContact[];
+  alertPreferences?: IAlertPreferences;
   emailVerificationToken?: string;
   emailVerificationExpiresAt?: Date;
   passwordResetToken?: string;
@@ -79,6 +101,33 @@ const RefreshTokenSchema = new Schema<IRefreshTokenSession>(
   { _id: true }
 );
 
+const UserVillageSchema = new Schema<IUserVillage>(
+  {
+    state: { type: String, trim: true, maxlength: 100 },
+    district: { type: String, trim: true, maxlength: 100 },
+    villageName: { type: String, trim: true, maxlength: 100 },
+  },
+  { _id: false }
+);
+
+const FamilyContactSchema = new Schema<IFamilyContact>(
+  {
+    name: { type: String, required: true, trim: true, maxlength: 100 },
+    phone: { type: String, required: true, trim: true, maxlength: 25 },
+    relationship: { type: String, trim: true, maxlength: 50 },
+  },
+  { _id: true }
+);
+
+const AlertPreferencesSchema = new Schema<IAlertPreferences>(
+  {
+    ivrs: { type: Boolean, default: true },
+    sms: { type: Boolean, default: true },
+    app: { type: Boolean, default: true },
+  },
+  { _id: false }
+);
+
 const UserSchema = new Schema<IUser>(
   {
     name: {
@@ -113,6 +162,18 @@ const UserSchema = new Schema<IUser>(
     language: {
       type: String,
       default: 'en',
+    },
+    village: {
+      type: UserVillageSchema,
+      default: undefined,
+    },
+    familyContacts: {
+      type: [FamilyContactSchema],
+      default: [],
+    },
+    alertPreferences: {
+      type: AlertPreferencesSchema,
+      default: () => ({ ivrs: true, sms: true, app: true }),
     },
     emailVerified: {
       type: Boolean,

@@ -35,6 +35,23 @@ export class UsersService {
     if (input.name !== undefined) user.name = input.name;
     if (input.phone !== undefined) user.phone = input.phone;
     if (input.language !== undefined) user.language = input.language;
+    if (input.village !== undefined) {
+      user.village = {
+        state: input.village.state || '',
+        district: input.village.district || '',
+        villageName: input.village.villageName || '',
+      };
+    }
+    if (input.familyContacts !== undefined) {
+      user.familyContacts = input.familyContacts as any;
+    }
+    if (input.alertPreferences !== undefined) {
+      user.alertPreferences = {
+        ivrs: input.alertPreferences.ivrs,
+        sms: input.alertPreferences.sms,
+        app: input.alertPreferences.app,
+      };
+    }
 
     await user.save();
     return user;
@@ -152,6 +169,9 @@ export class UsersService {
         phone: user.phone || null,
         language: user.language,
         emailVerified: user.emailVerified,
+        village: user.village || null,
+        familyContacts: user.familyContacts || [],
+        alertPreferences: user.alertPreferences || { ivrs: true, sms: true, app: true },
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       },

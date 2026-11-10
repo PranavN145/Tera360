@@ -1,5 +1,25 @@
 export type UserRole = 'citizen' | 'driver' | 'field_officer' | 'officer' | 'admin';
 
+export interface FamilyContact {
+  _id?: string;
+  id?: string;
+  name: string;
+  phone: string;
+  relationship?: string;
+}
+
+export interface UserVillage {
+  state?: string;
+  district?: string;
+  villageName?: string;
+}
+
+export interface AlertPreferences {
+  ivrs: boolean;
+  sms: boolean;
+  app: boolean;
+}
+
 export interface User {
   _id: string;
   id?: string;
@@ -10,6 +30,9 @@ export interface User {
   language?: string;
   emailVerified?: boolean;
   isActive?: boolean;
+  village?: UserVillage;
+  familyContacts?: FamilyContact[];
+  alertPreferences?: AlertPreferences;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -67,6 +90,9 @@ export interface UpdateProfilePayload {
   name?: string;
   phone?: string;
   language?: 'en' | 'as' | 'bn' | 'hi' | 'mni' | 'lus';
+  village?: UserVillage;
+  familyContacts?: FamilyContact[];
+  alertPreferences?: AlertPreferences;
 }
 
 export interface ChangePasswordPayload {
@@ -89,6 +115,9 @@ export interface UserExportData {
     phone: string | null;
     language: string;
     emailVerified: boolean;
+    village?: UserVillage | null;
+    familyContacts?: FamilyContact[];
+    alertPreferences?: AlertPreferences;
     createdAt: string;
     updatedAt: string;
   };

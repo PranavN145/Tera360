@@ -19,7 +19,7 @@ export default function PortalShell({
   title,
   subtitle,
   icon,
-  badgeColor,
+  badgeColor = "bg-[#DCE8D4] text-[#173D32]",
   maxWidth,
   allowedRoles,
   children,
@@ -32,7 +32,7 @@ export default function PortalShell({
       title={title}
       subtitle={subtitle}
     >
-      <div className={`space-y-6 ${maxWidth || ""}`}>
+      <div className={`space-y-6 ${maxWidth ? `${maxWidth} mx-auto` : "w-full"}`}>
         {/* User Account Info Bar */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
           <div className="p-4 bg-[#FAF8F2] rounded-2xl border border-[#173D32]/10 shadow-2xs">
@@ -49,9 +49,16 @@ export default function PortalShell({
           </div>
           <div className="p-4 bg-[#FAF8F2] rounded-2xl border border-[#173D32]/10 shadow-2xs">
             <span className="text-[#173D32]/60 font-medium block">Assigned Role</span>
-            <span className="font-extrabold text-[#173D32] text-sm mt-0.5 block capitalize">
-              {user?.role?.replace("_", " ") || "Portal User"}
-            </span>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold uppercase tracking-wider ${badgeColor}`}>
+                {user?.role?.replace("_", " ") || "Portal User"}
+              </span>
+              {user?.emailVerified && (
+                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-semibold">
+                  Verified
+                </span>
+              )}
+            </div>
           </div>
         </div>
 

@@ -3,6 +3,7 @@ import { Alert } from '../modules/alerts/alert.model';
 import { Road } from '../modules/roads/road.model';
 import { Report } from '../modules/reports/report.model';
 import { Contact } from '../modules/contact/contact.model';
+import { User } from '../modules/users/user.model';
 
 async function runModelTests() {
   console.log('\n========================================================');
@@ -165,6 +166,53 @@ async function runModelTests() {
     assert.strictEqual(goodContact.email, 'ramesh@example.in'); // lowercased
     assert.strictEqual(goodContact.status, 'new');
     assert.strictEqual(goodContact.validateSync(), undefined);
+  });
+
+  // 5. User Model Validation (Village, Family Contacts, Alert Preferences)
+  console.log('--- [Group 5: User Profile Model Validation] ---');
+
+  await test('User supports village, structured family contacts, and alert preferences', async () => {
+    const user = new User({
+      name: 'Temsula Ao',
+      email: 'temsula@terra360.in',
+      passwordHash: 'dummyhash',
+      role: 'citizen',
+      village: {
+        state: 'Nagaland',
+        district: 'Kohima',
+        villageName: 'Phesama',
+      },
+      familyContacts: [
+        { name: 'Moa Ao', phone: '+91 94360 11111', relationship: 'Spouse' },
+      ],
+      alertPreferences: {
+        ivrs: true,
+        sms: true,
+        app: false,
+      },
+    });
+
+    const err = user.validateSync();
+    assert.strictEqual(err, undefined);
+    assert.strictEqual(user.village?.villageName, 'Phesama');
+    assert.strictEqual(user.familyContacts?.length, 1);
+    assert.strictEqual(user.alertPreferences?.app, false);
+    assert.strictEqual(user.alertPreferences?.ivrs, true);
+  });
+
+  await test('User family contacts require name and phone', async () => {
+    const user = new User({
+      name: 'Bad Contact User',
+      email: 'badcontact@terra360.in',
+      passwordHash: 'dummyhash',
+      familyContacts: [
+        { name: '', phone: '' } as any,
+      ],
+    });
+
+    const err = user.validateSync();
+    assert.ok(err?.errors['familyContacts.0.name']);
+    assert.ok(err?.errors['familyContacts.0.phone']);
   });
 
   console.log('\n========================================================');
