@@ -1,6 +1,16 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useMemo } from "react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Check,
+  Construction,
+  Mountain,
+  Waves,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 import Header from "@/components/layout/Header";
 import { useApp } from "@/context/AppContext";
 import { publicApi, ApiClientError } from "@/lib/api";
@@ -17,12 +27,12 @@ const NE_STATES = [
   "Tripura",
 ];
 
-const HAZARD_TYPES = [
-  { id: "active-slide", label: "Active Debris Slide", icon: "⚠️" },
-  { id: "slope-cracks", label: "Tension Cracks on Slope", icon: "⚡" },
-  { id: "road-subsidence", label: "Road Sinking / Subsidence", icon: "🚧" },
-  { id: "rockfall", label: "Rockfall / Falling Boulders", icon: "🪨" },
-  { id: "muddy-water", label: "Sudden Muddy Runoff / Creep", icon: "🌊" },
+const HAZARD_TYPES: { id: string; label: string; Icon: LucideIcon }[] = [
+  { id: "active-slide", label: "Active Debris Slide", Icon: AlertTriangle },
+  { id: "slope-cracks", label: "Tension Cracks on Slope", Icon: Zap },
+  { id: "road-subsidence", label: "Road Sinking / Subsidence", Icon: Construction },
+  { id: "rockfall", label: "Rockfall / Falling Boulders", Icon: Mountain },
+  { id: "muddy-water", label: "Sudden Muddy Runoff / Creep", Icon: Waves },
 ];
 
 export default function ReportPage() {
@@ -33,7 +43,8 @@ export default function ReportPage() {
   const [hazardType, setHazardType] = useState("active-slide");
   const [urgency, setUrgency] = useState<"Critical" | "Warning" | "Watch">("Critical");
   const [description, setDescription] = useState("");
-  const [reporterName, setReporterName] = useState(user ? user.name : "");
+  const [reporterNameOverride, setReporterNameOverride] = useState<string | null>(null);
+  const reporterName = reporterNameOverride ?? (user?.name || "");
   const [phone, setPhone] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -56,13 +67,6 @@ export default function ReportPage() {
   const [captchaToken] = useState<string>(defaultCaptchaToken);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Sync reporter name if user logs in
-  useEffect(() => {
-    if (user && !reporterName) {
-      setReporterName(user.name);
-    }
-  }, [user, reporterName]);
 
   const handlePhotoSelect = (file: File) => {
     if (!file.type.startsWith("image/")) {
@@ -220,8 +224,8 @@ export default function ReportPage() {
 
         {submittedReport ? (
           <div className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-[28px] p-8 sm:p-12 text-center max-w-xl mx-auto shadow-sm">
-            <div className="w-16 h-16 rounded-full bg-[#DCE8D4] text-[#173D32] flex items-center justify-center text-3xl mx-auto mb-4">
-              ✓
+            <div className="w-16 h-16 rounded-full bg-[#DCE8D4] text-[#173D32] flex items-center justify-center mx-auto mb-4">
+              <Check className="w-8 h-8" strokeWidth={2.5} aria-hidden="true" />
             </div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#DCE8D4]/60 text-xs font-bold text-[#173D32] uppercase mb-2">
               Status: Broadcasted to State Control Cell
@@ -262,7 +266,7 @@ export default function ReportPage() {
               {/* Error Banner */}
               {errorMessage && (
                 <div className="p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 text-xs sm:text-sm leading-relaxed flex items-start gap-3">
-                  <span className="text-lg shrink-0">⚠️</span>
+                  <AlertTriangle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" aria-hidden="true" />
                   <div className="flex-1">
                     <p className="font-semibold">{errorMessage}</p>
                     {fieldErrors.captcha && (
@@ -277,10 +281,12 @@ export default function ReportPage() {
               {/* Row: State & Urgency */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-xs font-bold text-[#173D32] uppercase tracking-wide mb-2">
+                  <label htmlFor="report-state" className="block text-xs font-bold text-[#173D32] uppercase tracking-wide mb-2">
                     State / Territory *
                   </label>
                   <select
+                    id="report-state"
+                    name="state"
                     value={state}
                     onChange={(e) => setState(e.target.value)}
                     disabled={isSubmitting}
@@ -295,10 +301,12 @@ export default function ReportPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#173D32] uppercase tracking-wide mb-2">
+                  <label htmlFor="report-urgency" className="block text-xs font-bold text-[#173D32] uppercase tracking-wide mb-2">
                     Urgency Classification *
                   </label>
                   <select
+                    id="report-urgency"
+                    name="urgency"
                     value={urgency}
                     onChange={(e) => setUrgency(e.target.value as "Critical" | "Warning" | "Watch")}
                     disabled={isSubmitting}
@@ -313,10 +321,12 @@ export default function ReportPage() {
 
               {/* Exact Location */}
               <div>
-                <label className="block text-xs font-bold text-[#173D32] uppercase tracking-wide mb-2">
+                <label htmlFor="report-corridor" className="block text-xs font-bold text-[#173D32] uppercase tracking-wide mb-2">
                   Corridor, Kilometer Marker or Village *
                 </label>
                 <input
+                  id="report-corridor"
+                  name="corridor"
                   type="text"
                   placeholder="e.g. NH-29 near Chumukedima / Seti Jhora Bridge / Haflong Hill Cut"
                   value={corridor}
@@ -359,7 +369,7 @@ export default function ReportPage() {
                           : "bg-[#F6F4EC] text-[#173D32]/80 border-[#173D32]/15 hover:border-[#173D32]/40"
                       }`}
                     >
-                      <span className="text-base">{h.icon}</span>
+                      <h.Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
                       <span className="truncate">{h.label}</span>
                     </button>
                   ))}
@@ -368,10 +378,12 @@ export default function ReportPage() {
 
               {/* Detailed Description */}
               <div>
-                <label className="block text-xs font-bold text-[#173D32] uppercase tracking-wide mb-2">
+                <label htmlFor="report-description" className="block text-xs font-bold text-[#173D32] uppercase tracking-wide mb-2">
                   Observations & Road Clearance Status * (min 5 chars)
                 </label>
                 <textarea
+                  id="report-description"
+                  name="description"
                   rows={4}
                   placeholder="Describe slope movement, depth of mud, whether vehicles can pass, rainfall intensity, and visible danger to dwellings..."
                   value={description}
@@ -454,6 +466,8 @@ export default function ReportPage() {
                       </svg>
                     </button>
                     <input
+                      id="report-photo"
+                      name="photo"
                       ref={fileInputRef}
                       type="file"
                       accept="image/png,image/jpeg,image/jpg,image/webp"
@@ -479,6 +493,8 @@ export default function ReportPage() {
                     }`}
                   >
                     <input
+                      id="report-photo"
+                      name="photo"
                       ref={fileInputRef}
                       type="file"
                       accept="image/png,image/jpeg,image/jpg,image/webp"
@@ -509,24 +525,28 @@ export default function ReportPage() {
               {/* Reporter Info */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-xs font-bold text-[#173D32] uppercase tracking-wide mb-2">
+                  <label htmlFor="report-name" className="block text-xs font-bold text-[#173D32] uppercase tracking-wide mb-2">
                     Reporter Name (Optional)
                   </label>
                   <input
+                    id="report-name"
+                    name="reporterName"
                     type="text"
                     placeholder="e.g. T. Jamir"
                     value={reporterName}
-                    onChange={(e) => setReporterName(e.target.value)}
+                    onChange={(e) => setReporterNameOverride(e.target.value)}
                     disabled={isSubmitting}
                     className="w-full h-11 px-4 rounded-xl bg-[#F6F4EC] border border-[#173D32]/20 text-sm text-[#173D32] focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#173D32] uppercase tracking-wide mb-2">
+                  <label htmlFor="report-phone" className="block text-xs font-bold text-[#173D32] uppercase tracking-wide mb-2">
                     Contact Phone (Optional)
                   </label>
                   <input
+                    id="report-phone"
+                    name="phone"
                     type="tel"
                     placeholder="+91 98765 43210"
                     value={phone}
@@ -555,7 +575,7 @@ export default function ReportPage() {
                   ) : (
                     <>
                       <span>Transmit Observation</span>
-                      <span>→</span>
+                      <ArrowRight className="w-4 h-4" aria-hidden="true" />
                     </>
                   )}
                 </button>

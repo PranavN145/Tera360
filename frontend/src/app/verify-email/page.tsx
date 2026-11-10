@@ -3,6 +3,7 @@
 import React, { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { Check, X } from "lucide-react";
 import { authApi, ApiClientError } from "@/lib/api";
 
 function VerifyEmailContent() {
@@ -77,8 +78,8 @@ function VerifyEmailContent() {
         {/* Success state */}
         {status === "success" && (
           <div className="p-6 bg-[#FAF8F2] border border-emerald-300 rounded-2xl text-center animate-in fade-in">
-            <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-4 text-3xl font-bold">
-              ✓
+            <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-4">
+              <Check className="w-7 h-7" strokeWidth={2.5} aria-hidden="true" />
             </div>
             <h2 className="text-lg font-bold text-[#173D32] mb-2">
               Email Verified Successfully!
@@ -98,8 +99,8 @@ function VerifyEmailContent() {
         {/* Error state */}
         {status === "error" && (
           <div className="p-6 bg-[#FAF8F2] border border-red-200 rounded-2xl text-center animate-in fade-in">
-            <div className="w-14 h-14 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4 text-3xl font-bold">
-              ✕
+            <div className="w-14 h-14 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4">
+              <X className="w-7 h-7" strokeWidth={2.5} aria-hidden="true" />
             </div>
             <h2 className="text-lg font-bold text-[#173D32] mb-2">
               Verification Failed

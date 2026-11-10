@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { AlertTriangle, Megaphone, RefreshCw } from "lucide-react";
 import PortalLayout from "@/components/portal/PortalLayout";
 import { useApp } from "@/context/AppContext";
 import { publicApi, reportsApi } from "@/lib/api";
@@ -158,17 +159,17 @@ export default function OfficerDashboardPage() {
             type="button"
             onClick={handleManualRefresh}
             disabled={isLoading}
-            className="px-3.5 py-1.5 rounded-full bg-[#173D32]/10 hover:bg-[#173D32]/15 text-[#173D32] text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            className="px-3.5 py-1.5 rounded-full bg-[#173D32]/10 hover:bg-[#173D32]/15 text-[#173D32] text-xs font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             title="Refresh operational telemetry"
           >
-            <span className={isLoading ? "animate-spin" : ""}>↻</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
             <span>Refresh</span>
           </button>
           <Link
             href="/officer/alerts"
-            className="px-3.5 py-1.5 rounded-full bg-[#D6A65D] hover:bg-[#c9984e] text-[#173D32] text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-1.5 rounded-full bg-[#D6A65D] hover:bg-[#c9984e] text-[#173D32] text-xs font-bold shadow-xs transition-all inline-flex items-center gap-1.5 cursor-pointer"
           >
-            <span>📢</span>
+            <Megaphone className="w-3.5 h-3.5" aria-hidden="true" />
             <span>Broadcast Alert</span>
           </Link>
         </div>
@@ -179,7 +180,7 @@ export default function OfficerDashboardPage() {
         {error && (
           <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-900 flex items-center justify-between gap-4 w-full">
             <div className="flex items-center gap-2.5 text-xs sm:text-sm font-semibold">
-              <span className="text-base select-none">⚠️</span>
+              <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" aria-hidden="true" />
               <span>{error}</span>
             </div>
             <button

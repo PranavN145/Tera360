@@ -14,5 +14,11 @@ export { default as PortalHeader } from "./PortalHeader";
 export { default as PortalSidebar } from "./PortalSidebar";
 export { default as PortalFooter } from "./PortalFooter";
 export { default as PortalLoadingShell } from "./PortalLoadingShell";
+export { default as PortalKpiCard } from "../officer/OfficerKpiCard";
+export type {
+  OfficerKpiCardProps as PortalKpiCardProps,
+  KpiCardAccent,
+  KpiBadgeTone,
+} from "../officer/OfficerKpiCard";
 export * from "./portalNavConfig";
 

@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ArrowRight } from "lucide-react";
 import { PortalRoleConfig, PortalNavItem } from "./portalNavConfig";
 
 interface PortalSidebarProps {
@@ -102,6 +103,19 @@ export default function PortalSidebar({
         return (
           <svg className={`w-5 h-5 shrink-0 ${strokeClass}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+        );
+      case "route-check":
+        return (
+          <svg className={`w-5 h-5 shrink-0 ${strokeClass}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+          </svg>
+        );
+      case "users":
+        return (
+          <svg className={`w-5 h-5 shrink-0 ${strokeClass}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
         );
       default:
@@ -216,9 +230,10 @@ export default function PortalSidebar({
                 <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
                 <span>Ops Center Live</span>
               </div>
-              <span className="text-[10px] text-[#173D32]/60 group-hover:text-[#173D32] group-hover:translate-x-0.5 transition-transform">
-                →
-              </span>
+              <ArrowRight
+                className="w-3 h-3 text-[#173D32]/60 group-hover:text-[#173D32] group-hover:translate-x-0.5 transition-transform"
+                aria-hidden="true"
+              />
             </div>
             <p className="text-[#173D32]/75 leading-tight text-[10px]">
               Assam, Nagaland, Sikkim corridors synchronized.

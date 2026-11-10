@@ -2,6 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import StatusBadge, { BadgeVariant } from "@/components/ui/StatusBadge";
 
 export interface PortalMetricCardProps {
@@ -122,7 +123,7 @@ export default function PortalMetricCard({
             className="text-xs font-bold text-[#173D32] hover:underline inline-flex items-center gap-1 group"
           >
             <span>{linkText}</span>
-            <span className="transition-transform group-hover:translate-x-0.5">→</span>
+            <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
           </Link>
         </div>
       )}

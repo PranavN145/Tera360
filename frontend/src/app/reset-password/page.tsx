@@ -3,6 +3,7 @@
 import React, { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { AlertTriangle, Check } from "lucide-react";
 import { authApi, ApiClientError } from "@/lib/api";
 
 function ResetPasswordForm() {
@@ -90,8 +91,8 @@ function ResetPasswordForm() {
         {/* Success View */}
         {successMessage ? (
           <div className="p-6 bg-[#FAF8F2] border border-emerald-300 rounded-2xl text-center animate-in fade-in">
-            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-3 text-2xl font-bold">
-              ✓
+            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-3">
+              <Check className="w-6 h-6" strokeWidth={2.5} aria-hidden="true" />
             </div>
             <h2 className="text-lg font-bold text-[#173D32] mb-2">
               Password Reset Complete!
@@ -112,7 +113,7 @@ function ResetPasswordForm() {
             <>
               {errorMessage && (
                 <div className="mb-5 p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs sm:text-sm text-red-700 flex items-start gap-2.5 animate-in fade-in duration-200">
-                  <span className="font-bold text-red-800 text-base leading-none">!</span>
+                  <AlertTriangle className="w-4 h-4 text-red-700 shrink-0 mt-0.5" aria-hidden="true" />
                   <div className="flex-1">{errorMessage}</div>
                 </div>
               )}

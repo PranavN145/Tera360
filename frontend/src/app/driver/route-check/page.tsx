@@ -1,8 +1,26 @@
 "use client";
 
 import React, { useState } from "react";
-import ProtectedRoute from "@/components/auth/ProtectedRoute";
-import PortalShell from "@/components/portal/PortalShell";
+import {
+  AlertTriangle,
+  Ambulance,
+  ArrowLeftRight,
+  Ban,
+  Bell,
+  Car,
+  CheckCircle2,
+  CloudRain,
+  Download,
+  Droplets,
+  MapPin,
+  Navigation,
+  ShieldCheck,
+  Truck,
+  Zap,
+} from "lucide-react";
+import PortalLayout from "@/components/portal/PortalLayout";
+import PortalSectionCard from "@/components/portal/PortalSectionCard";
+import StatusBadge from "@/components/ui/StatusBadge";
 import RiskMap from "@/components/RiskMap";
 import { useApp } from "@/context/AppContext";
 
@@ -151,10 +169,11 @@ const ROUTE_PRESETS: RoutePreset[] = [
 export default function DriverRouteCheckPage() {
   const { openReportModal, addToast } = useApp();
   const [selectedRouteId, setSelectedRouteId] = useState<string>("nh29");
-  const [vehicleType, setVehicleType] = useState<"lmv" | "hcv" | "emergency">("lmv");
+  const [vehicleType, setVehicleType] = useState<"lmv" | "hcv" | "emergency">(
+    "lmv"
+  );
   const [originInput, setOriginInput] = useState<string>("");
   const [destinationInput, setDestinationInput] = useState<string>("");
-  const [isSavedRoute, setIsSavedRoute] = useState<boolean>(false);
   const [isSubscribed, setIsSubscribed] = useState<boolean>(false);
 
   const activeRoute =
@@ -164,7 +183,6 @@ export default function DriverRouteCheckPage() {
     setSelectedRouteId(preset.id);
     setOriginInput(preset.origin);
     setDestinationInput(preset.destination);
-    setIsSavedRoute(false);
   };
 
   const handleSwapLocations = () => {
@@ -230,344 +248,385 @@ Disaster Helpline: 1070 | Police Emergency: 112 | BRO Highway Control: 1800-118-
   const isBlocked = activeRoute.status === "blocked";
   const isCaution = activeRoute.status === "caution";
 
+  const VehicleIcon =
+    vehicleType === "hcv"
+      ? Truck
+      : vehicleType === "emergency"
+      ? Ambulance
+      : Car;
+
   return (
-    <ProtectedRoute allowedRoles={["driver"]}>
-      <PortalShell
-        title="Driver Corridor Route-Check Portal"
-        subtitle="Real-time highway risk assessments, active blockage telemetry, and verified bypass detours."
-        icon="🚛"
-        badgeColor="bg-amber-100 text-amber-900"
-        maxWidth="max-w-6xl"
-      >
-        <div className="space-y-6">
-          {/* Corridor Selection Tabs Strip */}
-          <div>
-            <div className="flex items-center justify-between gap-3 mb-2.5">
-              <span className="text-xs font-bold uppercase tracking-wider text-[#173D32]/70">
-                Major Northeast Highway Corridors
-              </span>
-              <span className="text-[11px] font-semibold text-[#173D32]/60">
-                Live BRO & SDMA Telemetry
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-              {ROUTE_PRESETS.map((preset) => {
-                const isSelected = preset.id === activeRoute.id;
-                const statusColor =
-                  preset.status === "blocked"
-                    ? "bg-red-500 text-white"
-                    : preset.status === "caution"
-                    ? "bg-amber-500 text-white"
-                    : "bg-emerald-600 text-white";
-
-                return (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => handleSelectPreset(preset)}
-                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                      isSelected
-                        ? "bg-[#173D32] text-[#F6F4EC] border-[#173D32] shadow-md ring-2 ring-[#D6A65D]"
-                        : "bg-[#FAF8F2] hover:bg-[#F0EDE3] border-[#173D32]/15 text-[#173D32]"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <span className="font-mono font-bold text-xs">
-                        {preset.highway}
-                      </span>
-                      <span
-                        className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-full ${statusColor}`}
-                      >
-                        {preset.status}
-                      </span>
-                    </div>
-                    <span className="text-xs font-bold truncate block">
-                      {preset.name}
-                    </span>
-                    <span className="text-[10px] opacity-75 mt-0.5 block">
-                      {preset.state} · {preset.distance}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+    <PortalLayout
+      allowedRoles={["driver"]}
+      title="Driver Corridor Route-Check Portal"
+      subtitle="Real-time highway risk assessments, active blockage telemetry, and verified bypass detours."
+      headerActions={
+        <button
+          type="button"
+          onClick={openReportModal}
+          className="px-4 py-2 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-xs transition-all inline-flex items-center gap-1.5 cursor-pointer"
+        >
+          <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
+          <span>Report Debris / Slide</span>
+        </button>
+      }
+    >
+      <div className="space-y-6 w-full">
+        {/* ── 1. Corridor Selection Tabs Strip ──────────────────────────── */}
+        <div>
+          <div className="flex items-center justify-between gap-3 mb-2.5">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[#173D32]/65">
+              Major Northeast Highway Corridors
+            </span>
+            <span className="text-[11px] font-semibold text-[#173D32]/60">
+              Live BRO &amp; SDMA Telemetry
+            </span>
           </div>
 
-          {/* Origin, Destination & Vehicle Selector Card */}
-          <div className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-3xl p-5 sm:p-6 shadow-xs">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
-              {/* Origin Field */}
-              <div className="lg:col-span-4">
-                <label className="block text-[11px] font-bold uppercase text-[#173D32]/70 mb-1">
-                  Trip Origin
-                </label>
-                <div className="flex items-center gap-2 bg-[#F6F4EC] border border-[#173D32]/20 rounded-xl px-3.5 py-2.5">
-                  <span className="text-emerald-700 font-bold">🟢</span>
-                  <input
-                    type="text"
-                    value={originInput || activeRoute.origin}
-                    onChange={(e) => setOriginInput(e.target.value)}
-                    className="bg-transparent text-xs sm:text-sm font-semibold text-[#173D32] focus:outline-none w-full"
-                    placeholder="Enter starting city/town..."
-                  />
-                </div>
-              </div>
-
-              {/* Swap Button */}
-              <div className="lg:col-span-1 flex justify-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {ROUTE_PRESETS.map((preset) => {
+              const isSelected = preset.id === activeRoute.id;
+              return (
                 <button
+                  key={preset.id}
                   type="button"
-                  onClick={handleSwapLocations}
-                  className="w-10 h-10 rounded-full border border-[#173D32]/20 hover:bg-[#173D32] hover:text-[#F6F4EC] transition-all flex items-center justify-center text-sm font-bold shadow-xs cursor-pointer"
-                  title="Swap Origin and Destination"
+                  onClick={() => handleSelectPreset(preset)}
+                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    isSelected
+                      ? "bg-[#173D32] text-[#F6F4EC] border-[#173D32] shadow-md ring-2 ring-[#D6A65D]"
+                      : "bg-[#FAF8F2] hover:bg-white border-[#173D32]/12 text-[#173D32] shadow-2xs"
+                  }`}
                 >
-                  ⇄
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="font-mono font-bold text-xs">
+                      {preset.highway}
+                    </span>
+                    <StatusBadge
+                      status={preset.status}
+                      size="xs"
+                      pulse={preset.status === "blocked"}
+                    />
+                  </div>
+                  <span className="text-xs font-extrabold truncate block">
+                    {preset.name}
+                  </span>
+                  <span className="text-[11px] opacity-75 mt-1 block">
+                    {preset.state} · {preset.distance}
+                  </span>
                 </button>
-              </div>
+              );
+            })}
+          </div>
+        </div>
 
-              {/* Destination Field */}
-              <div className="lg:col-span-4">
-                <label className="block text-[11px] font-bold uppercase text-[#173D32]/70 mb-1">
-                  Trip Destination
-                </label>
-                <div className="flex items-center gap-2 bg-[#F6F4EC] border border-[#173D32]/20 rounded-xl px-3.5 py-2.5">
-                  <span className="text-red-600 font-bold">📍</span>
-                  <input
-                    type="text"
-                    value={destinationInput || activeRoute.destination}
-                    onChange={(e) => setDestinationInput(e.target.value)}
-                    className="bg-transparent text-xs sm:text-sm font-semibold text-[#173D32] focus:outline-none w-full"
-                    placeholder="Enter destination..."
-                  />
-                </div>
+        {/* ── 2. Origin, Destination & Vehicle Selector Card ────────────── */}
+        <div className="bg-[#FAF8F2] border border-[#173D32]/12 rounded-3xl p-5 sm:p-6 shadow-xs">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
+            {/* Origin Field */}
+            <div className="lg:col-span-4">
+              <label
+                htmlFor="driver-origin-input"
+                className="block text-[10.5px] font-bold uppercase tracking-wider text-[#173D32]/65 mb-1.5"
+              >
+                Trip Origin
+              </label>
+              <div className="flex items-center gap-2 bg-white border border-[#173D32]/15 rounded-xl px-3.5 h-10">
+                <Navigation className="w-3.5 h-3.5 text-[#16A34A] shrink-0" aria-hidden="true" />
+                <input
+                  id="driver-origin-input"
+                  type="text"
+                  value={originInput || activeRoute.origin}
+                  onChange={(e) => setOriginInput(e.target.value)}
+                  className="bg-transparent text-xs sm:text-sm font-semibold text-[#173D32] focus:outline-none w-full"
+                  placeholder="Enter starting city/town..."
+                />
               </div>
+            </div>
 
-              {/* Vehicle Type Selector */}
-              <div className="lg:col-span-3">
-                <label className="block text-[11px] font-bold uppercase text-[#173D32]/70 mb-1">
-                  Vehicle Type
-                </label>
+            {/* Swap Button */}
+            <div className="lg:col-span-1 flex justify-center">
+              <button
+                type="button"
+                onClick={handleSwapLocations}
+                className="w-10 h-10 rounded-full bg-white border border-[#173D32]/15 hover:bg-[#173D32] hover:text-[#F6F4EC] text-[#173D32] transition-all flex items-center justify-center shadow-2xs cursor-pointer"
+                title="Swap Origin and Destination"
+                aria-label="Swap Origin and Destination"
+              >
+                <ArrowLeftRight className="w-4 h-4" aria-hidden="true" />
+              </button>
+            </div>
+
+            {/* Destination Field */}
+            <div className="lg:col-span-4">
+              <label
+                htmlFor="driver-dest-input"
+                className="block text-[10.5px] font-bold uppercase tracking-wider text-[#173D32]/65 mb-1.5"
+              >
+                Trip Destination
+              </label>
+              <div className="flex items-center gap-2 bg-white border border-[#173D32]/15 rounded-xl px-3.5 h-10">
+                <MapPin className="w-3.5 h-3.5 text-[#DC2626] shrink-0" aria-hidden="true" />
+                <input
+                  id="driver-dest-input"
+                  type="text"
+                  value={destinationInput || activeRoute.destination}
+                  onChange={(e) => setDestinationInput(e.target.value)}
+                  className="bg-transparent text-xs sm:text-sm font-semibold text-[#173D32] focus:outline-none w-full"
+                  placeholder="Enter destination..."
+                />
+              </div>
+            </div>
+
+            {/* Vehicle Type Selector */}
+            <div className="lg:col-span-3">
+              <label
+                htmlFor="driver-vehicle-select"
+                className="block text-[10.5px] font-bold uppercase tracking-wider text-[#173D32]/65 mb-1.5"
+              >
+                Vehicle Type
+              </label>
+              <div className="flex items-center gap-2 bg-white border border-[#173D32]/15 rounded-xl px-3 h-10">
+                <VehicleIcon className="w-4 h-4 text-[#173D32]/75 shrink-0" aria-hidden="true" />
                 <select
+                  id="driver-vehicle-select"
                   value={vehicleType}
                   onChange={(e) =>
-                    setVehicleType(e.target.value as "lmv" | "hcv" | "emergency")
+                    setVehicleType(
+                      e.target.value as "lmv" | "hcv" | "emergency"
+                    )
                   }
-                  className="w-full bg-[#F6F4EC] border border-[#173D32]/20 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-[#173D32] focus:outline-none cursor-pointer"
+                  className="w-full bg-transparent text-xs font-bold text-[#173D32] focus:outline-none cursor-pointer"
                 >
-                  <option value="lmv">🚗 Light Vehicle (LMV / SUV)</option>
-                  <option value="hcv">🚛 Heavy Commercial (HCV / Truck)</option>
-                  <option value="emergency">🚑 Emergency / Relief Convoy</option>
+                  <option value="lmv">Light Vehicle (LMV / SUV)</option>
+                  <option value="hcv">Heavy Commercial (HCV / Truck)</option>
+                  <option value="emergency">Emergency / Relief Convoy</option>
                 </select>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Corridor Clearance & Hazard Telemetry Banner */}
-          <div
-            className={`rounded-3xl p-5 sm:p-6 border shadow-sm transition-all ${
-              isBlocked
-                ? "bg-red-50/90 border-red-300 text-red-950"
-                : isCaution
-                ? "bg-amber-50/90 border-amber-300 text-amber-950"
-                : "bg-emerald-50/90 border-emerald-300 text-emerald-950"
-            }`}
-          >
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-current/15">
-              <div className="flex items-center gap-3">
-                <span className="text-3xl">
-                  {isBlocked ? "🛑" : isCaution ? "⚠️" : "✅"}
-                </span>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-black uppercase tracking-wider">
-                      {activeRoute.highway} · {activeRoute.state}
-                    </span>
-                    <span
-                      className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
-                        isBlocked
-                          ? "bg-red-600 text-white animate-pulse"
-                          : isCaution
-                          ? "bg-amber-600 text-white"
-                          : "bg-emerald-700 text-white"
-                      }`}
-                    >
-                      {activeRoute.statusText}
-                    </span>
-                  </div>
-                  <h2 className="text-xl sm:text-2xl font-black tracking-tight mt-0.5">
-                    {activeRoute.blockageLocation}
-                  </h2>
-                </div>
-              </div>
-
-              {/* Transit Times */}
-              <div className="flex items-center gap-3 shrink-0">
-                <div className="bg-white/80 rounded-2xl p-3 border border-current/15 text-center min-w-[100px]">
-                  <span className="text-[10px] uppercase font-bold opacity-70 block">
-                    Normal Time
-                  </span>
-                  <span className="text-sm font-bold">
-                    {activeRoute.normalDuration}
-                  </span>
-                </div>
-                <div className="bg-white/80 rounded-2xl p-3 border border-current/15 text-center min-w-[110px]">
-                  <span className="text-[10px] uppercase font-bold opacity-70 block">
-                    Current ETA
-                  </span>
-                  <span
-                    className={`text-sm font-black ${
-                      isBlocked ? "text-red-700" : isCaution ? "text-amber-700" : "text-emerald-700"
-                    }`}
-                  >
-                    {activeRoute.currentDuration}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Blockage Cause & Live Sensor Readouts */}
-            <div className="pt-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
-              <div className="lg:col-span-7">
-                <span className="text-[11px] uppercase font-bold tracking-wider opacity-75 block mb-1">
-                  Geological Obstruction Summary
-                </span>
-                <p className="text-xs sm:text-sm leading-relaxed">
-                  {activeRoute.blockageReason}
-                </p>
-              </div>
-
-              <div className="lg:col-span-5 grid grid-cols-2 gap-2.5">
-                <div className="bg-white/70 rounded-xl p-2.5 border border-current/10">
-                  <span className="text-[10px] uppercase font-bold opacity-70 block">
-                    Doppler Rainfall
-                  </span>
-                  <span className="text-xs font-bold text-[#173D32] mt-0.5 block">
-                    🌧️ {activeRoute.rainfall}
-                  </span>
-                </div>
-
-                <div className="bg-white/70 rounded-xl p-2.5 border border-current/10">
-                  <span className="text-[10px] uppercase font-bold opacity-70 block">
-                    Soil Saturation
-                  </span>
-                  <span className="text-xs font-bold text-[#173D32] mt-0.5 block">
-                    💧 {activeRoute.soilMoisture}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Recommended Detour & Bypass Card (When blocked or cautioned) */}
-          {(isBlocked || isCaution) && (
-            <div className="bg-[#FAF8F2] border-2 border-blue-400/60 rounded-3xl p-5 sm:p-6 shadow-sm">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 pb-3 border-b border-[#173D32]/10">
-                <div className="flex items-center gap-2.5">
-                  <span className="w-8 h-8 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center font-bold text-sm">
-                    🚑
-                  </span>
-                  <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-800">
-                      Official Bypass Clearance
-                    </span>
-                    <h3 className="text-base sm:text-lg font-black text-[#173D32]">
-                      {activeRoute.recommendedDetour.name}
-                    </h3>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-800 border border-blue-200">
-                    Distance: {activeRoute.recommendedDetour.extraDistance}
-                  </span>
-                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-800 border border-blue-200">
-                    Transit: {activeRoute.recommendedDetour.extraTime}
-                  </span>
-                </div>
-              </div>
-
-              <p className="text-xs sm:text-sm text-[#173D32]/85 leading-relaxed mb-3">
-                {activeRoute.recommendedDetour.description}
-              </p>
-
-              <div className="p-3 bg-blue-50/70 border border-blue-200/60 rounded-xl text-xs font-semibold text-blue-900 flex items-center gap-2">
-                <span>⚠️</span>
-                <span>
-                  <strong>Vehicle Suitability:</strong>{" "}
-                  {activeRoute.recommendedDetour.vehicleSuitability}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* 3D Corridor Mountain Elevation & Detour Map Preview */}
-          <div className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-3xl p-5 sm:p-6 shadow-xs">
-            <div className="flex items-center justify-between gap-3 mb-3.5">
-              <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-[#173D32]/70 block">
-                  3D Spatial Elevation & Hazard Preview
-                </span>
-                <span className="text-xs text-[#173D32]/60">
-                  {activeRoute.name} · Nagaland/Northeast Terrain Model
-                </span>
-              </div>
-              <span className="text-[11px] font-bold bg-[#173D32]/10 text-[#173D32] px-2.5 py-1 rounded-full">
-                Interactive 3D Engine
-              </span>
-            </div>
-
-            <div className="relative w-full h-[460px] sm:h-[520px] rounded-2xl overflow-hidden border border-[#173D32]/15 shadow-inner">
-              <RiskMap
-                key={activeRoute.id}
-                center={activeRoute.center}
-                zoom={activeRoute.zoom}
-                className="w-full h-full"
-              />
-            </div>
-          </div>
-
-          {/* Driver Emergency Actions Toolkit */}
-          <div className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-3xl p-5 sm:p-6 shadow-xs">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-[#173D32] mb-3.5 flex items-center gap-2">
-              <span>⚡</span> Driver Emergency Toolkit & Alerts
-            </h4>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <button
-                type="button"
-                onClick={openReportModal}
-                className="h-12 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
-              >
-                <span>⚠️</span> Report Rockfall / Debris
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSubscribeAlerts}
-                className={`h-12 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer ${
-                  isSubscribed
-                    ? "bg-emerald-700 hover:bg-emerald-800 text-white"
-                    : "bg-[#173D32] hover:bg-[#1a4437] text-white"
+        {/* ── 3. Corridor Clearance & Hazard Telemetry Banner ───────────── */}
+        <div
+          className={`rounded-3xl p-5 sm:p-6 border shadow-xs transition-all ${
+            isBlocked
+              ? "bg-[#FEF2F2] border-red-200 text-red-950"
+              : isCaution
+              ? "bg-[#FFFBEB] border-amber-200 text-amber-950"
+              : "bg-[#ECFDF5] border-emerald-200 text-emerald-950"
+          }`}
+        >
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-current/12">
+            <div className="flex items-start sm:items-center gap-3.5">
+              <div
+                className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${
+                  isBlocked
+                    ? "bg-red-100 text-red-700"
+                    : isCaution
+                    ? "bg-amber-100 text-amber-800"
+                    : "bg-emerald-100 text-emerald-700"
                 }`}
+                aria-hidden="true"
               >
-                <span>{isSubscribed ? "✅" : "🔔"}</span>
-                {isSubscribed
-                  ? "SMS Alerts Active (Unsubscribe)"
-                  : "Subscribe to Highway SMS Alerts"}
-              </button>
+                {isBlocked ? (
+                  <Ban className="w-5 h-5" />
+                ) : isCaution ? (
+                  <AlertTriangle className="w-5 h-5" />
+                ) : (
+                  <CheckCircle2 className="w-5 h-5" />
+                )}
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-black uppercase tracking-wider">
+                    {activeRoute.highway} · {activeRoute.state}
+                  </span>
+                  <StatusBadge
+                    status={activeRoute.status}
+                    label={activeRoute.statusText}
+                    size="xs"
+                    pulse={isBlocked}
+                  />
+                </div>
+                <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight mt-1">
+                  {activeRoute.blockageLocation}
+                </h2>
+              </div>
+            </div>
 
-              <button
-                type="button"
-                onClick={handleDownloadAdvisory}
-                className="h-12 px-4 rounded-xl bg-[#FAF8F2] hover:bg-[#F0EDE3] border-2 border-[#173D32]/25 text-[#173D32] font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
-              >
-                <span>📥</span> Download Offline Route Advisory
-              </button>
+            {/* Transit Times */}
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="bg-white/90 rounded-2xl p-3 border border-current/12 text-center min-w-[100px]">
+                <span className="text-[10px] uppercase font-bold opacity-70 block">
+                  Normal Time
+                </span>
+                <span className="text-sm font-bold text-[#173D32]">
+                  {activeRoute.normalDuration}
+                </span>
+              </div>
+              <div className="bg-white/90 rounded-2xl p-3 border border-current/12 text-center min-w-[120px]">
+                <span className="text-[10px] uppercase font-bold opacity-70 block">
+                  Current ETA
+                </span>
+                <span
+                  className={`text-sm font-black ${
+                    isBlocked
+                      ? "text-red-700"
+                      : isCaution
+                      ? "text-amber-700"
+                      : "text-emerald-700"
+                  }`}
+                >
+                  {activeRoute.currentDuration}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Blockage Cause & Live Sensor Readouts */}
+          <div className="pt-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div className="lg:col-span-7">
+              <span className="text-[11px] uppercase font-bold tracking-wider opacity-75 block mb-1">
+                Geological Obstruction Summary
+              </span>
+              <p className="text-xs sm:text-sm leading-relaxed">
+                {activeRoute.blockageReason}
+              </p>
+            </div>
+
+            <div className="lg:col-span-5 grid grid-cols-2 gap-2.5">
+              <div className="bg-white/85 rounded-xl p-3 border border-current/10">
+                <span className="text-[10px] uppercase font-bold opacity-70 inline-flex items-center gap-1">
+                  <CloudRain className="w-3 h-3 text-[#1D4ED8]" aria-hidden="true" />
+                  <span>Doppler Rainfall</span>
+                </span>
+                <span className="text-xs font-bold text-[#173D32] mt-1 block">
+                  {activeRoute.rainfall}
+                </span>
+              </div>
+
+              <div className="bg-white/85 rounded-xl p-3 border border-current/10">
+                <span className="text-[10px] uppercase font-bold opacity-70 inline-flex items-center gap-1">
+                  <Droplets className="w-3 h-3 text-[#17688A]" aria-hidden="true" />
+                  <span>Soil Saturation</span>
+                </span>
+                <span className="text-xs font-bold text-[#173D32] mt-1 block">
+                  {activeRoute.soilMoisture}
+                </span>
+              </div>
             </div>
           </div>
         </div>
-      </PortalShell>
-    </ProtectedRoute>
+
+        {/* ── 4. Recommended Detour & Bypass Card ──────────────────────── */}
+        {(isBlocked || isCaution) && (
+          <div className="bg-[#FAF8F2] border border-blue-300/80 rounded-3xl p-5 sm:p-6 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 pb-3 border-b border-[#173D32]/10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-800 flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-5 h-5" aria-hidden="true" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-blue-800 block">
+                    Official Bypass Clearance
+                  </span>
+                  <h3 className="text-base sm:text-lg font-extrabold text-[#173D32]">
+                    {activeRoute.recommendedDetour.name}
+                  </h3>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-50 text-blue-800 border border-blue-200">
+                  Distance: {activeRoute.recommendedDetour.extraDistance}
+                </span>
+                <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-50 text-blue-800 border border-blue-200">
+                  Transit: {activeRoute.recommendedDetour.extraTime}
+                </span>
+              </div>
+            </div>
+
+            <p className="text-xs sm:text-sm text-[#173D32]/85 leading-relaxed mb-3">
+              {activeRoute.recommendedDetour.description}
+            </p>
+
+            <div className="p-3 bg-blue-50/75 border border-blue-200/70 rounded-xl text-xs font-semibold text-blue-900 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-blue-700 shrink-0" aria-hidden="true" />
+              <span>
+                <strong>Vehicle Suitability:</strong>{" "}
+                {activeRoute.recommendedDetour.vehicleSuitability}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* ── 5. 3D Corridor Mountain Elevation & Detour Map Preview ────── */}
+        <PortalSectionCard
+          title="3D Spatial Elevation & Hazard Preview"
+          subtitle={`${activeRoute.name} · Northeast Terrain Model`}
+          badge={
+            <span className="text-[11px] font-bold bg-[#DCE8D4]/70 text-[#173D32] px-2.5 py-0.5 rounded-full">
+              Interactive 3D Engine
+            </span>
+          }
+        >
+          <div className="relative w-full h-[420px] sm:h-[500px] rounded-2xl overflow-hidden border border-[#173D32]/15 bg-[#EEF4EB] shadow-inner">
+            <RiskMap
+              key={activeRoute.id}
+              center={activeRoute.center}
+              zoom={activeRoute.zoom}
+              className="w-full h-full"
+            />
+          </div>
+        </PortalSectionCard>
+
+        {/* ── 6. Driver Emergency Actions Toolkit ───────────────────────── */}
+        <PortalSectionCard
+          title="Driver Emergency Toolkit & Alerts"
+          icon={<Zap className="w-4 h-4" aria-hidden="true" />}
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <button
+              type="button"
+              onClick={openReportModal}
+              className="h-11 px-4 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold text-xs inline-flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer"
+            >
+              <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Report Rockfall / Debris</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSubscribeAlerts}
+              className={`h-11 px-4 rounded-full font-bold text-xs inline-flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer ${
+                isSubscribed
+                  ? "bg-emerald-700 hover:bg-emerald-800 text-white"
+                  : "bg-[#173D32] hover:bg-[#1a4437] text-[#F6F4EC]"
+              }`}
+            >
+              {isSubscribed ? (
+                <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
+              ) : (
+                <Bell className="w-3.5 h-3.5" aria-hidden="true" />
+              )}
+              <span>
+                {isSubscribed
+                  ? "SMS Alerts Active (Unsubscribe)"
+                  : "Subscribe to Highway SMS Alerts"}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadAdvisory}
+              className="h-11 px-4 rounded-full bg-white hover:bg-[#FAF8F2] border border-[#173D32]/20 text-[#173D32] font-bold text-xs inline-flex items-center justify-center gap-2 transition-all shadow-2xs cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Download Offline Route Advisory</span>
+            </button>
+          </div>
+        </PortalSectionCard>
+      </div>
+    </PortalLayout>
   );
 }

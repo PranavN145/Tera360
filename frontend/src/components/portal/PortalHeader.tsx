@@ -4,6 +4,7 @@ import React, { useState, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ArrowRight, Bell } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { PortalRoleConfig } from "./portalNavConfig";
 import DropdownPortal from "@/components/ui/DropdownPortal";
@@ -187,8 +188,8 @@ export default function PortalHeader({
 
               {/* Authentic Empty State — Truthfully reports no pending notifications */}
               <div className="text-center py-6 px-3">
-                <div className="w-12 h-12 rounded-2xl bg-[#DCE8D4]/60 border border-[#173D32]/15 flex items-center justify-center text-2xl shadow-2xs mx-auto mb-3 text-[#173D32]">
-                  🔔
+                <div className="w-12 h-12 rounded-2xl bg-[#DCE8D4]/60 border border-[#173D32]/15 flex items-center justify-center shadow-2xs mx-auto mb-3 text-[#173D32]">
+                  <Bell className="w-5 h-5" aria-hidden="true" />
                 </div>
                 <h4 className="text-sm font-extrabold text-[#173D32] mb-1">
                   No New Notifications
@@ -203,7 +204,7 @@ export default function PortalHeader({
                     className="inline-flex items-center gap-1.5 text-xs font-bold text-[#173D32] hover:underline"
                   >
                     <span>Check Live Operational Feeds</span>
-                    <span>→</span>
+                    <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
                   </Link>
                 </div>
               </div>

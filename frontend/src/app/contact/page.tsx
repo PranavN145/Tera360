@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AlertTriangle, ArrowRight, Check } from "lucide-react";
 import Header from "@/components/layout/Header";
 import { useApp } from "@/context/AppContext";
 import { publicApi, ApiClientError } from "@/lib/api";
@@ -170,8 +171,9 @@ export default function ContactPage() {
               <span className="text-2xl font-black text-[#173D32] mt-1 block">1077</span>
               <p className="text-xs text-[#173D32]/70 mt-1">State Disaster Management Authority (SDMA)</p>
             </div>
-            <span className="text-xs font-bold text-red-700 mt-4 group-hover:translate-x-1 transition-transform inline-block">
-              Click to Call →
+            <span className="text-xs font-bold text-red-700 mt-4 group-hover:translate-x-1 transition-transform inline-flex items-center gap-1.5">
+              <span>Click to Call</span>
+              <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
             </span>
           </a>
 
@@ -186,8 +188,9 @@ export default function ContactPage() {
               <span className="text-2xl font-black text-[#173D32] mt-1 block">1070</span>
               <p className="text-xs text-[#173D32]/70 mt-1">Northeast Inter-State Coordination</p>
             </div>
-            <span className="text-xs font-bold text-[#173D32] mt-4 group-hover:translate-x-1 transition-transform inline-block">
-              Click to Call →
+            <span className="text-xs font-bold text-[#173D32] mt-4 group-hover:translate-x-1 transition-transform inline-flex items-center gap-1.5">
+              <span>Click to Call</span>
+              <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
             </span>
           </a>
 
@@ -202,8 +205,9 @@ export default function ContactPage() {
               <span className="text-2xl font-black text-[#173D32] mt-1 block">112</span>
               <p className="text-xs text-[#173D32]/70 mt-1">Police / Fire / Ambulance</p>
             </div>
-            <span className="text-xs font-bold text-[#173D32] mt-4 group-hover:translate-x-1 transition-transform inline-block">
-              Click to Call →
+            <span className="text-xs font-bold text-[#173D32] mt-4 group-hover:translate-x-1 transition-transform inline-flex items-center gap-1.5">
+              <span>Click to Call</span>
+              <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
             </span>
           </a>
 
@@ -230,8 +234,8 @@ export default function ContactPage() {
             {submittedContact ? (
               /* Success Confirmation Card */
               <div className="p-8 text-center bg-[#DCE8D4]/50 rounded-2xl border border-[#173D32]/15 animate-in fade-in duration-200">
-                <div className="w-16 h-16 rounded-full bg-[#DCE8D4] text-[#173D32] flex items-center justify-center text-3xl mx-auto mb-3 shadow-xs">
-                  ✓
+                <div className="w-16 h-16 rounded-full bg-[#DCE8D4] text-[#173D32] flex items-center justify-center mx-auto mb-3 shadow-xs">
+                  <Check className="w-8 h-8" strokeWidth={2.5} aria-hidden="true" />
                 </div>
                 <div className="inline-flex items-center gap-2 px-3 py-0.5 rounded-full bg-[#173D32]/10 text-[11px] font-bold text-[#173D32] uppercase mb-2">
                   Status: Logged to Dispatch Desk
@@ -263,7 +267,7 @@ export default function ContactPage() {
                 {/* Error Banner */}
                 {errorMessage && (
                   <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs leading-relaxed flex items-start gap-2.5">
-                    <span className="text-base shrink-0">⚠️</span>
+                    <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" aria-hidden="true" />
                     <p className="font-semibold flex-1">{errorMessage}</p>
                   </div>
                 )}

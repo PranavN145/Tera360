@@ -3,10 +3,29 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import {
+  AlertTriangle,
+  BarChart3,
+  CheckCircle2,
+  ShieldCheck,
+  User,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { getRolePortalPath, ApiClientError } from "@/lib/api";
 
-const DEMO_ACCOUNTS = [
+const DEMO_ACCOUNTS: {
+  role: string;
+  buttonLabel: string;
+  title: string;
+  name: string;
+  email: string;
+  password: string;
+  badge: string;
+  Icon: LucideIcon;
+  borderClass: string;
+}[] = [
   {
     role: "officer",
     buttonLabel: "Continue as Officer",
@@ -15,7 +34,7 @@ const DEMO_ACCOUNTS = [
     email: "officer@terra360.in",
     password: "Password123!",
     badge: "Operations & Warnings",
-    icon: "📊",
+    Icon: BarChart3,
     borderClass: "border-emerald-300/80 bg-emerald-50/70 hover:bg-emerald-100/80 text-emerald-950",
   },
   {
@@ -26,7 +45,7 @@ const DEMO_ACCOUNTS = [
     email: "field@terra360.in",
     password: "Password123!",
     badge: "Sensors & Clearance",
-    icon: "👮",
+    Icon: ShieldCheck,
     borderClass: "border-blue-300/80 bg-blue-50/70 hover:bg-blue-100/80 text-blue-950",
   },
   {
@@ -37,7 +56,7 @@ const DEMO_ACCOUNTS = [
     email: "citizen@terra360.in",
     password: "Password123!",
     badge: "Community & Safe Place",
-    icon: "👤",
+    Icon: User,
     borderClass: "border-amber-300/80 bg-amber-50/70 hover:bg-amber-100/80 text-amber-950",
   },
 ];
@@ -239,13 +258,12 @@ function LoginForm() {
                   : "bg-red-50 border-red-200 text-red-700"
               }`}
             >
-              <span
-                className={`font-bold text-base leading-none ${
-                  errorCode === "ACCOUNT_LOCKED" ? "text-amber-700" : "text-red-800"
+              <AlertTriangle
+                className={`w-4 h-4 shrink-0 mt-0.5 ${
+                  errorCode === "ACCOUNT_LOCKED" ? "text-amber-700" : "text-red-700"
                 }`}
-              >
-                !
-              </span>
+                aria-hidden="true"
+              />
               <div className="flex-1 leading-relaxed">
                 {errorCode === "ACCOUNT_LOCKED" && (
                   <div className="font-bold text-amber-950 mb-0.5">Account Temporarily Locked</div>
@@ -258,7 +276,7 @@ function LoginForm() {
           {/* Demo Info Notice */}
           {demoBannerInfo && (
             <div className="mb-3 py-1 px-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-900 flex items-center gap-1.5 animate-in fade-in">
-              <span className="font-bold text-emerald-700">✓</span>
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700 shrink-0" aria-hidden="true" />
               <div className="flex-1 truncate">{demoBannerInfo}</div>
             </div>
           )}
@@ -268,7 +286,7 @@ function LoginForm() {
             <div className="mb-4 p-2.5 sm:p-3 rounded-2xl bg-[#FAF8F2] border border-[#173D32]/12">
               <div className="flex items-center justify-between mb-2 px-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[#173D32]/70 flex items-center gap-1">
-                  <span>⚡</span>
+                  <Zap className="w-3 h-3 text-[#D6A65D]" aria-hidden="true" />
                   <span>Demo Mode</span>
                 </span>
                 <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#DCE8D4] text-[#173D32] font-black uppercase tracking-wider">
@@ -279,6 +297,7 @@ function LoginForm() {
               <div className="space-y-1.5">
                 {DEMO_ACCOUNTS.map((demo) => {
                   const isCurrentRoleLoading = isLoading && activeDemoRole === demo.role;
+                  const DemoIcon = demo.Icon;
                   return (
                     <div
                       key={demo.role}
@@ -290,7 +309,7 @@ function LoginForm() {
                         className="flex items-center gap-2 text-left flex-1 min-w-0 cursor-pointer group"
                         title="Click to populate credentials for review"
                       >
-                        <span className="text-sm shrink-0 leading-none">{demo.icon}</span>
+                        <DemoIcon className="w-4 h-4 shrink-0 text-[#173D32]" aria-hidden="true" />
                         <div className="min-w-0">
                           <div className="text-[11px] font-bold truncate flex items-center gap-1 text-[#173D32] leading-tight">
                             <span>{demo.name}</span>

@@ -2,6 +2,17 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Car,
+  CloudRain,
+  Droplets,
+  OctagonAlert,
+  X,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 import Header from "@/components/layout/Header";
 import { useApp } from "@/context/AppContext";
 import { publicApi } from "@/lib/api";
@@ -18,7 +29,7 @@ const SEVERITY_THEME: Record<
     pingBg: string;
     hoverBorder: string;
     shadowGlow: string;
-    hazardIcon: string;
+    HazardIcon: LucideIcon;
   }
 > = {
   Critical: {
@@ -28,7 +39,7 @@ const SEVERITY_THEME: Record<
     pingBg: "bg-red-400",
     hoverBorder: "hover:border-red-300",
     shadowGlow: "hover:shadow-[0_20px_40px_-10px_rgba(220,38,38,0.18)]",
-    hazardIcon: "⛔",
+    HazardIcon: OctagonAlert,
   },
   Warning: {
     topBorder: "bg-gradient-to-r from-amber-500 via-amber-400 to-orange-400",
@@ -37,7 +48,7 @@ const SEVERITY_THEME: Record<
     pingBg: "bg-amber-400",
     hoverBorder: "hover:border-amber-300",
     shadowGlow: "hover:shadow-[0_20px_40px_-10px_rgba(217,119,6,0.18)]",
-    hazardIcon: "⚠️",
+    HazardIcon: AlertTriangle,
   },
   Watch: {
     topBorder: "bg-gradient-to-r from-[#D6A65D] via-[#e2ba7e] to-[#D6A65D]/40",
@@ -46,7 +57,7 @@ const SEVERITY_THEME: Record<
     pingBg: "bg-[#D6A65D]/50",
     hoverBorder: "hover:border-[#D6A65D]/60",
     shadowGlow: "hover:shadow-[0_20px_40px_-10px_rgba(214,166,93,0.20)]",
-    hazardIcon: "⚡",
+    HazardIcon: Zap,
   },
 };
 
@@ -197,7 +208,10 @@ export default function AlertsPage() {
             {/* Search Box */}
             <div className="relative flex-1 sm:w-72">
               <input
+                id="alerts-search"
+                name="alerts-search"
                 type="text"
+                aria-label="Search location, highway, state"
                 placeholder="Search location, highway, state..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -221,9 +235,10 @@ export default function AlertsPage() {
                 <button
                   type="button"
                   onClick={() => setSearchTerm("")}
-                  className="absolute right-3 top-2.5 text-xs text-[#173D32]/50 hover:text-[#173D32] cursor-pointer"
+                  aria-label="Clear search"
+                  className="absolute right-3 top-2.5 text-[#173D32]/50 hover:text-[#173D32] cursor-pointer p-0.5"
                 >
-                  ✕
+                  <X className="w-3.5 h-3.5" aria-hidden="true" />
                 </button>
               )}
             </div>
@@ -313,7 +328,7 @@ export default function AlertsPage() {
                               className={`relative inline-flex rounded-full h-2 w-2 ${theme.dotBg}`}
                             />
                           </span>
-                          <span>{theme.hazardIcon}</span>
+                          <theme.HazardIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                           <span>{alert.severity}</span>
                         </span>
 
@@ -385,7 +400,7 @@ export default function AlertsPage() {
                     <div className="mt-4 grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-[#F6F4EC]/90 border border-[#173D32]/8 text-[11px]">
                       <div className="flex flex-col">
                         <span className="text-[10px] text-[#173D32]/60 font-bold uppercase tracking-wider flex items-center gap-1">
-                          <span>🌧️</span> Rain
+                          <CloudRain className="w-3 h-3 text-[#173D32]/65" aria-hidden="true" /> Rain
                         </span>
                         <span className="font-extrabold text-[#173D32] mt-0.5">
                           {item.rainfall24h || "Monitored"}
@@ -393,7 +408,7 @@ export default function AlertsPage() {
                       </div>
                       <div className="flex flex-col border-l border-[#173D32]/10 pl-2">
                         <span className="text-[10px] text-[#173D32]/60 font-bold uppercase tracking-wider flex items-center gap-1">
-                          <span>💧</span> Soil
+                          <Droplets className="w-3 h-3 text-[#173D32]/65" aria-hidden="true" /> Soil
                         </span>
                         <span className="font-extrabold text-[#173D32] mt-0.5">
                           {item.saturation || "Baseline"}
@@ -401,7 +416,7 @@ export default function AlertsPage() {
                       </div>
                       <div className="flex flex-col border-l border-[#173D32]/10 pl-2">
                         <span className="text-[10px] text-[#173D32]/60 font-bold uppercase tracking-wider flex items-center gap-1">
-                          <span>🚗</span> Transit
+                          <Car className="w-3 h-3 text-[#173D32]/65" aria-hidden="true" /> Transit
                         </span>
                         <span
                           className={`font-extrabold truncate mt-0.5 ${
@@ -434,7 +449,7 @@ export default function AlertsPage() {
                       className="inline-flex items-center gap-1.5 text-xs font-bold text-[#F6F4EC] bg-[#173D32] group-hover:bg-[#1a4437] px-4 py-1.5 rounded-full transition-all duration-200 cursor-pointer shadow-xs group-hover:shadow"
                     >
                       <span>View Details</span>
-                      <span className="transition-transform duration-200 group-hover:translate-x-1">→</span>
+                      <ArrowRight className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />
                     </button>
                   </div>
                 </article>
@@ -486,7 +501,7 @@ export default function AlertsPage() {
                   <div className="shrink-0 flex items-center justify-end">
                     <span className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#173D32] text-[#F6F4EC] text-xs font-bold group-hover:bg-[#1a4437] transition-all shadow-2xs">
                       <span>View Advisory</span>
-                      <span aria-hidden="true" className="group-hover:translate-x-1 transition-transform">→</span>
+                      <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" aria-hidden="true" />
                     </span>
                   </div>
                 </article>

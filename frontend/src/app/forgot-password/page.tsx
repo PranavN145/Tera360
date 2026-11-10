@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { Check } from "lucide-react";
 import { authApi, ApiClientError } from "@/lib/api";
 
 export default function ForgotPasswordPage() {
@@ -55,8 +56,8 @@ export default function ForgotPasswordPage() {
         {/* Success View */}
         {successMessage ? (
           <div className="p-6 bg-[#FAF8F2] border border-emerald-300 rounded-2xl text-center animate-in fade-in">
-            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-3 text-2xl font-bold">
-              ✓
+            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-3">
+              <Check className="w-6 h-6" strokeWidth={2.5} aria-hidden="true" />
             </div>
             <h2 className="text-lg font-bold text-[#173D32] mb-2">
               Check Your Email

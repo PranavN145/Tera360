@@ -4,10 +4,12 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
+  ArrowLeft,
   ArrowRight,
   Ban,
   CheckCircle2,
   MapPin,
+  Megaphone,
   Road,
   Search,
 } from "lucide-react";
@@ -102,16 +104,17 @@ export default function OfficerRoadsPage() {
         <div className="flex items-center gap-2">
           <Link
             href="/officer/alerts"
-            className="px-3.5 py-1.5 rounded-full bg-[#D6A65D] hover:bg-[#c9984e] text-[#173D32] text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-1.5 rounded-full bg-[#D6A65D] hover:bg-[#c9984e] text-[#173D32] text-xs font-bold shadow-xs transition-all inline-flex items-center gap-1.5 cursor-pointer"
           >
-            <span>📢</span>
+            <Megaphone className="w-3.5 h-3.5" aria-hidden="true" />
             <span>Broadcast Alert</span>
           </Link>
           <Link
             href="/officer/dashboard"
-            className="px-3.5 py-1.5 rounded-full bg-[#173D32] text-[#F6F4EC] text-xs font-bold hover:bg-[#1a4437] transition-all"
+            className="px-3.5 py-1.5 rounded-full bg-[#173D32] text-[#F6F4EC] text-xs font-bold hover:bg-[#1a4437] transition-all inline-flex items-center gap-1.5"
           >
-            ← Dashboard
+            <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Dashboard</span>
           </Link>
         </div>
       }

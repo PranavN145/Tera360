@@ -2,6 +2,15 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Bell,
+  CheckCircle2,
+  OctagonAlert,
+  Radar,
+  X,
+} from "lucide-react";
 import Header from "@/components/layout/Header";
 import RiskMap from "@/components/RiskMap";
 import { useApp } from "@/context/AppContext";
@@ -245,7 +254,7 @@ export default function RiskMapPage() {
               onClick={openReportModal}
               className="h-[48px] px-7 rounded-full bg-[#D6A65D] hover:bg-[#c9984e] text-[#173D32] text-sm font-bold shadow-xs hover:shadow transition-all duration-200 hover:-translate-y-0.5 flex items-center gap-2.5 cursor-pointer"
             >
-              <span>⚠️</span>
+              <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
               <span>Report Hazard</span>
             </button>
           </div>
@@ -258,8 +267,8 @@ export default function RiskMapPage() {
               <span className="text-[11px] uppercase font-bold text-[#173D32]/60 tracking-wider">
                 Corridors
               </span>
-              <span className="w-6 h-6 rounded-lg bg-[#DCE8D4]/60 flex items-center justify-center text-xs">
-                🛰️
+              <span className="w-6 h-6 rounded-lg bg-[#DCE8D4]/60 text-[#173D32] flex items-center justify-center">
+                <Radar className="w-3.5 h-3.5" aria-hidden="true" />
               </span>
             </div>
             <div className="mt-2 flex items-baseline gap-2">
@@ -278,8 +287,8 @@ export default function RiskMapPage() {
               <span className="text-[11px] uppercase font-bold text-[#173D32]/60 tracking-wider">
                 Active Alerts
               </span>
-              <span className="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center text-xs">
-                🔔
+              <span className="w-6 h-6 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center">
+                <Bell className="w-3.5 h-3.5" aria-hidden="true" />
               </span>
             </div>
             <div className="mt-2 flex items-baseline gap-2">
@@ -300,8 +309,8 @@ export default function RiskMapPage() {
               <span className="text-[11px] uppercase font-bold text-red-700/80 tracking-wider">
                 Blocked
               </span>
-              <span className="w-6 h-6 rounded-lg bg-red-100 flex items-center justify-center text-xs">
-                ⛔
+              <span className="w-6 h-6 rounded-lg bg-red-100 text-red-700 flex items-center justify-center">
+                <OctagonAlert className="w-3.5 h-3.5" aria-hidden="true" />
               </span>
             </div>
             <div className="mt-2 flex items-baseline gap-2">
@@ -320,8 +329,8 @@ export default function RiskMapPage() {
               <span className="text-[11px] uppercase font-bold text-amber-700/80 tracking-wider">
                 Under Caution
               </span>
-              <span className="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center text-xs">
-                ⚠️
+              <span className="w-6 h-6 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
+                <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
               </span>
             </div>
             <div className="mt-2 flex items-baseline gap-2">
@@ -340,8 +349,8 @@ export default function RiskMapPage() {
               <span className="text-[11px] uppercase font-bold text-emerald-800/80 tracking-wider">
                 Open Corridors
               </span>
-              <span className="w-6 h-6 rounded-lg bg-emerald-100 flex items-center justify-center text-xs">
-                ✅
+              <span className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
               </span>
             </div>
             <div className="mt-2 flex items-baseline gap-2">
@@ -406,7 +415,10 @@ export default function RiskMapPage() {
           <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-end">
             <div className="relative flex-1 sm:w-56">
               <input
+                id="risk-map-search"
+                name="risk-map-search"
                 type="text"
+                aria-label="Search highways"
                 placeholder="Search highways..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -425,14 +437,18 @@ export default function RiskMapPage() {
                 <button
                   type="button"
                   onClick={() => setSearch("")}
-                  className="absolute right-2.5 top-2.5 text-xs text-[#173D32]/50 hover:text-[#173D32]"
+                  aria-label="Clear highway search"
+                  className="absolute right-2.5 top-2.5 text-[#173D32]/50 hover:text-[#173D32] cursor-pointer p-0.5"
                 >
-                  ✕
+                  <X className="w-3.5 h-3.5" aria-hidden="true" />
                 </button>
               )}
             </div>
 
             <select
+              id="risk-map-severity"
+              name="risk-map-severity"
+              aria-label="Filter by severity"
               value={selectedSeverity}
               onChange={(e) => setSelectedSeverity(e.target.value)}
               className="h-10 px-3.5 rounded-full bg-[#F6F4EC] border border-[#173D32]/20 text-xs font-bold text-[#173D32] focus:outline-none cursor-pointer"
@@ -557,7 +573,7 @@ export default function RiskMapPage() {
                     className="inline-flex items-center gap-1.5 text-xs font-bold text-[#F6F4EC] bg-[#173D32] group-hover:bg-[#1a4437] px-4 py-1.5 rounded-full transition-all duration-200 cursor-pointer shadow-xs group-hover:shadow"
                   >
                     <span>View Telemetry</span>
-                    <span className="transition-transform duration-200 group-hover:translate-x-1">→</span>
+                    <ArrowRight className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />
                   </button>
                 </div>
               </article>

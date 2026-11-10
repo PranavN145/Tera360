@@ -2,7 +2,20 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  Bell,
+  MapPin,
+  PhoneCall,
+  Road,
+  ShieldCheck,
+} from "lucide-react";
 import PortalLayout from "@/components/portal/PortalLayout";
+import PortalFilterBar from "@/components/portal/PortalFilterBar";
+import PortalSectionCard from "@/components/portal/PortalSectionCard";
+import StatusBadge from "@/components/ui/StatusBadge";
 import RiskMap from "@/components/RiskMap";
 import { publicApi } from "@/lib/api";
 import { PublicRoadStatusItem, PublicAlertItem } from "@/types/public";
@@ -63,46 +76,72 @@ export default function CitizenMyAreaPage() {
       allowedRoles={["citizen"]}
       title="My Area Local Landslide Risk"
       subtitle="Hyper-local slope moisture assessment, arterial road clearance, and weather alerts for your neighborhood."
-    >
-      <div className="space-y-6">
-        {/* Region selector pill buttons */}
-        <div className="flex flex-wrap items-center gap-2 pb-2">
-          {REGIONS.map((reg) => (
-            <button
-              key={reg.id}
-              type="button"
-              onClick={() => setSelectedRegion(reg)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                selectedRegion.id === reg.id
-                  ? "bg-[#173D32] text-[#F6F4EC] shadow-2xs"
-                  : "bg-white/80 hover:bg-white text-[#173D32] border border-[#173D32]/15"
-              }`}
-            >
-              {reg.name}
-            </button>
-          ))}
+      headerActions={
+        <div className="flex items-center gap-2">
+          <Link
+            href="/citizen/safe-place"
+            className="px-3.5 py-1.5 rounded-full bg-[#173D32]/10 hover:bg-[#173D32]/15 text-[#173D32] text-xs font-bold transition-all inline-flex items-center gap-1.5"
+          >
+            <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Safe Places</span>
+          </Link>
+          <Link
+            href="/citizen/home"
+            className="px-3.5 py-1.5 rounded-full bg-[#173D32] text-[#F6F4EC] text-xs font-bold hover:bg-[#1a4437] transition-all inline-flex items-center gap-1.5"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Home</span>
+          </Link>
         </div>
+      }
+    >
+      <div className="space-y-5 sm:space-y-6 w-full">
+        {/* Region selector pill bar */}
+        <PortalFilterBar
+          className="px-3 py-2.5 sm:px-4 sm:py-3"
+          left={
+            <nav
+              aria-label="Select local hill region"
+              className="flex flex-wrap items-center gap-1.5"
+            >
+              {REGIONS.map((reg) => {
+                const isActive = selectedRegion.id === reg.id;
+                return (
+                  <button
+                    key={reg.id}
+                    type="button"
+                    aria-pressed={isActive}
+                    onClick={() => setSelectedRegion(reg)}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
+                      isActive
+                        ? "bg-[#173D32] text-[#F6F4EC] shadow-xs"
+                        : "text-[#173D32]/80 hover:text-[#173D32] hover:bg-[#173D32]/6"
+                    }`}
+                  >
+                    {isActive && (
+                      <MapPin className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                    )}
+                    <span>{reg.name}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          }
+        />
 
         {/* Selected Area Risk Overview Card */}
-        <div className="p-6 sm:p-8 bg-[#FAF8F2] rounded-3xl border border-[#173D32]/12 shadow-xs">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#173D32]/10">
-            <div>
-              <span className="text-[11px] font-bold text-[#173D32]/60 uppercase tracking-wider block">
-                Local Hill District
-              </span>
-              <h2 className="text-xl sm:text-2xl font-black text-[#173D32] mt-0.5">
-                {selectedRegion.name}
-              </h2>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-100 text-emerald-800">
-                Monitored Corridor: {selectedRegion.corridor}
-              </span>
-            </div>
-          </div>
-
+        <PortalSectionCard
+          title={selectedRegion.name}
+          subtitle="Local Hill District"
+          badge={
+            <span className="px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider bg-[#DCE8D4] text-[#173D32]">
+              Monitored Corridor: {selectedRegion.corridor}
+            </span>
+          }
+          padding="lg"
+        >
           {/* Standardized 3D Topographic Terrain View */}
-          <div className="mt-6 mb-6 w-full h-[300px] sm:h-[350px] rounded-2xl overflow-hidden border border-[#173D32]/15 bg-[#EEF4EB] shadow-xs">
+          <div className="mb-6 w-full h-[300px] sm:h-[360px] rounded-2xl overflow-hidden border border-[#173D32]/15 bg-[#EEF4EB] shadow-xs">
             <RiskMap
               variant="mini"
               selectedState={
@@ -123,41 +162,69 @@ export default function CitizenMyAreaPage() {
           </div>
 
           {/* Area Metrics */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mt-6 text-xs">
-            <div className="p-4 rounded-2xl bg-white border border-[#173D32]/10 shadow-2xs">
-              <span className="text-[#173D32]/60 block mb-1">Corridor Clearance</span>
-              <span
-                className={`text-base font-extrabold uppercase ${
-                  relevantRoad?.status === "blocked"
-                    ? "text-red-700"
-                    : relevantRoad?.status === "caution"
-                    ? "text-amber-700"
-                    : "text-emerald-700"
-                }`}
-              >
-                {relevantRoad ? relevantRoad.status : "Open"}
-              </span>
-              <p className="text-[11px] text-[#173D32]/60 mt-1">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5 text-xs">
+            <div className="p-4 rounded-2xl bg-white border border-[#173D32]/12 shadow-[0_2px_8px_-2px_rgba(23,61,50,0.04)] flex flex-col justify-between">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#173D32]/55 inline-flex items-center gap-1.5 mb-2">
+                  <Road className="w-3.5 h-3.5 text-[#173D32]/65" aria-hidden="true" />
+                  <span>Corridor Clearance</span>
+                </span>
+                <div>
+                  {isLoading ? (
+                    <div className="h-6 w-28 rounded-full bg-[#173D32]/10 animate-pulse" />
+                  ) : (
+                    <StatusBadge
+                      status={relevantRoad ? relevantRoad.status : "open"}
+                      size="sm"
+                      pulse={relevantRoad?.status === "blocked"}
+                    />
+                  )}
+                </div>
+              </div>
+              <p className="text-[11px] text-[#173D32]/65 mt-2.5 leading-relaxed">
                 {relevantRoad?.stretch || "Arterial Highway Link"}
               </p>
             </div>
 
-            <div className="p-4 rounded-2xl bg-white border border-[#173D32]/10 shadow-2xs">
-              <span className="text-[#173D32]/60 block mb-1">Active Advisory</span>
-              <span className="text-sm font-extrabold text-[#173D32] block truncate">
-                {relevantAlert ? relevantAlert.title : "No Active Hazard Warning"}
-              </span>
-              <p className="text-[11px] text-[#173D32]/60 mt-1">
-                {relevantAlert ? `Severity: ${relevantAlert.severity}` : "Conditions within safe limits"}
-              </p>
+            <div className="p-4 rounded-2xl bg-white border border-[#173D32]/12 shadow-[0_2px_8px_-2px_rgba(23,61,50,0.04)] flex flex-col justify-between">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#173D32]/55 inline-flex items-center gap-1.5 mb-2">
+                  <Bell className="w-3.5 h-3.5 text-[#173D32]/65" aria-hidden="true" />
+                  <span>Active Advisory</span>
+                </span>
+                {isLoading ? (
+                  <div className="h-5 w-40 rounded bg-[#173D32]/10 animate-pulse" />
+                ) : (
+                  <span className="text-sm font-extrabold text-[#173D32] block line-clamp-2">
+                    {relevantAlert ? relevantAlert.title : "No Active Hazard Warning"}
+                  </span>
+                )}
+              </div>
+              <div className="mt-2.5 flex items-center gap-2">
+                {relevantAlert ? (
+                  <StatusBadge status={relevantAlert.severity} size="xs" />
+                ) : (
+                  <span className="text-[11px] text-[#173D32]/65">
+                    Conditions within safe limits
+                  </span>
+                )}
+              </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-white border border-[#173D32]/10 shadow-2xs">
-              <span className="text-[#173D32]/60 block mb-1">Local Helpline</span>
-              <span className="text-sm font-black text-[#173D32] block">
-                1077 (District Disaster Line)
-              </span>
-              <p className="text-[11px] text-[#173D32]/60 mt-1">
+            <div className="p-4 rounded-2xl bg-white border border-[#173D32]/12 shadow-[0_2px_8px_-2px_rgba(23,61,50,0.04)] flex flex-col justify-between">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#173D32]/55 inline-flex items-center gap-1.5 mb-2">
+                  <PhoneCall className="w-3.5 h-3.5 text-[#1E7A45]" aria-hidden="true" />
+                  <span>Local Helpline</span>
+                </span>
+                <a
+                  href="tel:1077"
+                  className="text-sm font-black text-[#173D32] hover:underline block"
+                >
+                  1077 (District Disaster Line)
+                </a>
+              </div>
+              <p className="text-[11px] text-[#173D32]/65 mt-2.5">
                 24/7 Northeast Emergency Dispatch
               </p>
             </div>
@@ -169,18 +236,19 @@ export default function CitizenMyAreaPage() {
               href="/citizen/safe-place"
               className="inline-flex items-center gap-1.5 text-xs font-bold text-[#173D32] hover:underline"
             >
+              <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
               <span>View Designated Evacuation Shelters</span>
-              <span>→</span>
+              <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
             </Link>
             <Link
               href="/citizen/report"
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#173D32] text-[#F6F4EC] text-xs font-bold hover:bg-[#1f4e40] transition-colors"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#173D32] text-[#F6F4EC] text-xs font-bold hover:bg-[#1a4437] transition-all shadow-2xs"
             >
+              <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
               <span>Report Local Hazard</span>
-              <span>⚠️</span>
             </Link>
           </div>
-        </div>
+        </PortalSectionCard>
       </div>
     </PortalLayout>
   );

@@ -1,5 +1,6 @@
 import Header from "@/components/layout/Header";
 import Link from "next/link";
+import { ArrowRight, Megaphone, Mountain, Radar } from "lucide-react";
 
 export default function AboutPage() {
   return (
@@ -24,8 +25,8 @@ export default function AboutPage() {
         {/* Pillars Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           <div className="bg-[#FAF8F2] border border-[#173D32]/12 rounded-2xl p-6 sm:p-7 shadow-xs">
-            <div className="w-12 h-12 rounded-xl bg-[#DCE8D4]/70 flex items-center justify-center text-xl text-[#173D32] font-bold mb-4">
-              🛰️
+            <div className="w-12 h-12 rounded-xl bg-[#DCE8D4]/70 flex items-center justify-center text-[#173D32] mb-4">
+              <Radar className="w-6 h-6" aria-hidden="true" />
             </div>
             <h3 className="text-xl font-bold text-[#173D32] mb-2">Spaceborne Telemetry</h3>
             <p className="text-sm text-[#173D32]/80 leading-relaxed font-normal">
@@ -34,8 +35,8 @@ export default function AboutPage() {
           </div>
 
           <div className="bg-[#FAF8F2] border border-[#173D32]/12 rounded-2xl p-6 sm:p-7 shadow-xs">
-            <div className="w-12 h-12 rounded-xl bg-[#DCE8D4]/70 flex items-center justify-center text-xl text-[#173D32] font-bold mb-4">
-              ⛰️
+            <div className="w-12 h-12 rounded-xl bg-[#DCE8D4]/70 flex items-center justify-center text-[#173D32] mb-4">
+              <Mountain className="w-6 h-6" aria-hidden="true" />
             </div>
             <h3 className="text-xl font-bold text-[#173D32] mb-2">Pore-Water Analytics</h3>
             <p className="text-sm text-[#173D32]/80 leading-relaxed font-normal">
@@ -44,8 +45,8 @@ export default function AboutPage() {
           </div>
 
           <div className="bg-[#FAF8F2] border border-[#173D32]/12 rounded-2xl p-6 sm:p-7 shadow-xs">
-            <div className="w-12 h-12 rounded-xl bg-[#DCE8D4]/70 flex items-center justify-center text-xl text-[#173D32] font-bold mb-4">
-              📢
+            <div className="w-12 h-12 rounded-xl bg-[#DCE8D4]/70 flex items-center justify-center text-[#173D32] mb-4">
+              <Megaphone className="w-6 h-6" aria-hidden="true" />
             </div>
             <h3 className="text-xl font-bold text-[#173D32] mb-2">Hyperlocal Alerts</h3>
             <p className="text-sm text-[#173D32]/80 leading-relaxed font-normal">
@@ -72,7 +73,7 @@ export default function AboutPage() {
               className="h-11 px-6 rounded-full bg-[#D6A65D] text-[#173D32] text-sm font-bold flex items-center gap-2 hover:bg-[#c9984e] transition-colors"
             >
               <span>Explore Live Risk Map</span>
-              <span>→</span>
+              <ArrowRight className="w-4 h-4" aria-hidden="true" />
             </Link>
             <Link
               href="/contact"

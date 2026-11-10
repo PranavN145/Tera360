@@ -3,50 +3,53 @@
 import React, { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import {
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  Download,
+  Laptop,
+  Lock,
+  Shield,
+  Smartphone,
+  User,
+} from "lucide-react";
+import Header from "@/components/layout/Header";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { useApp } from "@/context/AppContext";
 import { usersApi, ApiClientError, getRolePortalPath } from "@/lib/api";
 import { UserSession } from "@/types/auth";
 
 type ActiveTab = "profile" | "password" | "sessions" | "privacy";
+type LanguageCode = "en" | "as" | "bn" | "hi" | "mni" | "lus";
+
+function resolveTabParam(raw: string | null): ActiveTab {
+  if (raw === "security" || raw === "password") return "password";
+  if (raw === "sessions" || raw === "privacy" || raw === "profile") return raw;
+  return "profile";
+}
 
 function AccountDashboard() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, updateProfile, logout, addToast } = useApp();
 
-  const tabParam = searchParams.get("tab") as ActiveTab | null;
-  const [activeTab, setActiveTab] = useState<ActiveTab>(
-    tabParam && ["profile", "password", "sessions", "privacy"].includes(tabParam)
-      ? tabParam
-      : "profile"
-  );
+  const tabParam = searchParams.get("tab");
+  const activeTab = resolveTabParam(tabParam);
 
-  useEffect(() => {
-    if (tabParam && ["profile", "password", "sessions", "privacy"].includes(tabParam)) {
-      setActiveTab(tabParam);
-    }
-  }, [tabParam]);
+  // Profile Form States (draft overrides fall back to latest authenticated user values)
+  const [nameDraft, setNameDraft] = useState<string | null>(null);
+  const [phoneDraft, setPhoneDraft] = useState<string | null>(null);
+  const [languageDraft, setLanguageDraft] = useState<LanguageCode | null>(null);
+  const name = nameDraft ?? user?.name ?? "";
+  const phone = phoneDraft ?? user?.phone ?? "";
+  const language: LanguageCode =
+    languageDraft ?? (user?.language as LanguageCode) ?? "en";
 
-  // Profile Form States
-  const [name, setName] = useState(user?.name || "");
-  const [phone, setPhone] = useState(user?.phone || "");
-  const [language, setLanguage] = useState<"en" | "as" | "bn" | "hi" | "mni" | "lus">(
-    (user?.language as any) || "en"
-  );
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileSuccessMsg, setProfileSuccessMsg] = useState<string | null>(null);
   const [profileErrorMsg, setProfileErrorMsg] = useState<string | null>(null);
   const [profileFieldErrors, setProfileFieldErrors] = useState<Record<string, string[]>>({});
-
-  // Sync profile state when user updates
-  useEffect(() => {
-    if (user) {
-      setName(user.name);
-      setPhone(user.phone || "");
-      if (user.language) setLanguage(user.language as any);
-    }
-  }, [user]);
 
   // Password Form States
   const [currentPassword, setCurrentPassword] = useState("");
@@ -70,7 +73,7 @@ function AccountDashboard() {
   const [deleteErrorMsg, setDeleteErrorMsg] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  // Fetch sessions on tab switch
+  // Fetch sessions on demand & when sessions tab is opened
   const loadSessions = useCallback(async () => {
     setIsLoadingSessions(true);
     setSessionsErrorMsg(null);
@@ -89,10 +92,44 @@ function AccountDashboard() {
   }, []);
 
   useEffect(() => {
-    if (activeTab === "sessions") {
-      loadSessions();
+    if (activeTab !== "sessions") return;
+    let isMounted = true;
+
+    async function fetchInitialSessions() {
+      try {
+        const data = await usersApi.getSessions();
+        if (isMounted) {
+          setSessions(data);
+          setSessionsErrorMsg(null);
+        }
+      } catch (err: unknown) {
+        if (isMounted) {
+          if (err instanceof ApiClientError) {
+            setSessionsErrorMsg(err.message);
+          } else {
+            setSessionsErrorMsg("Unable to load active sessions.");
+          }
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingSessions(false);
+        }
+      }
     }
-  }, [activeTab, loadSessions]);
+
+    fetchInitialSessions();
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTab]);
+
+  const handleSelectTab = (nextTab: ActiveTab) => {
+    if (nextTab === "sessions" && activeTab !== "sessions") {
+      setIsLoadingSessions(true);
+      setSessionsErrorMsg(null);
+    }
+    router.replace(`/account?tab=${nextTab}`, { scroll: false });
+  };
 
   // Handle Profile Update
   const handleProfileSubmit = async (e: React.FormEvent) => {
@@ -110,6 +147,9 @@ function AccountDashboard() {
         phone: phone.trim() || undefined,
         language,
       });
+      setNameDraft(null);
+      setPhoneDraft(null);
+      setLanguageDraft(null);
       setProfileSuccessMsg("Profile details updated successfully.");
     } catch (err: unknown) {
       if (err instanceof ApiClientError) {
@@ -259,23 +299,26 @@ function AccountDashboard() {
   const portalPath = getRolePortalPath(user?.role);
 
   return (
-    <div className="min-h-[85vh] bg-[#FAF8F2] py-8 sm:py-12 px-4 sm:px-6 lg:px-8 text-[#173D32]">
+    <div className="min-h-screen bg-[#F6F4EC] text-[#173D32] flex flex-col">
+      <Header />
+      <div className="flex-1 py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         {/* Account Header Banner */}
-        <div className="bg-[#F6F4EC] border border-[#173D32]/15 rounded-3xl p-6 sm:p-8 shadow-sm mb-8">
+        <div className="bg-[#FAF8F2] border border-[#173D32]/12 rounded-3xl p-6 sm:p-8 shadow-xs mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-[#173D32] text-[#F6F4EC] flex items-center justify-center text-2xl font-black shadow-sm">
+              <div className="w-16 h-16 rounded-2xl bg-[#173D32] text-[#F6F4EC] flex items-center justify-center text-2xl font-black shadow-xs shrink-0">
                 {user?.name?.charAt(0).toUpperCase() || "U"}
               </div>
               <div>
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <span className="px-2.5 py-0.5 rounded-full bg-[#DCE8D4] text-[#173D32] text-[11px] font-bold uppercase tracking-wider">
                     {user?.role?.replace("_", " ")}
                   </span>
                   {user?.emailVerified ? (
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center gap-1">
-                      <span>✓</span> Verified Email
+                    <span className="px-2 py-0.5 rounded-full bg-[#DCFCE7] text-[#166534] text-[10px] font-bold inline-flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
+                      <span>Verified Email</span>
                     </span>
                   ) : (
                     <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-bold">
@@ -295,9 +338,10 @@ function AccountDashboard() {
             <div className="flex items-center gap-3">
               <Link
                 href={portalPath}
-                className="px-4 py-2 rounded-full border border-[#173D32]/25 text-[#173D32] text-xs font-bold hover:bg-[#173D32]/5 transition-colors"
+                className="px-4 py-2 rounded-full bg-[#173D32] text-[#F6F4EC] text-xs font-bold hover:bg-[#1a4437] transition-colors inline-flex items-center gap-1.5 shadow-2xs"
               >
-                Go to Role Portal →
+                <span>Go to Role Portal</span>
+                <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
               </Link>
             </div>
           </div>
@@ -307,53 +351,57 @@ function AccountDashboard() {
         <div className="flex flex-wrap gap-2 mb-6 border-b border-[#173D32]/10 pb-3">
           <button
             type="button"
-            onClick={() => setActiveTab("profile")}
-            className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
+            onClick={() => handleSelectTab("profile")}
+            className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
               activeTab === "profile"
                 ? "bg-[#173D32] text-[#F6F4EC] shadow-xs"
-                : "bg-[#F6F4EC] text-[#173D32]/70 hover:text-[#173D32] border border-[#173D32]/10"
+                : "bg-[#FAF8F2] text-[#173D32]/75 hover:text-[#173D32] border border-[#173D32]/12"
             }`}
           >
-            👤 Profile & Preferences
+            <User className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Profile &amp; Preferences</span>
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("password")}
-            className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
+            onClick={() => handleSelectTab("password")}
+            className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
               activeTab === "password"
                 ? "bg-[#173D32] text-[#F6F4EC] shadow-xs"
-                : "bg-[#F6F4EC] text-[#173D32]/70 hover:text-[#173D32] border border-[#173D32]/10"
+                : "bg-[#FAF8F2] text-[#173D32]/75 hover:text-[#173D32] border border-[#173D32]/12"
             }`}
           >
-            🔒 Password & Security
+            <Lock className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Password &amp; Security</span>
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("sessions")}
-            className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
+            onClick={() => handleSelectTab("sessions")}
+            className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
               activeTab === "sessions"
                 ? "bg-[#173D32] text-[#F6F4EC] shadow-xs"
-                : "bg-[#F6F4EC] text-[#173D32]/70 hover:text-[#173D32] border border-[#173D32]/10"
+                : "bg-[#FAF8F2] text-[#173D32]/75 hover:text-[#173D32] border border-[#173D32]/12"
             }`}
           >
-            💻 Active Sessions
+            <Laptop className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Active Sessions</span>
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("privacy")}
-            className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
+            onClick={() => handleSelectTab("privacy")}
+            className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
               activeTab === "privacy"
                 ? "bg-[#173D32] text-[#F6F4EC] shadow-xs"
-                : "bg-[#F6F4EC] text-[#173D32]/70 hover:text-[#173D32] border border-[#173D32]/10"
+                : "bg-[#FAF8F2] text-[#173D32]/75 hover:text-[#173D32] border border-[#173D32]/12"
             }`}
           >
-            🛡️ Data & Privacy
+            <Shield className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Data &amp; Privacy</span>
           </button>
         </div>
 
         {/* Tab 1: Profile & Preferences */}
         {activeTab === "profile" && (
-          <div className="bg-[#F6F4EC] border border-[#173D32]/15 rounded-3xl p-6 sm:p-8 shadow-sm">
+          <div className="bg-[#FAF8F2] border border-[#173D32]/12 rounded-3xl p-6 sm:p-8 shadow-xs">
             <div className="mb-6 pb-4 border-b border-[#173D32]/10">
               <h2 className="text-lg font-bold text-[#173D32]">Profile Information</h2>
               <p className="text-xs text-[#173D32]/70 mt-0.5">
@@ -363,13 +411,15 @@ function AccountDashboard() {
 
             {profileSuccessMsg && (
               <div className="mb-5 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs sm:text-sm text-emerald-800 flex items-center gap-2">
-                <span className="font-bold">✓</span> {profileSuccessMsg}
+                <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />
+                <span>{profileSuccessMsg}</span>
               </div>
             )}
 
             {profileErrorMsg && (
               <div className="mb-5 p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs sm:text-sm text-red-700 flex items-center gap-2">
-                <span className="font-bold">!</span> {profileErrorMsg}
+                <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
+                <span>{profileErrorMsg}</span>
               </div>
             )}
 
@@ -383,10 +433,10 @@ function AccountDashboard() {
                   id="acc-name"
                   type="text"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => setNameDraft(e.target.value)}
                   required
                   disabled={isSavingProfile}
-                  className="w-full h-11 px-4 rounded-xl bg-[#FAF8F2] border border-[#173D32]/20 text-sm text-[#173D32] focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60"
+                  className="w-full h-11 px-4 rounded-xl bg-white border border-[#173D32]/15 text-sm text-[#173D32] focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60"
                 />
                 {profileFieldErrors.name && (
                   <p className="text-[11px] text-red-600 mt-1">{profileFieldErrors.name.join(", ")}</p>
@@ -399,8 +449,9 @@ function AccountDashboard() {
                   <label htmlFor="acc-email" className="block text-xs font-bold uppercase tracking-wide">
                     Email Address
                   </label>
-                  <span className="text-[10px] font-semibold text-[#173D32]/60 uppercase tracking-wider flex items-center gap-1">
-                    🔒 Protected Field
+                  <span className="text-[10px] font-semibold text-[#173D32]/60 uppercase tracking-wider inline-flex items-center gap-1">
+                    <Lock className="w-3 h-3" aria-hidden="true" />
+                    <span>Protected Field</span>
                   </span>
                 </div>
                 <input
@@ -422,8 +473,9 @@ function AccountDashboard() {
                   <label htmlFor="acc-role" className="block text-xs font-bold uppercase tracking-wide">
                     Assigned Clearance Role
                   </label>
-                  <span className="text-[10px] font-semibold text-[#173D32]/60 uppercase tracking-wider flex items-center gap-1">
-                    🔒 Protected Field
+                  <span className="text-[10px] font-semibold text-[#173D32]/60 uppercase tracking-wider inline-flex items-center gap-1">
+                    <Lock className="w-3 h-3" aria-hidden="true" />
+                    <span>Protected Field</span>
                   </span>
                 </div>
                 <input
@@ -449,9 +501,9 @@ function AccountDashboard() {
                   type="tel"
                   placeholder="e.g. +91 98765 43210"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => setPhoneDraft(e.target.value)}
                   disabled={isSavingProfile}
-                  className="w-full h-11 px-4 rounded-xl bg-[#FAF8F2] border border-[#173D32]/20 text-sm text-[#173D32] placeholder:text-[#173D32]/40 focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60"
+                  className="w-full h-11 px-4 rounded-xl bg-white border border-[#173D32]/15 text-sm text-[#173D32] placeholder:text-[#173D32]/40 focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60"
                 />
                 {profileFieldErrors.phone && (
                   <p className="text-[11px] text-red-600 mt-1">{profileFieldErrors.phone.join(", ")}</p>
@@ -466,9 +518,9 @@ function AccountDashboard() {
                 <select
                   id="acc-language"
                   value={language}
-                  onChange={(e) => setLanguage(e.target.value as any)}
+                  onChange={(e) => setLanguageDraft(e.target.value as LanguageCode)}
                   disabled={isSavingProfile}
-                  className="w-full h-11 px-4 rounded-xl bg-[#FAF8F2] border border-[#173D32]/20 text-sm font-semibold text-[#173D32] focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60 cursor-pointer"
+                  className="w-full h-11 px-4 rounded-xl bg-white border border-[#173D32]/15 text-sm font-semibold text-[#173D32] focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60 cursor-pointer"
                 >
                   <option value="en">English</option>
                   <option value="as">অসমীয়া (Assamese)</option>
@@ -504,7 +556,7 @@ function AccountDashboard() {
 
         {/* Tab 2: Security & Password */}
         {activeTab === "password" && (
-          <div className="bg-[#F6F4EC] border border-[#173D32]/15 rounded-3xl p-6 sm:p-8 shadow-sm">
+          <div className="bg-[#FAF8F2] border border-[#173D32]/12 rounded-3xl p-6 sm:p-8 shadow-xs">
             <div className="mb-6 pb-4 border-b border-[#173D32]/10">
               <h2 className="text-lg font-bold text-[#173D32]">Change Password</h2>
               <p className="text-xs text-[#173D32]/70 mt-0.5">
@@ -514,13 +566,15 @@ function AccountDashboard() {
 
             {passwordSuccessMsg && (
               <div className="mb-5 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs sm:text-sm text-emerald-800 flex items-center gap-2">
-                <span className="font-bold">✓</span> {passwordSuccessMsg}
+                <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />
+                <span>{passwordSuccessMsg}</span>
               </div>
             )}
 
             {passwordErrorMsg && (
               <div className="mb-5 p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs sm:text-sm text-red-700 flex items-center gap-2">
-                <span className="font-bold">!</span> {passwordErrorMsg}
+                <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
+                <span>{passwordErrorMsg}</span>
               </div>
             )}
 
@@ -538,7 +592,7 @@ function AccountDashboard() {
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   required
                   disabled={isUpdatingPassword}
-                  className="w-full h-11 px-4 rounded-xl bg-[#FAF8F2] border border-[#173D32]/20 text-sm text-[#173D32] focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60"
+                  className="w-full h-11 px-4 rounded-xl bg-white border border-[#173D32]/15 text-sm text-[#173D32] focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60"
                 />
                 {passwordFieldErrors.currentPassword && (
                   <p className="text-[11px] text-red-600 mt-1">{passwordFieldErrors.currentPassword.join(", ")}</p>
@@ -559,7 +613,7 @@ function AccountDashboard() {
                   required
                   minLength={8}
                   disabled={isUpdatingPassword}
-                  className="w-full h-11 px-4 rounded-xl bg-[#FAF8F2] border border-[#173D32]/20 text-sm text-[#173D32] focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60"
+                  className="w-full h-11 px-4 rounded-xl bg-white border border-[#173D32]/15 text-sm text-[#173D32] focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60"
                 />
                 {passwordFieldErrors.newPassword && (
                   <p className="text-[11px] text-red-600 mt-1">{passwordFieldErrors.newPassword.join(", ")}</p>
@@ -580,7 +634,7 @@ function AccountDashboard() {
                   required
                   minLength={8}
                   disabled={isUpdatingPassword}
-                  className="w-full h-11 px-4 rounded-xl bg-[#FAF8F2] border border-[#173D32]/20 text-sm text-[#173D32] focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60"
+                  className="w-full h-11 px-4 rounded-xl bg-white border border-[#173D32]/15 text-sm text-[#173D32] focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60"
                 />
                 {passwordFieldErrors.confirmPassword && (
                   <p className="text-[11px] text-red-600 mt-1">{passwordFieldErrors.confirmPassword.join(", ")}</p>
@@ -613,7 +667,7 @@ function AccountDashboard() {
 
         {/* Tab 3: Active Sessions */}
         {activeTab === "sessions" && (
-          <div className="bg-[#F6F4EC] border border-[#173D32]/15 rounded-3xl p-6 sm:p-8 shadow-sm">
+          <div className="bg-[#FAF8F2] border border-[#173D32]/12 rounded-3xl p-6 sm:p-8 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6 pb-4 border-b border-[#173D32]/10">
               <div>
                 <h2 className="text-lg font-bold text-[#173D32]">Active Sessions</h2>
@@ -625,7 +679,7 @@ function AccountDashboard() {
                 type="button"
                 onClick={loadSessions}
                 disabled={isLoadingSessions}
-                className="px-3.5 py-1.5 rounded-full border border-[#173D32]/20 text-xs font-semibold hover:bg-[#173D32]/5 transition-colors self-start sm:self-auto cursor-pointer disabled:opacity-50"
+                className="px-3.5 py-1.5 rounded-full bg-white border border-[#173D32]/15 text-xs font-semibold hover:bg-[#173D32]/5 transition-colors self-start sm:self-auto cursor-pointer disabled:opacity-50"
               >
                 Refresh List
               </button>
@@ -633,7 +687,8 @@ function AccountDashboard() {
 
             {sessionsErrorMsg && (
               <div className="mb-5 p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs sm:text-sm text-red-700 flex items-center gap-2">
-                <span className="font-bold">!</span> {sessionsErrorMsg}
+                <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
+                <span>{sessionsErrorMsg}</span>
               </div>
             )}
 
@@ -651,11 +706,15 @@ function AccountDashboard() {
                 {sessions.map((sess) => (
                   <div
                     key={sess.id}
-                    className="p-4 rounded-2xl bg-[#FAF8F2] border border-[#173D32]/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    className="p-4 rounded-2xl bg-white border border-[#173D32]/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                   >
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-[#F6F4EC] border border-[#173D32]/15 flex items-center justify-center text-lg shrink-0 mt-0.5">
-                        {sess.userAgent.toLowerCase().includes("mobile") ? "📱" : "💻"}
+                      <div className="w-10 h-10 rounded-xl bg-[#EAF0E6] border border-[#173D32]/10 flex items-center justify-center text-[#173D32] shrink-0 mt-0.5">
+                        {sess.userAgent.toLowerCase().includes("mobile") ? (
+                          <Smartphone className="w-4 h-4" aria-hidden="true" />
+                        ) : (
+                          <Laptop className="w-4 h-4" aria-hidden="true" />
+                        )}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -699,7 +758,7 @@ function AccountDashboard() {
         {activeTab === "privacy" && (
           <div className="flex flex-col gap-6">
             {/* Export Card */}
-            <div className="bg-[#F6F4EC] border border-[#173D32]/15 rounded-3xl p-6 sm:p-8 shadow-sm">
+            <div className="bg-[#FAF8F2] border border-[#173D32]/12 rounded-3xl p-6 sm:p-8 shadow-xs">
               <div className="mb-4">
                 <h2 className="text-lg font-bold text-[#173D32]">Export Personal Data</h2>
                 <p className="text-xs text-[#173D32]/70 mt-0.5">
@@ -711,7 +770,7 @@ function AccountDashboard() {
                 type="button"
                 disabled={isExporting}
                 onClick={handleExportData}
-                className="px-5 py-2.5 rounded-full bg-[#173D32] hover:bg-[#1f4e40] text-[#F6F4EC] text-xs font-bold transition-all shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-60"
+                className="px-5 py-2.5 rounded-full bg-[#173D32] hover:bg-[#1f4e40] text-[#F6F4EC] text-xs font-bold transition-all shadow-sm inline-flex items-center gap-2 cursor-pointer disabled:opacity-60"
               >
                 {isExporting ? (
                   <>
@@ -720,7 +779,8 @@ function AccountDashboard() {
                   </>
                 ) : (
                   <>
-                    <span>📥</span> Download Data Archive (JSON)
+                    <Download className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span>Download Data Archive (JSON)</span>
                   </>
                 )}
               </button>
@@ -762,8 +822,8 @@ function AccountDashboard() {
           >
             <div className="w-full max-w-md bg-[#FAF8F2] border border-red-300 rounded-3xl p-6 sm:p-8 shadow-2xl text-[#173D32]">
               <div className="text-center mb-5">
-                <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-3 text-2xl font-bold">
-                  ⚠️
+                <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-3">
+                  <AlertTriangle className="w-6 h-6" aria-hidden="true" />
                 </div>
                 <h3 className="text-lg font-extrabold text-red-950">
                   Confirm Account Deletion
@@ -817,6 +877,7 @@ function AccountDashboard() {
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   );
