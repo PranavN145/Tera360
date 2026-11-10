@@ -544,7 +544,7 @@ export function getRolePortalPath(role?: string): string {
       return '/driver/route-check';
     case 'field_officer':
     case 'field-officer':
-      return '/officer';
+      return '/field';
     case 'officer':
       return '/officer/dashboard';
     case 'admin':

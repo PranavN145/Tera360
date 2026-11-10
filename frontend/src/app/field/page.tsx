@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useApp } from "@/context/AppContext";
 import { fieldOfficerApi } from "@/lib/api";
 import type {
@@ -13,6 +14,53 @@ import type {
   FieldOfficerMapData,
   RoadCondition,
 } from "@/types/fieldOfficer";
+import {
+  LayoutDashboard,
+  ArrowLeft,
+  LogOut,
+  RefreshCw,
+  Globe,
+  Bell,
+  ChevronDown,
+  MapPin,
+  ClipboardList,
+  Map as MapIcon,
+  FileText,
+  Route,
+  AlertTriangle,
+  CheckCircle2,
+  FileWarning,
+  Play,
+  CheckCircle,
+  AlertOctagon,
+  Eye,
+  Navigation,
+  Compass,
+  CloudRain,
+  Layers,
+  Check,
+  X,
+  Camera,
+  ShieldAlert,
+  User,
+  Phone,
+  Building2,
+  SlidersHorizontal,
+  ExternalLink,
+  Info,
+  UploadCloud,
+  Clock,
+  ShieldCheck,
+  Ban,
+  Crosshair,
+  Calendar,
+  AlertCircle,
+  Lock,
+  ChevronRight,
+  Send,
+  Loader2,
+  Activity,
+} from "lucide-react";
 
 type TabType = "tasks" | "map" | "reports" | "roads" | "alerts";
 
@@ -40,7 +88,9 @@ interface RoadUpdateHistoryItem {
 }
 
 export default function FieldOfficerPortalPage() {
-  const { user } = useApp();
+  const { user, logout } = useApp();
+  const router = useRouter();
+
   const [activeTab, setActiveTab] = useState<TabType>("tasks");
   const [profileOpen, setProfileOpen] = useState(false);
   const [preferredLang, setPreferredLang] = useState("en");
@@ -110,112 +160,124 @@ export default function FieldOfficerPortalPage() {
   const [modalInputSecondary, setModalInputSecondary] = useState("");
   const [photoAttachment, setPhotoAttachment] = useState<string | null>(null);
   const [roadCondition, setRoadCondition] = useState<RoadCondition>("Partially Blocked");
-  const [notificationBanner, setNotificationBanner] = useState<string | null>(null);
+  const [notificationBanner, setNotificationBanner] = useState<{ message: string; type: "success" | "warning" | "info" } | null>(null);
 
-  const showBanner = useCallback((msg: string) => {
-    setNotificationBanner(msg);
+  const showBanner = useCallback((msg: string, type: "success" | "warning" | "info" = "success") => {
+    setNotificationBanner({ message: msg, type });
     const timer = setTimeout(() => setNotificationBanner(null), 4500);
     return () => clearTimeout(timer);
   }, []);
 
-  // ── Fetch All Live Data from Backend ──────────────────────────────────────
-  const loadAllData = useCallback(async (isSilent = false) => {
-    if (!isSilent) setRefreshing(true);
+  const handleLogout = async () => {
     try {
-      const [profRes, tasksRes, reportsRes, roadsRes, alertsRes, mapRes] =
-        await Promise.allSettled([
-          fieldOfficerApi.getProfile(),
-          fieldOfficerApi.getTasks(),
-          fieldOfficerApi.getReports(),
-          fieldOfficerApi.getCurrentRoadStatus(),
-          fieldOfficerApi.getAlerts(),
-          fieldOfficerApi.getMapData(),
-        ]);
+      await logout();
+      router.push("/login?role=field-officer");
+    } catch {
+      router.push("/login");
+    }
+  };
 
-      if (profRes.status === "fulfilled" && profRes.value) {
-        const pVal = profRes.value as FieldOfficerProfile & { activeDuty?: boolean };
+  // ── Fetch All Live Data from Backend ──────────────────────────────────────
+  const loadAllData = useCallback(async () => {
+    try {
+      setRefreshing(true);
+
+      const [pRes, tRes, rRes, rdRes, aRes, mRes] = await Promise.allSettled([
+        fieldOfficerApi.getProfile(),
+        fieldOfficerApi.getTasks(),
+        fieldOfficerApi.getReports(),
+        fieldOfficerApi.getCurrentRoadStatus(),
+        fieldOfficerApi.getAlerts(),
+        fieldOfficerApi.getMapData(),
+      ]);
+
+      if (pRes.status === "fulfilled" && pRes.value) {
         setProfile((prev) => ({
           ...prev,
-          ...pVal,
-          activeDutyStatus: pVal.activeDuty !== undefined ? pVal.activeDuty : (pVal.activeDutyStatus ?? true),
+          ...pRes.value,
+          id: pRes.value.id || prev.id,
+          name: pRes.value.name || prev.name,
+          assignedArea: pRes.value.assignedArea || prev.assignedArea,
+          department: pRes.value.department || prev.department,
+          phone: pRes.value.phone || prev.phone,
         }));
-        if (pVal.language) {
-          setPreferredLang(pVal.language.toLowerCase());
+        if (pRes.value.language) {
+          setPreferredLang(pRes.value.language.toLowerCase());
         }
       }
 
-      if (tasksRes.status === "fulfilled" && Array.isArray(tasksRes.value)) {
-        setTasks(tasksRes.value);
+      if (tRes.status === "fulfilled" && Array.isArray(tRes.value)) {
+        setTasks(tRes.value);
       }
 
-      if (reportsRes.status === "fulfilled" && Array.isArray(reportsRes.value)) {
-        setReports(reportsRes.value);
+      if (rRes.status === "fulfilled" && Array.isArray(rRes.value)) {
+        setReports(rRes.value);
       }
 
-      if (roadsRes.status === "fulfilled" && Array.isArray(roadsRes.value)) {
-        setRoads(roadsRes.value);
-        // Initialize road update history if not populated
-        setRoadHistory((prev) => {
-          if (prev.length === 0) {
-            return roadsRes.value.map((r, idx) => ({
+      if (rdRes.status === "fulfilled" && Array.isArray(rdRes.value)) {
+        setRoads(rdRes.value);
+        if (rdRes.value.length > 0 && roadHistory.length === 0) {
+          setRoadHistory(
+            rdRes.value.map((rd, idx) => ({
               id: `HIST-${idx + 1}`,
-              roadSegmentId: r.roadSegmentId,
-              stretchName: r.stretchName,
-              condition: r.condition,
-              reason: r.reason,
-              photoUrl: r.photoUrl,
-              timestamp: r.timestamp || new Date().toISOString(),
-              updatedBy: r.updatedBy || "Officer K. Patil",
-            }));
-          }
-          return prev;
-        });
+              roadSegmentId: rd.roadSegmentId,
+              stretchName: rd.stretchName,
+              condition: rd.condition,
+              reason: rd.reason || "Scheduled monitoring log entry",
+              photoUrl: rd.photoUrl,
+              timestamp: rd.timestamp || new Date(Date.now() - idx * 3600000).toISOString(),
+              updatedBy: rd.updatedBy || "Officer K. Patil",
+            }))
+          );
+        }
       }
 
-      if (alertsRes.status === "fulfilled" && Array.isArray(alertsRes.value)) {
-        setAlerts(alertsRes.value);
+      if (aRes.status === "fulfilled" && Array.isArray(aRes.value)) {
+        setAlerts(aRes.value);
       }
 
-      if (mapRes.status === "fulfilled" && mapRes.value) {
-        setMapData(mapRes.value);
+      if (mRes.status === "fulfilled" && mRes.value) {
+        setMapData(mRes.value);
       }
 
-      setLastSynced(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Network error";
-      console.warn("Field officer API sync error:", msg);
-      showBanner("Running in local session mode. Telemetry will re-sync automatically.");
+      const now = new Date();
+      setLastSynced(now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+    } catch {
+      showBanner("Unable to refresh sector telemetry. Using cached data.", "warning");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [showBanner]);
+  }, [roadHistory.length, showBanner]);
 
   useEffect(() => {
     loadAllData();
+    const interval = setInterval(() => {
+      loadAllData();
+    }, 45000);
+    return () => clearInterval(interval);
   }, [loadAllData]);
 
   // ── Language Update ───────────────────────────────────────────────────────
   const handleLanguageChange = async (newLang: string) => {
     setPreferredLang(newLang);
     try {
-      await fieldOfficerApi.updateLanguage(newLang);
-      setProfile((prev) => ({ ...prev, language: newLang }));
-      showBanner(`Language preference updated to ${newLang.toUpperCase()}`);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to update language";
-      showBanner(msg);
+      await fieldOfficerApi.updateLanguage(newLang.toUpperCase());
+      setProfile((prev) => ({ ...prev, language: newLang.toUpperCase() }));
+      showBanner(`Operational language updated to ${newLang.toUpperCase()}`, "info");
+    } catch {
+      showBanner("Failed to persist language preference.", "warning");
     }
   };
 
   // ── File Photo Attachment Helper ──────────────────────────────────────────
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
+      reader.onload = () => {
         setPhotoAttachment(reader.result as string);
-        showBanner("Inspection photo attached successfully.");
+        showBanner(`Field photo attached: ${file.name}`, "info");
       };
       reader.readAsDataURL(file);
     }
@@ -229,10 +291,10 @@ export default function FieldOfficerPortalPage() {
       setTasks((prev) =>
         prev.map((t) => (t.id === id ? { ...t, ...updated, status: "In_Progress", startedAt: updated.startedAt || new Date().toISOString() } : t))
       );
-      showBanner(`Task ${id} started. Inspection timer is active.`);
+      showBanner(`Task ${id} started. Inspection active.`, "success");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : `Failed to start task ${id}`;
-      showBanner(msg);
+      showBanner(msg, "warning");
     } finally {
       setIsSubmitting(false);
     }
@@ -242,7 +304,7 @@ export default function FieldOfficerPortalPage() {
     if (!selectedId) return;
     try {
       setIsSubmitting(true);
-      const notes = modalInput.trim() || "Inspection concluded successfully. Slope integrity verified.";
+      const notes = modalInput.trim() || "Inspection concluded. Slope integrity verified.";
       const updated = await fieldOfficerApi.completeTask(selectedId, notes);
       setTasks((prev) =>
         prev.map((t) =>
@@ -260,10 +322,10 @@ export default function FieldOfficerPortalPage() {
       );
       setModalType(null);
       setModalInput("");
-      showBanner(`Task ${selectedId} marked as Completed.`);
+      showBanner(`Task ${selectedId} marked Completed.`, "success");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : `Failed to complete task ${selectedId}`;
-      showBanner(msg);
+      showBanner(msg, "warning");
     } finally {
       setIsSubmitting(false);
     }
@@ -292,10 +354,10 @@ export default function FieldOfficerPortalPage() {
       setModalType(null);
       setModalInput("");
       setModalInputSecondary("");
-      showBanner(`🚨 Task ${selectedId} escalated directly to Central Disaster Desk!`);
+      showBanner(`Task ${selectedId} escalated to Central Command Desk.`, "warning");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : `Failed to escalate task ${selectedId}`;
-      showBanner(msg);
+      showBanner(msg, "warning");
     } finally {
       setIsSubmitting(false);
     }
@@ -325,10 +387,10 @@ export default function FieldOfficerPortalPage() {
       setModalType(null);
       setModalInput("");
       setPhotoAttachment(null);
-      showBanner(`Report ${selectedId} verified. Ground truth and field notes recorded.`);
+      showBanner(`Report ${selectedId} verified. Ground truth saved.`, "success");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : `Failed to verify report ${selectedId}`;
-      showBanner(msg);
+      showBanner(msg, "warning");
     } finally {
       setIsSubmitting(false);
     }
@@ -348,10 +410,10 @@ export default function FieldOfficerPortalPage() {
       );
       setModalType(null);
       setModalInput("");
-      showBanner(`Report ${selectedId} marked as Rejected.`);
+      showBanner(`Report ${selectedId} marked Rejected.`, "info");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : `Failed to reject report ${selectedId}`;
-      showBanner(msg);
+      showBanner(msg, "warning");
     } finally {
       setIsSubmitting(false);
     }
@@ -375,10 +437,10 @@ export default function FieldOfficerPortalPage() {
       setModalType(null);
       setModalInput("");
       setModalInputSecondary("");
-      showBanner(`🚨 Villager Report ${selectedId} escalated straight to High Command!`);
+      showBanner(`Report ${selectedId} escalated to High Command.`, "warning");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : `Failed to escalate report ${selectedId}`;
-      showBanner(msg);
+      showBanner(msg, "warning");
     } finally {
       setIsSubmitting(false);
     }
@@ -415,7 +477,7 @@ export default function FieldOfficerPortalPage() {
         )
       );
 
-      // Add to previously submitted updates audit log
+      // Add to audit log
       setRoadHistory((prev) => [
         {
           id: `HIST-${Date.now()}`,
@@ -433,10 +495,10 @@ export default function FieldOfficerPortalPage() {
       setModalType(null);
       setModalInput("");
       setPhotoAttachment(null);
-      showBanner(`📡 Road condition updated to '${roadCondition}' & synchronized with Central Dashboard!`);
+      showBanner(`Road condition updated to '${roadCondition}'.`, "success");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to update road condition";
-      showBanner(msg);
+      showBanner(msg, "warning");
     } finally {
       setIsSubmitting(false);
     }
@@ -460,10 +522,10 @@ export default function FieldOfficerPortalPage() {
             : a
         )
       );
-      showBanner(`Emergency Alert ${id} acknowledged.`);
+      showBanner(`Emergency Alert ${id} acknowledged.`, "success");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : `Failed to acknowledge alert ${id}`;
-      showBanner(msg);
+      showBanner(msg, "warning");
     } finally {
       setIsSubmitting(false);
     }
@@ -519,78 +581,163 @@ export default function FieldOfficerPortalPage() {
     .slice(0, 2)
     .toUpperCase();
 
+  const getRoadConditionBadge = (condition: RoadCondition) => {
+    switch (condition) {
+      case "Open":
+        return {
+          icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />,
+          classes: "bg-emerald-50 text-emerald-800 border-emerald-200",
+        };
+      case "Caution":
+        return {
+          icon: <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />,
+          classes: "bg-amber-50 text-amber-800 border-amber-200",
+        };
+      case "Partially Blocked":
+        return {
+          icon: <AlertOctagon className="w-3.5 h-3.5 text-orange-600" />,
+          classes: "bg-orange-50 text-orange-800 border-orange-200",
+        };
+      case "Blocked":
+        return {
+          icon: <Ban className="w-3.5 h-3.5 text-rose-600" />,
+          classes: "bg-rose-50 text-rose-800 border-rose-200",
+        };
+      default:
+        return {
+          icon: <Route className="w-3.5 h-3.5 text-slate-600" />,
+          classes: "bg-slate-50 text-slate-800 border-slate-200",
+        };
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#F6F4EC] text-[#173D32] flex flex-col font-sans">
-      {/* ── 1. PORTAL HEADER (Shared Brand & Officer Profile) ───── */}
-      <header className="bg-[#173D32] text-[#F8F4EC] border-b border-[#DCE8D4]/20 shadow-md sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
+      {/* ── 1. PORTAL HEADER ───────────────────────────────────────────────── */}
+      <header className="bg-[#173D32] text-[#F8F4EC] border-b border-[#DCE8D4]/20 shadow-xs sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+          {/* Left: Brand + Navigation Quick Actions */}
           <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2 group" title="Return to Main Website Homepage">
-              <span className="text-2xl font-black tracking-wider text-[#DCE8D4] group-hover:text-[#D6A65D] transition-colors">
+            <Link href="/" className="flex items-center gap-2 group" title="Return to Main Website">
+              <span className="text-xl sm:text-2xl font-black tracking-wider text-[#DCE8D4] group-hover:text-[#D6A65D] transition-colors">
                 TERRA<span className="text-[#D6A65D]">360</span>
               </span>
-              <span className="text-sm font-semibold text-[#DCE8D4]/60">/</span>
+              <span className="text-sm font-semibold text-[#DCE8D4]/50">/</span>
               <span className="bg-[#D6A65D]/20 text-[#D6A65D] border border-[#D6A65D]/30 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider">
-                Officer
+                Field Direct View
               </span>
             </Link>
+
+            {/* Back Button */}
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== "undefined" && window.history.length > 2) {
+                  router.back();
+                } else {
+                  router.push("/");
+                }
+              }}
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#DCE8D4]/20 hover:bg-[#DCE8D4]/10 text-[#DCE8D4] text-xs font-semibold transition-colors cursor-pointer"
+              title="Go to previous page"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Back</span>
+            </button>
+
+            {/* Home / Dashboard Reset Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("tasks");
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors cursor-pointer ${
+                activeTab === "tasks"
+                  ? "bg-[#D6A65D] text-[#173D32] border-[#D6A65D]"
+                  : "border-[#DCE8D4]/20 text-[#DCE8D4] hover:bg-[#DCE8D4]/10"
+              }`}
+              title="Overview Dashboard"
+            >
+              <LayoutDashboard className="w-3.5 h-3.5" />
+              <span>Dashboard</span>
+            </button>
+
+            {/* Public Website Link */}
             <Link
               href="/"
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#DCE8D4]/10 hover:bg-[#DCE8D4]/20 border border-[#DCE8D4]/20 text-[#DCE8D4] text-xs font-semibold transition-all cursor-pointer"
+              className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#DCE8D4]/20 hover:bg-[#DCE8D4]/10 text-[#DCE8D4] text-xs font-medium transition-colors"
+              title="Visit Public Website"
             >
-              <span>←</span>
-              <span>Main Website</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Main Site</span>
             </Link>
           </div>
 
-          <div className="flex items-center gap-3 sm:gap-4">
-            {/* Live Sync Badge */}
-            <div className="hidden lg:flex items-center gap-2 bg-[#122e26] border border-[#DCE8D4]/20 px-3 py-1.5 rounded-full text-xs">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="font-semibold text-[#DCE8D4]">{profile.assignedArea}</span>
+          {/* Right: Telemetry & Profile Tools */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Live Sector Pulse */}
+            <div className="hidden xl:flex items-center gap-1.5 bg-[#122e26] border border-[#DCE8D4]/20 px-3 py-1 rounded-full text-xs">
+              <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="font-semibold text-[#DCE8D4] truncate max-w-[200px]">{profile.assignedArea}</span>
             </div>
 
-            {/* Manual Sync Trigger */}
+            {/* Re-sync Button */}
             <button
               type="button"
               onClick={() => loadAllData()}
               disabled={refreshing}
               title={`Last synced: ${lastSynced}. Click to re-sync.`}
-              className="hidden sm:flex items-center gap-1.5 bg-[#122e26] hover:bg-[#1f4e40] border border-[#DCE8D4]/20 text-[#DCE8D4] px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1.5 bg-[#122e26] hover:bg-[#1f4e40] border border-[#DCE8D4]/20 text-[#DCE8D4] px-2.5 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer disabled:opacity-50"
             >
-              <span className={refreshing ? "animate-spin inline-block" : ""}>🔄</span>
-              <span className="hidden xl:inline">{refreshing ? "Syncing..." : lastSynced}</span>
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline">{refreshing ? "Syncing..." : lastSynced}</span>
             </button>
 
             {/* Language Switcher */}
-            <div className="flex items-center gap-1 bg-[#122e26] border border-[#DCE8D4]/20 rounded-full px-2 py-1 text-xs">
-              <span className="text-xs text-[#DCE8D4]/60">🌐</span>
+            <div className="flex items-center gap-1 bg-[#122e26] border border-[#DCE8D4]/20 rounded-lg px-2 py-1 text-xs">
+              <Globe className="w-3.5 h-3.5 text-[#DCE8D4]/70" />
               <select
-                aria-label="Language selector"
+                aria-label="Operational Language"
                 value={preferredLang}
                 onChange={(e) => handleLanguageChange(e.target.value)}
                 className="bg-transparent text-[#DCE8D4] font-semibold text-xs outline-none cursor-pointer"
               >
-                <option value="en" className="bg-[#173D32] text-[#F8F4EC]">EN (English)</option>
-                <option value="hi" className="bg-[#173D32] text-[#F8F4EC]">HI (हिंदी)</option>
-                <option value="mr" className="bg-[#173D32] text-[#F8F4EC]">MR (मराठी)</option>
-                <option value="ao" className="bg-[#173D32] text-[#F8F4EC]">AO (Ao Naga)</option>
+                <option value="en" className="bg-[#173D32] text-[#F8F4EC]">EN</option>
+                <option value="hi" className="bg-[#173D32] text-[#F8F4EC]">HI</option>
+                <option value="mr" className="bg-[#173D32] text-[#F8F4EC]">MR</option>
+                <option value="ao" className="bg-[#173D32] text-[#F8F4EC]">AO</option>
               </select>
             </div>
 
-            {/* Alerts Notification Bell */}
+            {/* Emergency Alerts Bell */}
             <button
               type="button"
               onClick={() => setActiveTab("alerts")}
-              className="relative p-2 rounded-full bg-[#122e26] text-[#DCE8D4] hover:text-[#D6A65D] transition-colors cursor-pointer"
+              className={`relative p-2 rounded-lg border transition-colors cursor-pointer ${
+                activeTab === "alerts"
+                  ? "bg-[#D6A65D] text-[#173D32] border-[#D6A65D]"
+                  : "bg-[#122e26] text-[#DCE8D4] hover:text-[#D6A65D] border-[#DCE8D4]/20"
+              }`}
               title="Emergency Alerts"
             >
-              🔔
+              <Bell className="w-4 h-4" />
               {alerts.some((a) => !a.acknowledged) && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white font-bold text-[10px] flex items-center justify-center animate-pulse">
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white font-bold text-[10px] flex items-center justify-center">
                   {alerts.filter((a) => !a.acknowledged).length}
                 </span>
               )}
+            </button>
+
+            {/* Accessible Header Logout Button */}
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#DCE8D4]/10 hover:bg-rose-950/40 border border-[#DCE8D4]/20 hover:border-rose-400/50 text-[#DCE8D4] hover:text-rose-200 text-xs font-semibold transition-colors cursor-pointer"
+              title="Sign Out"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Logout</span>
             </button>
 
             {/* Profile Dropdown Toggle */}
@@ -598,66 +745,64 @@ export default function FieldOfficerPortalPage() {
               <button
                 type="button"
                 onClick={() => setProfileOpen(!profileOpen)}
-                className="flex items-center gap-2 bg-[#DCE8D4]/15 hover:bg-[#DCE8D4]/25 border border-[#DCE8D4]/30 px-3 py-1.5 rounded-full transition-all cursor-pointer"
+                className="flex items-center gap-2 bg-[#DCE8D4]/15 hover:bg-[#DCE8D4]/25 border border-[#DCE8D4]/30 px-2.5 py-1 rounded-lg transition-all cursor-pointer"
               >
-                <div className="w-7 h-7 rounded-full bg-[#D6A65D] text-[#173D32] font-black flex items-center justify-center text-xs shadow-xs">
+                <div className="w-6 h-6 rounded-md bg-[#D6A65D] text-[#173D32] font-extrabold flex items-center justify-center text-xs">
                   {officerInitials}
                 </div>
-                <span className="font-semibold text-xs text-[#F8F4EC] hidden sm:inline">{profile.name}</span>
-                <span className="text-xs opacity-60">▼</span>
+                <span className="font-semibold text-xs text-[#F8F4EC] hidden lg:inline">{profile.name}</span>
+                <ChevronDown className="w-3 h-3 opacity-70" />
               </button>
 
               {/* Profile Dropdown Card */}
               {profileOpen && (
-                <div className="absolute right-0 mt-2 w-80 bg-[#FAF8F2] text-[#173D32] rounded-2xl shadow-2xl border border-[#173D32]/20 p-5 z-50 animate-in fade-in slide-in-from-top-2">
+                <div className="absolute right-0 mt-2 w-76 bg-[#FAF8F2] text-[#173D32] rounded-2xl shadow-lg border border-[#173D32]/15 p-4 z-50">
                   <div className="flex items-center gap-3 pb-3 border-b border-[#173D32]/10 mb-3">
-                    <div className="w-11 h-11 rounded-full bg-[#173D32] text-[#D6A65D] font-extrabold flex items-center justify-center text-sm shadow-xs">
+                    <div className="w-10 h-10 rounded-xl bg-[#173D32] text-[#D6A65D] font-bold flex items-center justify-center text-sm">
                       {officerInitials}
                     </div>
-                    <div>
-                      <h4 className="font-bold text-sm text-[#173D32]">{profile.name}</h4>
-                      <p className="text-xs text-[#173D32]/70 font-mono">{profile.badgeNumber || profile.id}</p>
+                    <div className="overflow-hidden">
+                      <h4 className="font-bold text-sm text-[#173D32] truncate">{profile.name}</h4>
+                      <p className="text-xs text-[#173D32]/60 font-mono">{profile.badgeNumber || profile.id}</p>
                     </div>
                   </div>
                   <div className="space-y-2 text-xs">
                     <div>
-                      <span className="text-[#173D32]/60 font-medium block">Department:</span>
+                      <span className="text-[#173D32]/60 block font-medium">Department</span>
                       <span className="font-semibold">{profile.department}</span>
                     </div>
                     <div>
-                      <span className="text-[#173D32]/60 font-medium block">Assigned Area:</span>
-                      <span className="font-semibold text-[#173D32]">{profile.assignedArea}</span>
+                      <span className="text-[#173D32]/60 block font-medium">Assigned Area</span>
+                      <span className="font-semibold">{profile.assignedArea}</span>
                     </div>
                     <div>
-                      <span className="text-[#173D32]/60 font-medium block">Phone Number:</span>
+                      <span className="text-[#173D32]/60 block font-medium">Phone</span>
                       <span className="font-mono font-semibold">{profile.phone}</span>
                     </div>
                     <div>
-                      <span className="text-[#173D32]/60 font-medium block">Preferred Language:</span>
-                      <span className="font-semibold uppercase">{profile.language}</span>
-                    </div>
-                    <div>
-                      <span className="text-[#173D32]/60 font-medium block">Active Duty Status:</span>
-                      <span className="inline-flex items-center gap-1.5 text-emerald-800 font-bold bg-emerald-100 px-2.5 py-0.5 rounded-full mt-0.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
-                        {profile.activeDutyStatus ? "Online / Active" : "Standby"}
+                      <span className="text-[#173D32]/60 block font-medium">Duty Status</span>
+                      <span className="inline-flex items-center gap-1.5 text-emerald-800 font-bold bg-emerald-100 px-2 py-0.5 rounded-md mt-0.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                        {profile.activeDutyStatus ? "Active On-Duty" : "Standby"}
                       </span>
                     </div>
                   </div>
                   <div className="mt-4 pt-3 border-t border-[#173D32]/10 flex flex-col gap-2">
                     <button
                       type="button"
-                      onClick={() => setProfileOpen(false)}
-                      className="w-full py-1.5 rounded-xl bg-[#173D32] text-[#F8F4EC] text-xs font-bold hover:bg-[#1f4e40] transition-colors cursor-pointer"
+                      onClick={handleLogout}
+                      className="w-full py-2 rounded-xl bg-rose-700 hover:bg-rose-800 text-white text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      Close Profile
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Sign Out</span>
                     </button>
-                    <Link
-                      href="/"
-                      className="w-full py-1.5 rounded-xl border border-[#173D32]/20 text-[#173D32] text-xs font-semibold text-center hover:bg-black/5 transition-colors"
+                    <button
+                      type="button"
+                      onClick={() => setProfileOpen(false)}
+                      className="w-full py-1.5 rounded-xl border border-[#173D32]/20 text-[#173D32] text-xs font-semibold hover:bg-black/5 transition-colors cursor-pointer"
                     >
-                      Return to Homepage
-                    </Link>
+                      Close
+                    </button>
                   </div>
                 </div>
               )}
@@ -666,35 +811,105 @@ export default function FieldOfficerPortalPage() {
         </div>
       </header>
 
-      {/* ── 2. LIVE ACTION TOAST NOTIFICATION ──────────────────── */}
+      {/* ── 2. MOBILE MODULE TAB BAR ───────────────────────────────────────── */}
+      <div className="md:hidden bg-[#FAF8F2] border-b border-[#173D32]/15 px-3 py-2 sticky top-16 z-30 overflow-x-auto scrollbar-none flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab("tasks")}
+          className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+            activeTab === "tasks" ? "bg-[#173D32] text-[#F8F4EC]" : "bg-white/60 text-[#173D32] border border-[#173D32]/10"
+          }`}
+        >
+          <ClipboardList className="w-3.5 h-3.5" />
+          <span>Tasks ({tasks.filter((t) => t.status !== "Completed").length})</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("map")}
+          className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+            activeTab === "map" ? "bg-[#173D32] text-[#F8F4EC]" : "bg-white/60 text-[#173D32] border border-[#173D32]/10"
+          }`}
+        >
+          <MapIcon className="w-3.5 h-3.5" />
+          <span>Map</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("reports")}
+          className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+            activeTab === "reports" ? "bg-[#173D32] text-[#F8F4EC]" : "bg-white/60 text-[#173D32] border border-[#173D32]/10"
+          }`}
+        >
+          <FileText className="w-3.5 h-3.5" />
+          <span>Reports ({reports.filter((r) => r.status === "Pending").length})</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("roads")}
+          className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+            activeTab === "roads" ? "bg-[#173D32] text-[#F8F4EC]" : "bg-white/60 text-[#173D32] border border-[#173D32]/10"
+          }`}
+        >
+          <Route className="w-3.5 h-3.5" />
+          <span>Roads ({roads.length})</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("alerts")}
+          className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+            activeTab === "alerts" ? "bg-[#173D32] text-[#F8F4EC]" : "bg-white/60 text-[#173D32] border border-[#173D32]/10"
+          }`}
+        >
+          <Bell className="w-3.5 h-3.5" />
+          <span>Alerts ({alerts.filter((a) => !a.acknowledged).length})</span>
+        </button>
+      </div>
+
+      {/* ── 3. LIVE TOAST NOTIFICATION ─────────────────────────────────────── */}
       {notificationBanner && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-[#D6A65D] text-[#173D32] px-6 py-2.5 rounded-full font-bold text-xs shadow-xl border border-[#173D32]/20 flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
-          <span>⚡</span>
-          <span>{notificationBanner}</span>
+        <div
+          className={`fixed top-20 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-xl font-semibold text-xs shadow-md border flex items-center gap-2 ${
+            notificationBanner.type === "warning"
+              ? "bg-amber-50 text-amber-900 border-amber-300"
+              : notificationBanner.type === "info"
+              ? "bg-sky-50 text-sky-900 border-sky-300"
+              : "bg-emerald-50 text-emerald-900 border-emerald-300"
+          }`}
+        >
+          {notificationBanner.type === "warning" ? (
+            <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0" />
+          ) : (
+            <CheckCircle className="w-4 h-4 text-emerald-700 shrink-0" />
+          )}
+          <span>{notificationBanner.message}</span>
         </div>
       )}
 
-      {/* ── 3. MAIN PORTAL BODY (Sidebar + Tab Content Canvas) ──── */}
-      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col md:flex-row gap-8">
-        {/* Left Side Navigation Tabs */}
-        <nav className="w-full md:w-64 shrink-0 space-y-3" aria-label="Portal Navigation Tabs">
-          <div className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-3xl p-3 shadow-xs space-y-1">
+      {/* ── 4. MAIN CONTENT LAYOUT ─────────────────────────────────────────── */}
+      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col md:flex-row gap-6">
+        {/* Desktop Sidebar Navigation */}
+        <aside className="w-full md:w-64 shrink-0 space-y-4" aria-label="Module Navigation">
+          <div className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-2xl p-2.5 shadow-xs space-y-1">
+            <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-[#173D32]/60">
+              Field Modules
+            </div>
+
             {/* 1. My Tasks */}
             <button
               type="button"
               onClick={() => setActiveTab("tasks")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === "tasks"
-                  ? "bg-[#173D32] text-[#F8F4EC] shadow-sm"
+                  ? "bg-[#173D32] text-[#F8F4EC] shadow-xs"
                   : "text-[#173D32] hover:bg-[#DCE8D4]/40"
               }`}
             >
-              <div className="flex items-center gap-3">
-                <span className="text-base">📋</span>
+              <div className="flex items-center gap-2.5">
+                <ClipboardList className="w-4 h-4" />
                 <span>My Tasks</span>
               </div>
               <span
-                className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold ${
+                className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
                   activeTab === "tasks" ? "bg-[#D6A65D] text-[#173D32]" : "bg-[#173D32]/10"
                 }`}
               >
@@ -706,17 +921,17 @@ export default function FieldOfficerPortalPage() {
             <button
               type="button"
               onClick={() => setActiveTab("map")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === "map"
-                  ? "bg-[#173D32] text-[#F8F4EC] shadow-sm"
+                  ? "bg-[#173D32] text-[#F8F4EC] shadow-xs"
                   : "text-[#173D32] hover:bg-[#DCE8D4]/40"
               }`}
             >
-              <div className="flex items-center gap-3">
-                <span className="text-base">🗺️</span>
+              <div className="flex items-center gap-2.5">
+                <MapIcon className="w-4 h-4" />
                 <span>Assigned Area Map</span>
               </div>
-              <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-bold">
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-bold">
                 Live
               </span>
             </button>
@@ -725,18 +940,18 @@ export default function FieldOfficerPortalPage() {
             <button
               type="button"
               onClick={() => setActiveTab("reports")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === "reports"
-                  ? "bg-[#173D32] text-[#F8F4EC] shadow-sm"
+                  ? "bg-[#173D32] text-[#F8F4EC] shadow-xs"
                   : "text-[#173D32] hover:bg-[#DCE8D4]/40"
               }`}
             >
-              <div className="flex items-center gap-3">
-                <span className="text-base">📢</span>
+              <div className="flex items-center gap-2.5">
+                <FileText className="w-4 h-4" />
                 <span>Reports</span>
               </div>
               <span
-                className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold ${
+                className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
                   activeTab === "reports" ? "bg-[#D6A65D] text-[#173D32]" : "bg-[#173D32]/10"
                 }`}
               >
@@ -748,18 +963,18 @@ export default function FieldOfficerPortalPage() {
             <button
               type="button"
               onClick={() => setActiveTab("roads")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === "roads"
-                  ? "bg-[#173D32] text-[#F8F4EC] shadow-sm"
+                  ? "bg-[#173D32] text-[#F8F4EC] shadow-xs"
                   : "text-[#173D32] hover:bg-[#DCE8D4]/40"
               }`}
             >
-              <div className="flex items-center gap-3">
-                <span className="text-base">🚧</span>
+              <div className="flex items-center gap-2.5">
+                <Route className="w-4 h-4" />
                 <span>Road Status</span>
               </div>
               <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold">
-                {roads.length} Roads
+                {roads.length}
               </span>
             </button>
 
@@ -767,20 +982,20 @@ export default function FieldOfficerPortalPage() {
             <button
               type="button"
               onClick={() => setActiveTab("alerts")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === "alerts"
-                  ? "bg-[#173D32] text-[#F8F4EC] shadow-sm"
+                  ? "bg-[#173D32] text-[#F8F4EC] shadow-xs"
                   : "text-[#173D32] hover:bg-[#DCE8D4]/40"
               }`}
             >
-              <div className="flex items-center gap-3">
-                <span className="text-base">🚨</span>
+              <div className="flex items-center gap-2.5">
+                <Bell className="w-4 h-4" />
                 <span>Alerts</span>
               </div>
               <span
-                className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold ${
+                className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
                   alerts.some((a) => !a.acknowledged)
-                    ? "bg-rose-500 text-white animate-pulse"
+                    ? "bg-rose-600 text-white"
                     : "bg-[#173D32]/10 text-[#173D32]"
                 }`}
               >
@@ -790,920 +1005,965 @@ export default function FieldOfficerPortalPage() {
           </div>
 
           {/* Quick Context Card */}
-          <div className="bg-[#DCE8D4]/40 border border-[#173D32]/15 rounded-3xl p-4 text-xs space-y-2">
+          <div className="bg-[#DCE8D4]/40 border border-[#173D32]/15 rounded-2xl p-4 text-xs space-y-2">
             <div className="flex items-center justify-between">
-              <h5 className="font-black text-[#173D32] uppercase tracking-wider text-[11px]">Sector Operations</h5>
+              <h5 className="font-bold text-[#173D32] uppercase tracking-wider text-[11px]">
+                Sector 4 Operations
+              </h5>
               <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
             </div>
-            <p className="text-[#173D32]/80 leading-relaxed text-[11px]">
-              Assigned corridor: <strong>{profile.assignedArea}</strong>. Telemetry and inspection actions are synchronized to the Central Disaster Desk.
+            <p className="text-[#173D32]/80 leading-relaxed text-xs">
+              Corridor: <strong>{profile.assignedArea}</strong>. Live field inspections sync directly to the Central Disaster Management Console.
             </p>
           </div>
-        </nav>
+        </aside>
 
-        {/* Right Tab Content Canvas */}
-        <main className="flex-1 space-y-6">
-          {loading && (
-            <div className="flex items-center justify-center p-12 text-[#173D32]/70 text-xs font-bold gap-2">
-              <span className="animate-spin text-lg">⚙️</span>
-              <span>Connecting to Terra360 Field Operations Desk...</span>
-            </div>
-          )}
-
-          {/* ── REAL-TIME SECTOR OVERVIEW METRICS ────────────────── */}
-          <section aria-label="Officer Real-time Overview" className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-            {/* 1. Tasks: Pending vs In Progress */}
-            <button
-              type="button"
+        {/* Main Tab Canvas */}
+        <main className="flex-1 min-w-0 space-y-6">
+          {/* Real-time Sector Overview Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div
               onClick={() => setActiveTab("tasks")}
-              className={`text-left p-4 rounded-2xl border transition-all cursor-pointer ${
-                activeTab === "tasks"
-                  ? "bg-[#FAF8F2] border-[#173D32] shadow-sm ring-2 ring-[#173D32]/20"
-                  : "bg-[#FAF8F2] border-[#173D32]/15 hover:border-[#173D32]/30"
-              }`}
+              className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-2xl p-4 shadow-xs hover:border-[#173D32]/40 transition-colors cursor-pointer"
             >
-              <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center justify-between mb-2">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-[#173D32]/70">
                   Assigned Tasks
                 </span>
-                <span className="text-sm">📋</span>
+                <ClipboardList className="w-4 h-4 text-[#173D32]/60" />
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-black text-[#173D32]">
+                <span className="text-2xl font-extrabold text-[#173D32]">
                   {tasks.filter((t) => t.status !== "Completed").length}
                 </span>
-                <span className="text-xs text-[#173D32]/70 font-semibold">Active in Sector</span>
+                <span className="text-xs text-[#173D32]/60">active / {tasks.length} total</span>
               </div>
-              <div className="flex items-center gap-2 mt-2 pt-2 border-t border-[#173D32]/10 text-[11px] font-bold">
-                <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900">
-                  {tasks.filter((t) => t.status === "Assigned" || (t.status as string) === "Pending").length} Pending
-                </span>
-                <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-900">
-                  {tasks.filter((t) => t.status === "In_Progress").length} In Progress
-                </span>
-              </div>
-            </button>
+              <p className="text-[11px] text-[#173D32]/70 mt-1">
+                {tasks.filter((t) => t.status === "In_Progress").length} in-progress inspection(s)
+              </p>
+            </div>
 
-            {/* 2. Active Road Blockage Alerts in Designated Sector */}
-            <button
-              type="button"
+            <div
               onClick={() => setActiveTab("roads")}
-              className={`text-left p-4 rounded-2xl border transition-all cursor-pointer ${
-                activeTab === "roads"
-                  ? "bg-[#FAF8F2] border-[#173D32] shadow-sm ring-2 ring-[#173D32]/20"
-                  : "bg-[#FAF8F2] border-[#173D32]/15 hover:border-[#173D32]/30"
-              }`}
+              className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-2xl p-4 shadow-xs hover:border-[#173D32]/40 transition-colors cursor-pointer"
             >
-              <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center justify-between mb-2">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-[#173D32]/70">
                   Road Conditions
                 </span>
-                <span className="text-sm">🚧</span>
+                <Route className="w-4 h-4 text-[#173D32]/60" />
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-black text-rose-700">
+                <span className="text-2xl font-extrabold text-[#173D32]">
                   {roads.filter((r) => r.condition !== "Open").length}
                 </span>
-                <span className="text-xs text-[#173D32]/70 font-semibold">Active Hazards</span>
+                <span className="text-xs text-[#173D32]/60">hazard alerts / {roads.length} segments</span>
               </div>
-              <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#173D32]/10 text-[11px]">
-                <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-900 font-bold">
-                  {roads.filter((r) => r.condition === "Blocked" || r.condition === "Partially Blocked").length} Blocked/Partial
-                </span>
-                <span className="font-mono text-[#173D32]/60 text-[10px]">
-                  {roads.length} Segments
-                </span>
-              </div>
-            </button>
+              <p className="text-[11px] text-[#173D32]/70 mt-1">
+                {roads.filter((r) => r.condition === "Blocked").length} road blockage(s) flagged
+              </p>
+            </div>
 
-            {/* 3. Citizen Reports Awaiting Verification */}
-            <button
-              type="button"
+            <div
               onClick={() => setActiveTab("reports")}
-              className={`text-left p-4 rounded-2xl border transition-all cursor-pointer ${
-                activeTab === "reports"
-                  ? "bg-[#FAF8F2] border-[#173D32] shadow-sm ring-2 ring-[#173D32]/20"
-                  : "bg-[#FAF8F2] border-[#173D32]/15 hover:border-[#173D32]/30"
-              }`}
+              className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-2xl p-4 shadow-xs hover:border-[#173D32]/40 transition-colors cursor-pointer"
             >
-              <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center justify-between mb-2">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-[#173D32]/70">
                   Citizen Reports
                 </span>
-                <span className="text-sm">📢</span>
+                <FileText className="w-4 h-4 text-[#173D32]/60" />
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-black text-amber-700">
+                <span className="text-2xl font-extrabold text-[#173D32]">
                   {reports.filter((r) => r.status === "Pending").length}
                 </span>
-                <span className="text-xs text-[#173D32]/70 font-semibold">Awaiting Verification</span>
+                <span className="text-xs text-[#173D32]/60">pending verification</span>
               </div>
-              <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#173D32]/10 text-[11px]">
-                <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold">
-                  Action Required
-                </span>
-                <span className="font-mono text-[#173D32]/60 text-[10px]">
-                  {reports.length} Total Reports
-                </span>
-              </div>
-            </button>
-          </section>
+              <p className="text-[11px] text-[#173D32]/70 mt-1">
+                {reports.filter((r) => r.status === "Verified").length} confirmed ground-truth
+              </p>
+            </div>
+          </div>
 
-          {/* ══════════════════════════════════════════════════════════ */}
-          {/* ── TAB 1: MY TASKS ─────────────────────────────────── */}
-          {/* ══════════════════════════════════════════════════════════ */}
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {/* TAB 1: MY TASKS                                                */}
+          {/* ════════════════════════════════════════════════════════════════ */}
           {activeTab === "tasks" && (
             <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              {/* Header & Filter Controls */}
+              <div className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-xl font-extrabold text-[#173D32]">Assigned Inspection Tasks</h2>
-                  <p className="text-xs text-[#173D32]/70 mt-0.5">
-                    Tasks assigned to {profile.name} ({profile.id}) across {profile.assignedArea}.
+                  <h2 className="text-lg font-bold text-[#173D32]">Assigned Inspection Tasks</h2>
+                  <p className="text-xs text-[#173D32]/70">
+                    High-priority landslide ground checks and engineering inspections in {profile.assignedArea}
                   </p>
                 </div>
 
-                {/* Filters */}
                 <div className="flex items-center gap-2">
-                  <select
-                    aria-label="Filter tasks by status"
-                    value={taskFilterStatus}
-                    onChange={(e) => setTaskFilterStatus(e.target.value)}
-                    className="bg-[#FAF8F2] border border-[#173D32]/20 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-[#173D32] outline-none"
-                  >
-                    <option value="All">All Statuses</option>
-                    <option value="Assigned">Pending / Assigned</option>
-                    <option value="In_Progress">In Progress</option>
-                    <option value="Completed">Completed</option>
-                    <option value="Escalated">Escalated</option>
-                  </select>
+                  <div className="flex items-center gap-1 text-xs">
+                    <span className="text-[#173D32]/60 font-medium">Status:</span>
+                    <select
+                      aria-label="Filter tasks by status"
+                      value={taskFilterStatus}
+                      onChange={(e) => setTaskFilterStatus(e.target.value)}
+                      className="bg-white border border-[#173D32]/20 rounded-lg px-2.5 py-1 text-xs font-semibold outline-none cursor-pointer"
+                    >
+                      <option value="All">All Statuses</option>
+                      <option value="Assigned">Assigned / Pending</option>
+                      <option value="In_Progress">In Progress</option>
+                      <option value="Completed">Completed</option>
+                      <option value="Escalated">Escalated</option>
+                    </select>
+                  </div>
 
-                  <select
-                    aria-label="Filter tasks by risk"
-                    value={taskFilterRisk}
-                    onChange={(e) => setTaskFilterRisk(e.target.value)}
-                    className="bg-[#FAF8F2] border border-[#173D32]/20 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-[#173D32] outline-none"
-                  >
-                    <option value="All">All Risks</option>
-                    <option value="Critical">Critical</option>
-                    <option value="High">High</option>
-                    <option value="Moderate">Moderate</option>
-                    <option value="Low">Low</option>
-                  </select>
+                  <div className="flex items-center gap-1 text-xs">
+                    <span className="text-[#173D32]/60 font-medium">Risk:</span>
+                    <select
+                      aria-label="Filter tasks by risk level"
+                      value={taskFilterRisk}
+                      onChange={(e) => setTaskFilterRisk(e.target.value)}
+                      className="bg-white border border-[#173D32]/20 rounded-lg px-2.5 py-1 text-xs font-semibold outline-none cursor-pointer"
+                    >
+                      <option value="All">All Risks</option>
+                      <option value="Critical">Critical</option>
+                      <option value="High">High</option>
+                      <option value="Medium">Medium</option>
+                      <option value="Low">Low</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
+              {/* Tasks List */}
               {filteredTasks.length === 0 ? (
-                <div className="bg-[#FAF8F2] border border-[#173D32]/10 rounded-3xl p-8 text-center text-xs text-[#173D32]/60">
-                  No inspection tasks match your current filter.
+                <div className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-2xl p-8 text-center">
+                  <ClipboardList className="w-8 h-8 text-[#173D32]/30 mx-auto mb-2" />
+                  <p className="text-sm font-bold text-[#173D32]">No matching tasks found</p>
+                  <p className="text-xs text-[#173D32]/60 mt-1">Adjust filters to inspect assigned work orders</p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {filteredTasks.map((task) => (
-                    <div
-                      key={task.id}
-                      className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-3xl p-5 shadow-xs hover:border-[#173D32]/30 transition-all"
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[#173D32]/10 mb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs font-black text-[#173D32] bg-[#DCE8D4] px-2.5 py-1 rounded-lg">
-                            {task.id}
-                          </span>
-                          <span
-                            className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
-                              task.riskLevel === "Critical"
-                                ? "bg-rose-100 text-rose-800"
-                                : task.riskLevel === "High"
-                                ? "bg-amber-100 text-amber-800"
-                                : "bg-blue-100 text-blue-800"
-                            }`}
-                          >
-                            {task.riskLevel} Risk
-                          </span>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#173D32]/10 text-[#173D32]">
-                            Priority: {task.priority || task.riskLevel}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`text-xs font-bold px-3 py-1 rounded-full ${
-                              task.status === "In_Progress"
-                                ? "bg-sky-100 text-sky-800 animate-pulse"
-                                : task.status === "Completed"
-                                ? "bg-emerald-100 text-emerald-800"
-                                : task.status === "Escalated"
-                                ? "bg-red-100 text-red-800"
-                                : "bg-slate-200 text-slate-800"
-                            }`}
-                          >
-                            ● {task.status.replace("_", " ")}
-                          </span>
-                        </div>
-                      </div>
+                <div className="space-y-3">
+                  {filteredTasks.map((task) => {
+                    const isCompleted = task.status === "Completed";
+                    const isInProgress = task.status === "In_Progress";
+                    const isEscalated = task.status === "Escalated";
 
-                      <div className="space-y-2 text-xs">
-                        <div>
-                          <span className="text-[#173D32]/60 font-semibold">Location / Chainage:</span>
-                          <p className="font-bold text-sm text-[#173D32] mt-0.5 flex items-center gap-1.5">
-                            <span>📍</span> {getTaskLocation(task)}
-                          </p>
-                        </div>
-                        <div>
-                          <span className="text-[#173D32]/60 font-semibold">Inspection Reason:</span>
-                          <p className="text-[#173D32]/90 leading-relaxed mt-0.5">{task.reason}</p>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-4 text-[11px] text-[#173D32]/70 pt-1">
-                          <span>
-                            Deadline: <strong>{new Date(task.deadline).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}</strong>
-                          </span>
-                          {task.startedAt && (
-                            <span>
-                              Started: <strong>{new Date(task.startedAt).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}</strong>
+                    return (
+                      <div
+                        key={task.id}
+                        className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-2xl p-4 sm:p-5 shadow-xs hover:border-[#173D32]/35 transition-all"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-3 border-b border-[#173D32]/10">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                              <span className="font-mono text-xs font-bold text-[#173D32] bg-[#173D32]/10 px-2 py-0.5 rounded-md">
+                                {task.id}
+                              </span>
+
+                              {/* Risk Badge */}
+                              <span
+                                className={`text-[11px] font-bold px-2 py-0.5 rounded-md border ${
+                                  task.riskLevel === "Critical"
+                                    ? "bg-rose-50 text-rose-800 border-rose-200"
+                                    : task.riskLevel === "High"
+                                    ? "bg-amber-50 text-amber-800 border-amber-200"
+                                    : "bg-blue-50 text-blue-800 border-blue-200"
+                                }`}
+                              >
+                                {task.riskLevel} Risk
+                              </span>
+
+                              {/* Status Badge */}
+                              <span
+                                className={`text-[11px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 ${
+                                  isCompleted
+                                    ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                    : isInProgress
+                                    ? "bg-amber-50 text-amber-800 border-amber-200"
+                                    : isEscalated
+                                    ? "bg-purple-50 text-purple-800 border-purple-200"
+                                    : "bg-slate-50 text-slate-700 border-slate-200"
+                                }`}
+                              >
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full ${
+                                    isCompleted
+                                      ? "bg-emerald-600"
+                                      : isInProgress
+                                      ? "bg-amber-600"
+                                      : isEscalated
+                                      ? "bg-purple-600"
+                                      : "bg-slate-400"
+                                  }`}
+                                />
+                                <span>{task.status.replace("_", " ")}</span>
+                              </span>
+                            </div>
+
+                            <h3 className="text-sm sm:text-base font-bold text-[#173D32]">
+                              {task.title || getTaskLocation(task)}
+                            </h3>
+
+                            <div className="flex items-center gap-2 text-xs text-[#173D32]/70 mt-1">
+                              <MapPin className="w-3.5 h-3.5 shrink-0" />
+                              <span>{getTaskLocation(task)}</span>
+                              <span className="opacity-40">•</span>
+                              <span className="font-mono text-[11px]">{getTaskCoordinates(task)}</span>
+                            </div>
+                          </div>
+
+                          <div className="text-left sm:text-right shrink-0">
+                            <span className="text-[11px] text-[#173D32]/60 block font-medium">Deadline</span>
+                            <span className="text-xs font-semibold font-mono text-[#173D32]">
+                              {new Date(task.deadline).toLocaleDateString([], {
+                                month: "short",
+                                day: "numeric",
+                              })}{" "}
+                              {new Date(task.deadline).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
                             </span>
-                          )}
-                          {task.completedAt && (
-                            <span>
-                              Completed: <strong>{new Date(task.completedAt).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}</strong>
-                            </span>
-                          )}
+                          </div>
                         </div>
 
+                        {/* Reason / Findings */}
+                        <div className="py-3 text-xs text-[#173D32]/85 leading-relaxed">
+                          <span className="font-semibold text-[#173D32]">Reason:</span> {task.reason}
+                        </div>
+
+                        {/* Completed Notes or Escalation Notes if present */}
                         {getTaskNotes(task) && (
-                          <div className="bg-[#DCE8D4]/40 p-2.5 rounded-xl border border-[#173D32]/10 mt-2">
-                            <span className="font-bold text-[#173D32]">Officer Completion Notes:</span> {getTaskNotes(task)}
+                          <div className="mb-3 p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900">
+                            <span className="font-bold">Inspection Findings:</span> {getTaskNotes(task)}
                           </div>
                         )}
 
                         {getTaskEscalationReason(task) && (
-                          <div className="bg-rose-50 text-rose-900 p-2.5 rounded-xl border border-rose-200 mt-2">
-                            <span className="font-bold">🚨 Escalation Reason:</span> {getTaskEscalationReason(task)}
+                          <div className="mb-3 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-900">
+                            <span className="font-bold">Escalation Justification:</span> {getTaskEscalationReason(task)}
                           </div>
                         )}
-                      </div>
 
-                      {/* Actions */}
-                      <div className="flex flex-wrap items-center gap-2 pt-4 mt-3 border-t border-[#173D32]/10">
-                        {task.status === "Assigned" && (
-                          <button
-                            type="button"
-                            onClick={() => handleStartTask(task.id)}
-                            disabled={isSubmitting}
-                            className="px-4 py-2 rounded-xl bg-[#173D32] text-[#F8F4EC] text-xs font-bold hover:bg-[#1f4e40] transition-colors cursor-pointer disabled:opacity-50"
-                          >
-                            ▶ Start Inspection
-                          </button>
-                        )}
-                        {task.status === "In_Progress" && (
+                        {/* Action Buttons Bar */}
+                        <div className="pt-3 border-t border-[#173D32]/10 flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            {task.status !== "In_Progress" && !isCompleted && (
+                              <button
+                                type="button"
+                                disabled={isSubmitting}
+                                onClick={() => handleStartTask(task.id)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#173D32] hover:bg-[#1f4e40] text-[#F8F4EC] text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                              >
+                                <Play className="w-3.5 h-3.5" />
+                                <span>Start Inspection</span>
+                              </button>
+                            )}
+
+                            {!isCompleted && (
+                              <button
+                                type="button"
+                                disabled={isSubmitting}
+                                onClick={() => {
+                                  setSelectedId(task.id);
+                                  setModalType("completeTask");
+                                }}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                              >
+                                <CheckCircle className="w-3.5 h-3.5" />
+                                <span>Mark Completed</span>
+                              </button>
+                            )}
+
+                            {!isEscalated && !isCompleted && (
+                              <button
+                                type="button"
+                                disabled={isSubmitting}
+                                onClick={() => {
+                                  setSelectedId(task.id);
+                                  setModalType("escalateTask");
+                                }}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-600/40 text-rose-700 hover:bg-rose-50 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                              >
+                                <AlertTriangle className="w-3.5 h-3.5" />
+                                <span>Escalate to Command</span>
+                              </button>
+                            )}
+                          </div>
+
                           <button
                             type="button"
                             onClick={() => {
                               setSelectedId(task.id);
-                              setModalInput("");
-                              setModalType("completeTask");
+                              setModalType("viewTask");
                             }}
-                            className="px-4 py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 transition-colors cursor-pointer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#173D32]/20 hover:bg-[#173D32]/5 text-[#173D32] text-xs font-semibold transition-colors cursor-pointer"
                           >
-                            ✓ Mark Completed
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>View Details</span>
                           </button>
-                        )}
-                        {task.status !== "Completed" && task.status !== "Escalated" && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedId(task.id);
-                              setModalInput("");
-                              setModalInputSecondary("Critical");
-                              setModalType("escalateTask");
-                            }}
-                            className="px-4 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 transition-colors cursor-pointer"
-                          >
-                            ⚠️ Escalate to Command
-                          </button>
-                        )}
-
-                        {/* Detailed View Modal Trigger */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedId(task.id);
-                            setModalType("viewTask");
-                          }}
-                          className="px-3.5 py-2 rounded-xl border border-[#173D32]/25 text-[#173D32] text-xs font-bold hover:bg-[#173D32]/10 transition-colors cursor-pointer ml-auto"
-                        >
-                          🔍 View Details
-                        </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
           )}
 
-          {/* ══════════════════════════════════════════════════════════ */}
-          {/* ── TAB 2: ASSIGNED AREA MAP ───────────────────────── */}
-          {/* ══════════════════════════════════════════════════════════ */}
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {/* TAB 2: ASSIGNED AREA MAP                                       */}
+          {/* ════════════════════════════════════════════════════════════════ */}
           {activeTab === "map" && (
             <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-xl font-extrabold text-[#173D32]">Assigned Area Map & Danger Zones</h2>
-                  <p className="text-xs text-[#173D32]/70 mt-0.5">
-                    Spatial corridors, village jurisdictions, and active navigation routes for {profile.assignedArea}.
+                  <h2 className="text-lg font-bold text-[#173D32]">Assigned Area Spatial Map</h2>
+                  <p className="text-xs text-[#173D32]/70">
+                    High-risk landslide zones, monitoring stations, and emergency access corridors for {profile.assignedArea}
                   </p>
                 </div>
 
-                {/* Layer Toggle */}
-                <div className="flex items-center gap-1 bg-[#FAF8F2] border border-[#173D32]/20 p-1 rounded-2xl text-xs font-bold">
+                <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white/70 border border-[#173D32]/15">
                   <button
                     type="button"
                     onClick={() => setMapLayer("topo")}
-                    className={`px-3 py-1 rounded-xl transition-all cursor-pointer ${
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       mapLayer === "topo" ? "bg-[#173D32] text-[#F8F4EC]" : "text-[#173D32]/70 hover:text-[#173D32]"
                     }`}
                   >
-                    Topography
+                    <Layers className="w-3.5 h-3.5" />
+                    <span>Topographic</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setMapLayer("hazard")}
-                    className={`px-3 py-1 rounded-xl transition-all cursor-pointer ${
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       mapLayer === "hazard" ? "bg-[#173D32] text-[#F8F4EC]" : "text-[#173D32]/70 hover:text-[#173D32]"
                     }`}
                   >
-                    Susceptibility
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    <span>Hazard Heatmap</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setMapLayer("rainfall")}
-                    className={`px-3 py-1 rounded-xl transition-all cursor-pointer ${
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       mapLayer === "rainfall" ? "bg-[#173D32] text-[#F8F4EC]" : "text-[#173D32]/70 hover:text-[#173D32]"
                     }`}
                   >
-                    24h Rainfall
+                    <CloudRain className="w-3.5 h-3.5" />
+                    <span>24h Rain Saturation</span>
                   </button>
                 </div>
               </div>
 
-              {/* Interactive Sector Canvas Card */}
-              <div className="bg-[#173D32] text-[#F8F4EC] rounded-3xl p-6 border border-[#DCE8D4]/20 relative overflow-hidden shadow-xl space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#DCE8D4]/20 pb-3">
+              {/* Spatial Interactive View Canvas */}
+              <div className="bg-[#173D32] text-[#F8F4EC] rounded-2xl p-5 shadow-xs border border-[#173D32]/20 relative overflow-hidden">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#DCE8D4]/20 mb-4">
                   <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
-                    <span className="text-xs font-extrabold uppercase tracking-wider text-[#DCE8D4]">
-                      {mapData?.sector || profile.assignedArea} Spatial Grid
+                    <Compass className="w-4 h-4 text-[#D6A65D]" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-[#DCE8D4]">
+                      Sector 4 Corridors Navigation Grid
                     </span>
                   </div>
-                  <span className="text-[11px] font-mono text-[#D6A65D]">
-                    Center: [{mapData?.sectorCenter ? mapData.sectorCenter.join(", ") : "30.1550° N, 78.3220° E"}]
+                  <span className="text-xs font-mono text-[#DCE8D4]/70">
+                    Lat: {selectedLocation.coordinates[0].toFixed(4)}° N, Long: {selectedLocation.coordinates[1].toFixed(4)}° E
                   </span>
                 </div>
 
-                {/* Assigned Villages & Monitored Road Stretches */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="bg-[#122e26] border border-[#DCE8D4]/20 rounded-2xl p-3.5 space-y-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#D6A65D] block">
-                      Assigned Villages
-                    </span>
-                    <div className="space-y-1 text-xs text-[#DCE8D4]">
-                      <div
-                        onClick={() =>
-                          setSelectedLocation({
-                            name: "Rampur Upper",
-                            coordinates: [30.160, 78.315],
-                            type: "village",
-                            detail: "Population 2,400 • Primary Evacuation Zone: School Grounds",
-                          })
-                        }
-                        className="p-1.5 rounded-lg hover:bg-white/10 cursor-pointer flex items-center justify-between"
-                      >
-                        <span className="font-bold">🏡 Rampur Upper</span>
-                        <span className="text-[10px] opacity-70">Evac: School Grounds</span>
-                      </div>
-                      <div
-                        onClick={() =>
-                          setSelectedLocation({
-                            name: "Devipura",
-                            coordinates: [30.153, 78.332],
-                            type: "village",
-                            detail: "Population 1,800 • Primary Evacuation Zone: Community Hall",
-                          })
-                        }
-                        className="p-1.5 rounded-lg hover:bg-white/10 cursor-pointer flex items-center justify-between"
-                      >
-                        <span className="font-bold">🏡 Devipura</span>
-                        <span className="text-[10px] opacity-70">Evac: Community Hall</span>
-                      </div>
-                      <div
-                        onClick={() =>
-                          setSelectedLocation({
-                            name: "Shivalik Ridge Hamlet",
-                            coordinates: [30.142, 78.322],
-                            type: "village",
-                            detail: "Population 950 • High downslope exposure to debris flow",
-                          })
-                        }
-                        className="p-1.5 rounded-lg hover:bg-white/10 cursor-pointer flex items-center justify-between"
-                      >
-                        <span className="font-bold">🏡 Shivalik Ridge</span>
-                        <span className="text-[10px] opacity-70">Evac: South Ground</span>
-                      </div>
-                    </div>
-                  </div>
+                {/* Spatial Map Simulation Screen */}
+                <div className="h-64 sm:h-80 rounded-xl bg-[#122e26] border border-[#DCE8D4]/20 p-4 relative flex flex-col justify-between overflow-hidden">
+                  {/* Grid Lines Pattern */}
+                  <div
+                    className="absolute inset-0 opacity-15 pointer-events-none"
+                    style={{
+                      backgroundImage:
+                        "linear-gradient(to right, #DCE8D4 1px, transparent 1px), linear-gradient(to bottom, #DCE8D4 1px, transparent 1px)",
+                      backgroundSize: "28px 28px",
+                    }}
+                  />
 
-                  <div className="bg-[#122e26] border border-[#DCE8D4]/20 rounded-2xl p-3.5 space-y-1 md:col-span-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#D6A65D] block">
-                      Monitored Highway Corridors
-                    </span>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                      {roads.map((r) => (
-                        <div
-                          key={r.roadSegmentId}
-                          onClick={() =>
-                            setSelectedLocation({
-                              name: r.stretchName,
-                              coordinates: [30.145, 78.32],
-                              type: "road",
-                              detail: `Condition: ${r.condition} — ${r.reason}`,
-                            })
-                          }
-                          className="p-2 rounded-xl bg-white/5 border border-white/10 hover:border-[#D6A65D] cursor-pointer space-y-1 transition-all"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-[11px] text-white truncate">{r.stretchName}</span>
-                            <span
-                              className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase ${
-                                r.condition === "Blocked"
-                                  ? "bg-rose-500 text-white"
-                                  : r.condition === "Partially Blocked"
-                                  ? "bg-amber-500 text-white"
-                                  : r.condition === "Caution"
-                                  ? "bg-yellow-400 text-black"
-                                  : "bg-emerald-600 text-white"
-                              }`}
-                            >
-                              {r.condition}
-                            </span>
-                          </div>
-                          <p className="text-[10px] text-[#DCE8D4]/70 truncate">{r.reason}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Highlighted High-Risk Hazard Zones */}
-                <div className="space-y-2">
-                  <span className="text-xs font-black uppercase tracking-wider text-[#D6A65D] block">
-                    High-Risk Landslide Hazard Zones
-                  </span>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                    <div
-                      onClick={() =>
-                        setSelectedLocation({
-                          name: "KM 42+200 Upper Ridge Cutting (Zone HZ-01)",
-                          coordinates: [30.1425, 78.3182],
-                          type: "hazard",
-                          detail: "Slope 48° • Soil Saturation 89% • 24h Rain 118mm. Urgent retaining inspection.",
-                        })
-                      }
-                      className="bg-[#122e26] border border-rose-500/50 rounded-2xl p-4 space-y-2 hover:border-rose-400 cursor-pointer transition-all"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-extrabold text-rose-300">🚨 KM 42+200 Upper Ridge Cutting</span>
-                        <span className="text-[10px] bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full font-bold">
-                          Weight: 0.94 (Critical)
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-[#DCE8D4]/80">
-                        Slope: 48° | Soil Saturation: 89% | 24h Rain: 118mm
-                      </p>
-                      <div className="text-[11px] text-amber-200">
-                        Protocol: Enforce single-lane regulated convoy, maintain spotter at KM 42+300.
-                      </div>
-                    </div>
-
-                    <div
-                      onClick={() =>
-                        setSelectedLocation({
-                          name: "Village Approach B-12 Colluvium (Zone HZ-02)",
-                          coordinates: [30.1588, 78.3341],
-                          type: "hazard",
-                          detail: "Slope 39° • Soil Saturation 78% • 24h Rain 94mm. Culvert foundation erosion risk.",
-                        })
-                      }
-                      className="bg-[#122e26] border border-amber-500/50 rounded-2xl p-4 space-y-2 hover:border-amber-400 cursor-pointer transition-all"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-extrabold text-amber-300">⚠️ B-12 Colluvium Slide Zone</span>
-                        <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-bold">
-                          Weight: 0.78 (High)
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-[#DCE8D4]/80">
-                        Slope: 39° | Soil Saturation: 78% | 24h Rain: 94mm
-                      </p>
-                      <div className="text-[11px] text-amber-200">
-                        Protocol: Pre-position backhoe at chainage 3+400; monitor slope tension cracks.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Interactive Turn-by-Turn Navigation Routing Card */}
-                <div className="bg-[#122e26] border border-[#DCE8D4]/30 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs">
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-bold text-[#D6A65D] uppercase tracking-wider block">
-                      Active Navigation Route To Selected Target
-                    </span>
-                    <p className="font-bold text-white text-sm flex items-center gap-2">
-                      <span>🎯</span> {selectedLocation.name}
-                    </p>
-                    <p className="text-[11px] text-[#DCE8D4]/80">{selectedLocation.detail}</p>
-                    <span className="text-[10px] font-mono text-[#D6A65D]">
-                      GPS Coordinates: [{selectedLocation.coordinates.join(", ")}]
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2.5 shrink-0 w-full md:w-auto">
+                  {/* Sector Points Pins */}
+                  <div className="relative z-10 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {/* Village Pin 1 */}
                     <button
                       type="button"
                       onClick={() =>
-                        showBanner(
-                          `Navigation coordinates [${selectedLocation.coordinates.join(", ")}] transmitted to field terminal!`
-                        )
+                        setSelectedLocation({
+                          name: "Rampur Upper",
+                          coordinates: [30.1482, 78.3241],
+                          type: "village",
+                          detail: "Population: 2,400 • Primary Evacuation Zone: School Grounds",
+                        })
                       }
-                      className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-[#D6A65D] text-[#173D32] font-black hover:bg-[#e0b268] transition-colors cursor-pointer text-xs"
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        selectedLocation.name === "Rampur Upper"
+                          ? "bg-[#D6A65D] text-[#173D32] border-[#D6A65D] font-bold"
+                          : "bg-[#173D32]/80 text-[#DCE8D4] border-[#DCE8D4]/20 hover:bg-[#173D32]"
+                      }`}
                     >
-                      🧭 Transmit GPS & Route
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <MapPin className="w-3.5 h-3.5" />
+                        <span>Rampur Upper</span>
+                      </div>
+                      <span className="text-[10px] opacity-80 block mt-0.5">Village Settlement</span>
+                    </button>
+
+                    {/* Village Pin 2 */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSelectedLocation({
+                          name: "Devipura",
+                          coordinates: [30.1554, 78.3298],
+                          type: "village",
+                          detail: "Population: 1,800 • Primary Evacuation Zone: Community Hall",
+                        })
+                      }
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        selectedLocation.name === "Devipura"
+                          ? "bg-[#D6A65D] text-[#173D32] border-[#D6A65D] font-bold"
+                          : "bg-[#173D32]/80 text-[#DCE8D4] border-[#DCE8D4]/20 hover:bg-[#173D32]"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <MapPin className="w-3.5 h-3.5" />
+                        <span>Devipura</span>
+                      </div>
+                      <span className="text-[10px] opacity-80 block mt-0.5">Village Settlement</span>
+                    </button>
+
+                    {/* Village Pin 3 */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSelectedLocation({
+                          name: "Shivalik Ridge",
+                          coordinates: [30.1418, 78.3129],
+                          type: "village",
+                          detail: "Population: 950 • Downslope exposure to rockfall",
+                        })
+                      }
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        selectedLocation.name === "Shivalik Ridge"
+                          ? "bg-[#D6A65D] text-[#173D32] border-[#D6A65D] font-bold"
+                          : "bg-[#173D32]/80 text-[#DCE8D4] border-[#DCE8D4]/20 hover:bg-[#173D32]"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <MapPin className="w-3.5 h-3.5" />
+                        <span>Shivalik Ridge</span>
+                      </div>
+                      <span className="text-[10px] opacity-80 block mt-0.5">High Exposure Village</span>
                     </button>
                   </div>
+
+                  {/* Road Stretches Overlays */}
+                  <div className="relative z-10 flex flex-wrap gap-2 my-auto">
+                    {roads.map((r) => (
+                      <button
+                        key={r.roadSegmentId}
+                        type="button"
+                        onClick={() =>
+                          setSelectedLocation({
+                            name: r.stretchName,
+                            coordinates: [30.1425, 78.3182],
+                            type: "road",
+                            detail: `Condition: ${r.condition} — ${r.reason}`,
+                          })
+                        }
+                        className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+                          selectedLocation.name === r.stretchName
+                            ? "bg-[#D6A65D] text-[#173D32] border-[#D6A65D]"
+                            : "bg-[#122e26]/90 border-[#DCE8D4]/25 text-[#DCE8D4] hover:bg-[#173D32]"
+                        }`}
+                      >
+                        <Route className="w-3.5 h-3.5" />
+                        <span>{r.stretchName}</span>
+                        <span
+                          className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${
+                            r.condition === "Blocked"
+                              ? "bg-rose-900 text-rose-200"
+                              : r.condition === "Partially Blocked"
+                              ? "bg-orange-900 text-orange-200"
+                              : "bg-amber-900 text-amber-200"
+                          }`}
+                        >
+                          {r.condition}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Danger Zone Indicators */}
+                  <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSelectedLocation({
+                          name: "KM 42+200 Upper Ridge Cutting",
+                          coordinates: [30.1425, 78.3182],
+                          type: "hazard",
+                          detail: "Slope: 48° • Soil Saturation: 89% • 24h Rain: 118mm. Retaining wall inspection required.",
+                        })
+                      }
+                      className={`p-2 rounded-lg border text-left cursor-pointer ${
+                        selectedLocation.name === "KM 42+200 Upper Ridge Cutting"
+                          ? "bg-rose-950 border-rose-400 text-rose-100"
+                          : "bg-[#173D32]/80 border-rose-500/30 text-rose-200 hover:bg-[#173D32]"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 text-xs font-bold">
+                        <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+                        <span>KM 42+200 Upper Ridge Cutting</span>
+                      </div>
+                      <span className="text-[10px] text-rose-300 block">Active Tension Cracks (Critical)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSelectedLocation({
+                          name: "B-12 Approach Culvert Washout",
+                          coordinates: [30.1588, 78.3341],
+                          type: "hazard",
+                          detail: "Slope: 39° • Soil Saturation: 78% • 24h Rain: 94mm. Culvert foundation erosion risk.",
+                        })
+                      }
+                      className={`p-2 rounded-lg border text-left cursor-pointer ${
+                        selectedLocation.name === "B-12 Approach Culvert Washout"
+                          ? "bg-amber-950 border-amber-400 text-amber-100"
+                          : "bg-[#173D32]/80 border-amber-500/30 text-amber-200 hover:bg-[#173D32]"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 text-xs font-bold">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                        <span>B-12 Approach Road Foundation</span>
+                      </div>
+                      <span className="text-[10px] text-amber-300 block">Culvert Scour / Subsidence</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Selected Coordinate Focus Inspector */}
+                <div className="mt-4 p-3.5 rounded-xl bg-[#122e26] border border-[#DCE8D4]/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div>
+                    <span className="text-[#DCE8D4]/60 block text-[11px] font-medium">Selected Ground Target</span>
+                    <h4 className="font-bold text-[#F8F4EC] flex items-center gap-1.5 mt-0.5">
+                      <Crosshair className="w-3.5 h-3.5 text-[#D6A65D]" />
+                      <span>{selectedLocation.name}</span>
+                    </h4>
+                    {selectedLocation.detail && (
+                      <p className="text-[11px] text-[#DCE8D4]/80 mt-0.5">{selectedLocation.detail}</p>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      showBanner(`Routing telemetry to ${selectedLocation.name} dispatched.`, "info");
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#D6A65D] hover:bg-[#c4954d] text-[#173D32] font-bold text-xs transition-colors cursor-pointer shrink-0"
+                  >
+                    <Navigation className="w-3.5 h-3.5" />
+                    <span>Navigate to Ground Target</span>
+                  </button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* ══════════════════════════════════════════════════════════ */}
-          {/* ── TAB 3: VILLAGER REPORTS ────────────────────────── */}
-          {/* ══════════════════════════════════════════════════════════ */}
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {/* TAB 3: VILLAGER REPORTS                                        */}
+          {/* ════════════════════════════════════════════════════════════════ */}
           {activeTab === "reports" && (
             <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-xl font-extrabold text-[#173D32]">Citizen & Villager Hazard Reports</h2>
-                  <p className="text-xs text-[#173D32]/70 mt-0.5">
-                    Reports submitted by villagers in {profile.assignedArea}. Verify on-ground, reject with reasons, or escalate.
+                  <h2 className="text-lg font-bold text-[#173D32]">Citizen & Villager Hazard Reports</h2>
+                  <p className="text-xs text-[#173D32]/70">
+                    Community eyewitness hazard dispatches requiring field verification in {profile.assignedArea}
                   </p>
                 </div>
 
-                {/* Status Filter */}
-                <select
-                  aria-label="Filter reports by status"
-                  value={reportFilterStatus}
-                  onChange={(e) => setReportFilterStatus(e.target.value)}
-                  className="bg-[#FAF8F2] border border-[#173D32]/20 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-[#173D32] outline-none"
-                >
-                  <option value="All">All Reports</option>
-                  <option value="Pending">Pending Verification</option>
-                  <option value="Verified">Verified Ground Truth</option>
-                  <option value="Rejected">Rejected</option>
-                  <option value="Escalated">Escalated to Command</option>
-                </select>
+                <div className="flex items-center gap-1 text-xs">
+                  <span className="text-[#173D32]/60 font-medium">Filter:</span>
+                  <select
+                    aria-label="Filter citizen reports"
+                    value={reportFilterStatus}
+                    onChange={(e) => setReportFilterStatus(e.target.value)}
+                    className="bg-white border border-[#173D32]/20 rounded-lg px-2.5 py-1 text-xs font-semibold outline-none cursor-pointer"
+                  >
+                    <option value="All">All Reports</option>
+                    <option value="Pending">Pending Verification</option>
+                    <option value="Verified">Verified (Ground Truth)</option>
+                    <option value="Rejected">Rejected</option>
+                    <option value="Escalated">Escalated</option>
+                  </select>
+                </div>
               </div>
 
               {filteredReports.length === 0 ? (
-                <div className="bg-[#FAF8F2] border border-[#173D32]/10 rounded-3xl p-8 text-center text-xs text-[#173D32]/60">
-                  No villager reports match your current filter.
+                <div className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-2xl p-8 text-center">
+                  <FileText className="w-8 h-8 text-[#173D32]/30 mx-auto mb-2" />
+                  <p className="text-sm font-bold text-[#173D32]">No citizen reports matching filter</p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {filteredReports.map((rep) => (
-                    <div
-                      key={rep.id}
-                      className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-3xl p-5 shadow-xs space-y-3 hover:border-[#173D32]/30 transition-all"
-                    >
-                      <div className="flex items-center justify-between border-b border-[#173D32]/10 pb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs font-bold text-[#173D32] bg-[#DCE8D4] px-2 py-0.5 rounded">
-                            {rep.id}
-                          </span>
-                          <span className="text-xs font-extrabold text-[#173D32]">{rep.hazardType}</span>
-                        </div>
-                        <span
-                          className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
-                            rep.status === "Verified"
-                              ? "bg-emerald-100 text-emerald-800"
-                              : rep.status === "Rejected"
-                              ? "bg-slate-200 text-slate-700"
-                              : rep.status === "Escalated"
-                              ? "bg-rose-100 text-rose-800"
-                              : "bg-amber-100 text-amber-800"
-                          }`}
-                        >
-                          ● {rep.status}
-                        </span>
-                      </div>
+                <div className="space-y-3">
+                  {filteredReports.map((rep) => {
+                    const isPending = rep.status === "Pending";
+                    const isVerified = rep.status === "Verified";
+                    const isRejected = rep.status === "Rejected";
+                    const isEscalated = rep.status === "Escalated";
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-                        <div className="sm:col-span-2 space-y-1.5">
-                          <p className="text-[#173D32] font-semibold leading-relaxed">{rep.locationDescription}</p>
-                          <div className="text-[11px] text-[#173D32]/70 flex flex-wrap items-center gap-3">
-                            <span>
-                              Reported by: <strong>{rep.villagerName}</strong> ({rep.contact})
-                            </span>
-                            <span>
-                              Time: {new Date(rep.timestamp).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}
-                            </span>
+                    return (
+                      <div
+                        key={rep.id}
+                        className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-2xl p-4 sm:p-5 shadow-xs hover:border-[#173D32]/35 transition-all"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-3 border-b border-[#173D32]/10">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                              <span className="font-mono text-xs font-bold text-[#173D32] bg-[#173D32]/10 px-2 py-0.5 rounded-md">
+                                {rep.id}
+                              </span>
+
+                              <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200">
+                                {rep.hazardType}
+                              </span>
+
+                              <span
+                                className={`text-[11px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 ${
+                                  isVerified
+                                    ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                    : isRejected
+                                    ? "bg-slate-50 text-slate-700 border-slate-200"
+                                    : isEscalated
+                                    ? "bg-purple-50 text-purple-800 border-purple-200"
+                                    : "bg-amber-50 text-amber-800 border-amber-200"
+                                }`}
+                              >
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full ${
+                                    isVerified
+                                      ? "bg-emerald-600"
+                                      : isRejected
+                                      ? "bg-slate-400"
+                                      : isEscalated
+                                      ? "bg-purple-600"
+                                      : "bg-amber-600"
+                                  }`}
+                                />
+                                <span>{rep.status}</span>
+                              </span>
+                            </div>
+
+                            <h3 className="text-sm sm:text-base font-bold text-[#173D32]">
+                              {rep.locationDescription}
+                            </h3>
+
+                            <div className="flex items-center gap-3 text-xs text-[#173D32]/70 mt-1 flex-wrap">
+                              <span>
+                                Caller: <strong className="text-[#173D32]">{rep.villagerName}</strong> ({rep.contact})
+                              </span>
+                              <span className="opacity-40">•</span>
+                              <span className="font-mono text-[11px]">
+                                {new Date(rep.timestamp).toLocaleString([], {
+                                  month: "short",
+                                  day: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </span>
+                            </div>
                           </div>
 
-                          {rep.fieldNotes && (
-                            <div className="bg-[#DCE8D4]/40 p-2.5 rounded-xl text-[11px] border border-[#173D32]/10 mt-1">
-                              <strong>Officer Field Notes:</strong> {rep.fieldNotes}
-                            </div>
-                          )}
-
-                          {rep.rejectionReason && (
-                            <div className="bg-rose-50 text-rose-900 p-2.5 rounded-xl text-[11px] border border-rose-200 mt-1">
-                              <strong>Rejection Justification:</strong> {rep.rejectionReason}
-                            </div>
+                          {rep.coordinates && (
+                            <span className="font-mono text-[11px] bg-[#173D32]/5 px-2.5 py-1 rounded-md text-[#173D32] shrink-0">
+                              {rep.coordinates[0].toFixed(4)}° N, {rep.coordinates[1].toFixed(4)}° E
+                            </span>
                           )}
                         </div>
 
-                        {/* Photo Thumbnail */}
-                        {rep.photoUrl && (
-                          <div className="sm:col-span-1">
-                            <div className="h-24 w-full rounded-2xl overflow-hidden bg-slate-200 border border-[#173D32]/15 relative">
-                              <img
-                                src={rep.photoUrl}
-                                alt="Hazard observation"
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
+                        {/* Officer Notes or Rejection Reason if present */}
+                        {rep.fieldNotes && (
+                          <div className="mt-3 p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900">
+                            <span className="font-bold">Officer Ground Truth:</span> {rep.fieldNotes}
                           </div>
                         )}
-                      </div>
 
-                      {/* Actions */}
-                      <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-[#173D32]/10">
-                        {rep.status === "Pending" && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedId(rep.id);
-                                setModalInput("");
-                                setPhotoAttachment(null);
-                                setModalType("verifyReport");
-                              }}
-                              className="px-3.5 py-1.5 rounded-xl bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 transition-colors cursor-pointer"
-                            >
-                              ✓ Verify with Notes & Photo
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedId(rep.id);
-                                setModalInput("");
-                                setModalType("rejectReport");
-                              }}
-                              className="px-3.5 py-1.5 rounded-xl border border-rose-400 text-rose-700 text-xs font-bold hover:bg-rose-50 transition-colors cursor-pointer"
-                            >
-                              ✕ Reject Report
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedId(rep.id);
-                                setModalInput("");
-                                setModalInputSecondary("");
-                                setModalType("escalateReport");
-                              }}
-                              className="px-3.5 py-1.5 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 transition-colors cursor-pointer"
-                            >
-                              ⚠️ Escalate to Command
-                            </button>
-                          </>
+                        {rep.rejectionReason && (
+                          <div className="mt-3 p-2.5 rounded-xl bg-slate-100 border border-slate-300 text-xs text-slate-800">
+                            <span className="font-bold">Rejection Justification:</span> {rep.rejectionReason}
+                          </div>
                         )}
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedId(rep.id);
-                            setModalType("viewReport");
-                          }}
-                          className="px-3.5 py-1.5 rounded-xl border border-[#173D32]/25 text-[#173D32] text-xs font-bold hover:bg-[#173D32]/10 transition-colors cursor-pointer ml-auto"
-                        >
-                          🔍 View Full Report
-                        </button>
+                        {/* Action Buttons Bar */}
+                        <div className="pt-3 mt-3 border-t border-[#173D32]/10 flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            {isPending && (
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={isSubmitting}
+                                  onClick={() => {
+                                    setSelectedId(rep.id);
+                                    setModalType("verifyReport");
+                                  }}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>Verify Ground Truth</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={isSubmitting}
+                                  onClick={() => {
+                                    setSelectedId(rep.id);
+                                    setModalType("rejectReport");
+                                  }}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-400 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                  <span>Reject</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={isSubmitting}
+                                  onClick={() => {
+                                    setSelectedId(rep.id);
+                                    setModalType("escalateReport");
+                                  }}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-500/40 hover:bg-rose-50 text-rose-700 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                                >
+                                  <AlertTriangle className="w-3.5 h-3.5" />
+                                  <span>Escalate</span>
+                                </button>
+                              </>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedId(rep.id);
+                              setModalType("viewReport");
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#173D32]/20 hover:bg-[#173D32]/5 text-[#173D32] text-xs font-semibold transition-colors cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Full Report</span>
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
           )}
 
-          {/* ══════════════════════════════════════════════════════════ */}
-          {/* ── TAB 4: ROAD STATUS ─────────────────────────────── */}
-          {/* ══════════════════════════════════════════════════════════ */}
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {/* TAB 4: ROAD STATUS                                             */}
+          {/* ════════════════════════════════════════════════════════════════ */}
           {activeTab === "roads" && (
             <div className="space-y-6">
-              <div>
-                <h2 className="text-xl font-extrabold text-[#173D32]">Real-Time Road Corridor Conditions</h2>
+              <div className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-2xl p-4 shadow-xs">
+                <h2 className="text-lg font-bold text-[#173D32]">Monitored Road Corridors</h2>
                 <p className="text-xs text-[#173D32]/70 mt-0.5">
-                  Update segment conditions (Open, Caution, Partially Blocked, Blocked) with photograph attachments and reasons.
+                  Real-time conditions across National Highway and State Highway stretches in {profile.assignedArea}
                 </p>
               </div>
 
-              {roads.length === 0 ? (
-                <div className="bg-[#FAF8F2] border border-[#173D32]/10 rounded-3xl p-8 text-center text-xs text-[#173D32]/60">
-                  No monitored road stretches currently recorded in this sector.
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {roads.map((road) => (
+              {/* Road Segments Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {roads.map((road) => {
+                  const badge = getRoadConditionBadge(road.condition);
+
+                  return (
                     <div
                       key={road.roadSegmentId}
-                      className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-3xl p-5 shadow-xs space-y-3"
+                      className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-2xl p-5 shadow-xs flex flex-col justify-between"
                     >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#173D32]/10 pb-3">
-                        <div>
-                          <h4 className="font-extrabold text-sm text-[#173D32]">{road.stretchName}</h4>
-                          <span className="text-[11px] font-mono text-[#173D32]/70">{road.roadSegmentId}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <span className="font-mono text-xs font-bold text-[#173D32] bg-[#173D32]/10 px-2 py-0.5 rounded-md">
+                            {road.roadSegmentId}
+                          </span>
                           <span
-                            className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
-                              road.condition === "Blocked"
-                                ? "bg-rose-600 text-white animate-pulse"
-                                : road.condition === "Partially Blocked"
-                                ? "bg-amber-500 text-white"
-                                : road.condition === "Caution"
-                                ? "bg-yellow-400 text-slate-900"
-                                : "bg-emerald-600 text-white"
-                            }`}
+                            className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md border ${badge.classes}`}
                           >
-                            {road.condition}
+                            {badge.icon}
+                            <span>{road.condition}</span>
                           </span>
                         </div>
+
+                        <h3 className="text-base font-bold text-[#173D32]">{road.stretchName}</h3>
+                        <p className="text-xs text-[#173D32]/80 mt-2 leading-relaxed">{road.reason}</p>
                       </div>
 
-                      <div className="text-xs space-y-1">
-                        <p className="text-[#173D32]/90 leading-relaxed">
-                          <strong>Current Status Reason:</strong> {road.reason}
-                        </p>
-                        {road.photoUrl && (
-                          <div className="my-2">
-                            <span className="text-[10px] text-[#173D32]/60 font-semibold block mb-1">Attached Photo:</span>
-                            <img
-                              src={road.photoUrl}
-                              alt="Road condition"
-                              className="h-24 rounded-xl object-cover border border-[#173D32]/20"
-                            />
-                          </div>
-                        )}
-                        <p className="text-[11px] text-[#173D32]/60 pt-1">
-                          Last Updated:{" "}
-                          {new Date(road.timestamp).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}{" "}
-                          by {getRoadUpdater(road)}
-                        </p>
-                      </div>
+                      <div className="pt-4 mt-4 border-t border-[#173D32]/10 flex items-center justify-between gap-2">
+                        <div className="text-[11px] text-[#173D32]/60">
+                          <span>Updated by {getRoadUpdater(road)}</span>
+                          <span className="block font-mono text-[10px]">
+                            {road.timestamp
+                              ? new Date(road.timestamp).toLocaleTimeString([], {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })
+                              : "Recently"}
+                          </span>
+                        </div>
 
-                      <div className="pt-3 border-t border-[#173D32]/10 flex items-center justify-between">
                         <button
                           type="button"
                           onClick={() => {
                             setSelectedId(road.roadSegmentId);
                             setRoadCondition(road.condition);
-                            setModalInput(road.reason);
-                            setPhotoAttachment(road.photoUrl || null);
+                            setModalInput(road.reason || "");
                             setModalType("updateRoad");
                           }}
-                          className="px-4 py-2 rounded-xl bg-[#173D32] text-[#F8F4EC] text-xs font-bold hover:bg-[#1f4e40] transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#173D32] hover:bg-[#1f4e40] text-[#F8F4EC] text-xs font-bold transition-colors cursor-pointer"
                         >
-                          ⚡ Update Condition & Photo
+                          <Route className="w-3.5 h-3.5" />
+                          <span>Update Condition</span>
                         </button>
-                        <span className="text-[10px] text-[#173D32]/60 font-mono">
-                          Broadcasts to Administrator & Route Planners
-                        </span>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
+                  );
+                })}
+              </div>
 
-              {/* Previously Submitted Updates Feed */}
-              {roadHistory.length > 0 && (
-                <div className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-3xl p-5 shadow-xs space-y-3">
-                  <div className="flex items-center justify-between border-b border-[#173D32]/10 pb-2">
-                    <h3 className="font-extrabold text-sm text-[#173D32]">Previously Submitted Updates (Audit Log)</h3>
-                    <span className="text-[11px] text-[#173D32]/60">{roadHistory.length} recorded entries</span>
+              {/* Previously Submitted Updates Audit Log */}
+              <div className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-2xl p-5 shadow-xs">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-[#173D32]">Previously Submitted Road Updates</h3>
+                    <p className="text-xs text-[#173D32]/60">Historical log of condition adjustments in Sector 4</p>
                   </div>
-                  <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
-                    {roadHistory.map((item) => (
-                      <div
-                        key={item.id}
-                        className="p-3 bg-white/60 rounded-xl border border-[#173D32]/10 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
-                      >
-                        <div className="space-y-0.5">
+                  <Clock className="w-4 h-4 text-[#173D32]/50" />
+                </div>
+
+                <div className="divide-y divide-[#173D32]/10 text-xs">
+                  {roadHistory.map((item) => {
+                    const badge = getRoadConditionBadge(item.condition);
+
+                    return (
+                      <div key={item.id} className="py-2.5 flex items-start justify-between gap-3">
+                        <div>
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-[#173D32]">{item.stretchName}</span>
                             <span
-                              className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase ${
-                                item.condition === "Blocked"
-                                  ? "bg-rose-100 text-rose-800"
-                                  : item.condition === "Partially Blocked"
-                                  ? "bg-amber-100 text-amber-800"
-                                  : item.condition === "Caution"
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : "bg-emerald-100 text-emerald-800"
-                              }`}
+                              className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.2 rounded border ${badge.classes}`}
                             >
-                              {item.condition}
+                              {badge.icon}
+                              <span>{item.condition}</span>
                             </span>
                           </div>
-                          <p className="text-[11px] text-[#173D32]/80">{item.reason}</p>
+                          <p className="text-[11px] text-[#173D32]/75 mt-0.5">{item.reason}</p>
                         </div>
-                        <div className="text-[10px] text-[#173D32]/60 font-mono sm:text-right shrink-0">
-                          <div>{new Date(item.timestamp).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}</div>
-                          <div>By {item.updatedBy}</div>
-                        </div>
+                        <span className="font-mono text-[10px] text-[#173D32]/60 shrink-0">
+                          {new Date(item.timestamp).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
-              )}
+              </div>
             </div>
           )}
 
-          {/* ══════════════════════════════════════════════════════════ */}
-          {/* ── TAB 5: SECTOR ALERTS ───────────────────────────── */}
-          {/* ══════════════════════════════════════════════════════════ */}
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {/* TAB 5: SECTOR ALERTS                                           */}
+          {/* ════════════════════════════════════════════════════════════════ */}
           {activeTab === "alerts" && (
             <div className="space-y-4">
-              <div>
-                <h2 className="text-xl font-extrabold text-[#173D32]">Sector Emergency Alerts & Protocols</h2>
+              <div className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-2xl p-4 shadow-xs">
+                <h2 className="text-lg font-bold text-[#173D32]">Sector Emergency Alerts & Protocols</h2>
                 <p className="text-xs text-[#173D32]/70 mt-0.5">
-                  Disaster response protocols dispatched to {profile.assignedArea}. Review instructions and acknowledge receipt.
+                  Official meteorological and geological warnings issued for {profile.assignedArea}
                 </p>
               </div>
 
-              {alerts.length === 0 ? (
-                <div className="bg-[#FAF8F2] border border-[#173D32]/10 rounded-3xl p-8 text-center text-xs text-[#173D32]/60">
-                  No active sector alerts.
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {alerts.map((alert) => (
+              <div className="space-y-3">
+                {alerts.map((alert) => {
+                  const isCritical = alert.severity === "Critical";
+                  const isWarning = alert.severity === "Warning";
+
+                  return (
                     <div
                       key={alert.id}
-                      className={`rounded-3xl p-5 border shadow-xs space-y-3 ${
-                        alert.severity === "Critical"
-                          ? "bg-rose-50/80 border-rose-300"
-                          : "bg-[#FAF8F2] border-[#173D32]/15"
+                      className={`rounded-2xl p-5 shadow-xs border ${
+                        isCritical
+                          ? "bg-rose-50/80 border-rose-300 text-rose-950"
+                          : isWarning
+                          ? "bg-amber-50/80 border-amber-300 text-amber-950"
+                          : "bg-sky-50/80 border-sky-300 text-sky-950"
                       }`}
                     >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#173D32]/10 pb-3">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-xs font-black uppercase ${
-                              alert.severity === "Critical"
-                                ? "bg-rose-600 text-white animate-pulse"
-                                : "bg-amber-500 text-white"
-                            }`}
-                          >
-                            {alert.severity}
-                          </span>
-                          <h4 className="font-extrabold text-sm text-[#173D32]">{alert.title}</h4>
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-3 border-b border-black/10">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className="font-mono text-xs font-bold bg-white/70 px-2 py-0.5 rounded-md border border-black/10">
+                              {alert.id}
+                            </span>
+                            <span
+                              className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
+                                isCritical
+                                  ? "bg-rose-700 text-white"
+                                  : isWarning
+                                  ? "bg-amber-700 text-white"
+                                  : "bg-sky-700 text-white"
+                              }`}
+                            >
+                              {alert.severity} Severity
+                            </span>
+                          </div>
+
+                          <h3 className="text-base font-bold">{alert.title}</h3>
+                          <p className="text-xs opacity-75 mt-0.5">{alert.targetSector || (alert as unknown as { assignedArea?: string }).assignedArea || profile.assignedArea}</p>
                         </div>
-                        <span className="text-[11px] text-[#173D32]/60 font-mono">
-                          {new Date(alert.createdAt).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}
+
+                        <span className="font-mono text-xs opacity-70">
+                          {new Date(alert.createdAt).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
                         </span>
                       </div>
 
-                      <div className="text-xs space-y-2">
-                        <span className="font-bold text-[#173D32] uppercase tracking-wider text-[11px] block">
-                          Standard Action Protocol:
-                        </span>
-                        <pre className="font-sans whitespace-pre-wrap bg-white/70 p-3.5 rounded-2xl text-xs text-[#173D32] border border-[#173D32]/10 leading-relaxed">
-                          {alert.instructions}
-                        </pre>
-                      </div>
+                      <p className="text-xs leading-relaxed py-3">{alert.instructions}</p>
 
-                      <div className="pt-3 border-t border-[#173D32]/10 flex flex-wrap items-center justify-between gap-2">
+                      <div className="pt-3 border-t border-black/10 flex flex-wrap items-center justify-between gap-2">
                         {alert.acknowledged ? (
-                          <span className="text-emerald-800 font-bold text-xs flex items-center gap-1.5">
-                            ✓ Acknowledged by Officer{" "}
-                            {alert.acknowledgedAt &&
-                              `(${new Date(alert.acknowledgedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})`}
+                          <span className="inline-flex items-center gap-1.5 text-emerald-800 text-xs font-bold bg-emerald-100/90 border border-emerald-300 px-2.5 py-1 rounded-lg">
+                            <CheckCircle className="w-3.5 h-3.5 text-emerald-700" />
+                            <span>
+                              Acknowledged at{" "}
+                              {alert.acknowledgedAt
+                                ? new Date(alert.acknowledgedAt).toLocaleTimeString([], {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })
+                                : "recorded"}
+                            </span>
                           </span>
                         ) : (
                           <button
                             type="button"
-                            onClick={() => handleAcknowledgeAlert(alert.id)}
                             disabled={isSubmitting}
-                            className="px-4 py-2 rounded-xl bg-[#173D32] text-[#F8F4EC] text-xs font-bold hover:bg-[#1f4e40] transition-colors cursor-pointer disabled:opacity-50"
+                            onClick={() => handleAcknowledgeAlert(alert.id)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#173D32] hover:bg-[#1f4e40] text-[#F8F4EC] text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
                           >
-                            ✓ Acknowledge Receipt
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            <span>Acknowledge Alert</span>
                           </button>
                         )}
 
@@ -1713,342 +1973,384 @@ export default function FieldOfficerPortalPage() {
                             setSelectedId(alert.id);
                             setModalType("viewAlert");
                           }}
-                          className="px-3.5 py-1.5 rounded-xl border border-[#173D32]/25 text-[#173D32] text-xs font-bold hover:bg-[#173D32]/10 transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-black/20 hover:bg-black/5 text-xs font-semibold transition-colors cursor-pointer"
                         >
-                          📋 Protocol Details
+                          <ShieldAlert className="w-3.5 h-3.5" />
+                          <span>Protocol Details</span>
                         </button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
+                  );
+                })}
+              </div>
             </div>
           )}
         </main>
       </div>
 
-      {/* ══════════════════════════════════════════════════════════ */}
-      {/* ── ACTION & DETAIL MODALS ──────────────────────────────── */}
-      {/* ══════════════════════════════════════════════════════════ */}
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {/* 5. ACTION & DETAIL MODALS                                      */}
+      {/* ════════════════════════════════════════════════════════════════ */}
       {modalType && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
-          <div className="bg-[#FAF8F2] border border-[#173D32]/20 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="font-extrabold text-lg text-[#173D32]">
-              {modalType === "completeTask" && `Complete Inspection: ${selectedId}`}
-              {modalType === "escalateTask" && `🚨 Escalate Task: ${selectedId} to Command`}
-              {modalType === "verifyReport" && `Verify Villager Report: ${selectedId}`}
-              {modalType === "rejectReport" && `Reject Citizen Report: ${selectedId}`}
-              {modalType === "escalateReport" && `🚨 Escalate Report: ${selectedId}`}
-              {modalType === "updateRoad" && `Update Road Condition: ${selectedId}`}
-              {modalType === "viewTask" && `Inspection Task Details: ${selectedId}`}
-              {modalType === "viewReport" && `Citizen Report Details: ${selectedId}`}
-              {modalType === "viewAlert" && `Emergency Protocol Details: ${selectedId}`}
-            </h3>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[#FAF8F2] text-[#173D32] rounded-2xl shadow-xl border border-[#173D32]/20 max-w-lg w-full p-6 space-y-4">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-[#173D32]/10">
+              <h3 className="font-bold text-base text-[#173D32] flex items-center gap-2">
+                {modalType === "completeTask" && <CheckCircle className="w-4 h-4 text-emerald-700" />}
+                {modalType === "escalateTask" && <AlertTriangle className="w-4 h-4 text-rose-700" />}
+                {modalType === "verifyReport" && <Check className="w-4 h-4 text-emerald-700" />}
+                {modalType === "rejectReport" && <X className="w-4 h-4 text-slate-700" />}
+                {modalType === "escalateReport" && <AlertTriangle className="w-4 h-4 text-rose-700" />}
+                {modalType === "updateRoad" && <Route className="w-4 h-4 text-[#173D32]" />}
+                {modalType === "viewTask" && <ClipboardList className="w-4 h-4 text-[#173D32]" />}
+                {modalType === "viewReport" && <FileText className="w-4 h-4 text-[#173D32]" />}
+                {modalType === "viewAlert" && <ShieldAlert className="w-4 h-4 text-[#173D32]" />}
 
-            {/* Complete Task Modal */}
+                <span>
+                  {modalType === "completeTask" && `Complete Inspection: ${selectedId}`}
+                  {modalType === "escalateTask" && `Escalate Task: ${selectedId}`}
+                  {modalType === "verifyReport" && `Verify Report: ${selectedId}`}
+                  {modalType === "rejectReport" && `Reject Report: ${selectedId}`}
+                  {modalType === "escalateReport" && `Escalate Report: ${selectedId}`}
+                  {modalType === "updateRoad" && `Update Road Condition: ${selectedId}`}
+                  {modalType === "viewTask" && `Task Record: ${selectedId}`}
+                  {modalType === "viewReport" && `Citizen Hazard Report: ${selectedId}`}
+                  {modalType === "viewAlert" && `Emergency Alert Protocol: ${selectedId}`}
+                </span>
+              </h3>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setModalType(null);
+                  setModalInput("");
+                  setModalInputSecondary("");
+                  setPhotoAttachment(null);
+                }}
+                className="p-1 rounded-lg hover:bg-black/5 text-[#173D32]/60 hover:text-[#173D32] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
             {modalType === "completeTask" && (
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-[#173D32]">
-                  Completion Notes / Ground Observations:
-                </label>
+              <div className="space-y-3">
+                <p className="text-xs text-[#173D32]/80">
+                  Document engineering findings and corrective actions taken during this field inspection.
+                </p>
                 <textarea
-                  rows={4}
                   value={modalInput}
                   onChange={(e) => setModalInput(e.target.value)}
-                  placeholder="Describe ground stability, mitigations conducted, culvert clearance..."
-                  className="w-full bg-white border border-[#173D32]/20 rounded-2xl p-3 text-xs outline-none focus:border-[#173D32]"
+                  placeholder="e.g. Upper ridge cracks inspected. Gabion mesh reinforced, retaining wall stable."
+                  rows={3}
+                  className="w-full p-3 rounded-xl border border-[#173D32]/20 bg-white text-xs outline-none focus:ring-1 focus:ring-[#173D32]"
                 />
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={handleCompleteTask}
+                  className="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs transition-colors cursor-pointer"
+                >
+                  {isSubmitting ? "Submitting..." : "Submit Task Completion"}
+                </button>
               </div>
             )}
 
-            {/* Escalate Task Modal */}
             {modalType === "escalateTask" && (
               <div className="space-y-3">
+                <p className="text-xs text-[#173D32]/80">
+                  Specify urgency and justify direct escalation to Central Disaster Command.
+                </p>
                 <div>
-                  <label className="text-xs font-semibold text-[#173D32] block mb-1">Escalation Priority:</label>
+                  <label className="block text-[11px] font-bold text-[#173D32]/70 uppercase mb-1">
+                    Escalation Priority
+                  </label>
                   <select
                     value={modalInputSecondary || "Critical"}
                     onChange={(e) => setModalInputSecondary(e.target.value)}
-                    className="w-full bg-white border border-[#173D32]/20 rounded-xl p-2.5 text-xs font-bold text-[#173D32] outline-none"
+                    className="w-full p-2 rounded-xl border border-[#173D32]/20 bg-white text-xs font-semibold outline-none"
                   >
-                    <option value="Critical">Critical Priority</option>
-                    <option value="High">High Priority</option>
-                    <option value="Moderate">Moderate Priority</option>
+                    <option value="Critical">Critical (Immediate Hazard)</option>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-rose-800 block mb-1">
-                    Mandatory Escalation Reason:
+                  <label className="block text-[11px] font-bold text-[#173D32]/70 uppercase mb-1">
+                    Justification
                   </label>
                   <textarea
-                    rows={4}
                     value={modalInput}
                     onChange={(e) => setModalInput(e.target.value)}
-                    placeholder="Explain why immediate senior disaster officer / excavator intervention is needed..."
-                    className="w-full bg-white border border-rose-300 rounded-2xl p-3 text-xs outline-none focus:border-rose-600"
+                    placeholder="e.g. Retaining wall deflection exceeding 40mm. Heavy equipment required."
+                    rows={3}
+                    className="w-full p-3 rounded-xl border border-[#173D32]/20 bg-white text-xs outline-none focus:ring-1 focus:ring-[#173D32]"
                   />
                 </div>
+                <button
+                  type="button"
+                  disabled={isSubmitting || !modalInput.trim()}
+                  onClick={handleEscalateTask}
+                  className="w-full py-2.5 rounded-xl bg-rose-700 hover:bg-rose-800 text-white font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? "Submitting..." : "Dispatch Escalation to Command"}
+                </button>
               </div>
             )}
 
-            {/* Verify Report Modal */}
             {modalType === "verifyReport" && (
               <div className="space-y-3">
+                <p className="text-xs text-[#173D32]/80">
+                  Confirm ground truth, add field observations, and optionally attach photographic evidence.
+                </p>
                 <div>
-                  <label className="text-xs font-semibold text-[#173D32] block mb-1">
-                    Field Verification Notes:
+                  <label className="block text-[11px] font-bold text-[#173D32]/70 uppercase mb-1">
+                    Field Notes
                   </label>
                   <textarea
-                    rows={3}
                     value={modalInput}
                     onChange={(e) => setModalInput(e.target.value)}
-                    placeholder="Document ground truth, verified crack dimensions, hazard confirmation..."
-                    className="w-full bg-white border border-[#173D32]/20 rounded-2xl p-3 text-xs outline-none focus:border-[#173D32]"
+                    placeholder="e.g. Ground inspected. Debris field active across 15 meters."
+                    rows={3}
+                    className="w-full p-3 rounded-xl border border-[#173D32]/20 bg-white text-xs outline-none focus:ring-1 focus:ring-[#173D32]"
                   />
                 </div>
+
                 <div>
-                  <label className="text-xs font-semibold text-[#173D32] block mb-1">
-                    Attach Inspector Photograph:
+                  <label className="block text-[11px] font-bold text-[#173D32]/70 uppercase mb-1">
+                    Attach Photo Evidence
                   </label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handlePhotoUpload}
-                    className="w-full text-xs text-[#173D32] file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-[#173D32] file:text-[#F8F4EC] cursor-pointer"
-                  />
-                  {photoAttachment && (
-                    <div className="mt-2">
-                      <span className="text-[10px] text-emerald-800 font-bold block mb-1">Image Preview:</span>
-                      <img src={photoAttachment} alt="Inspector observation" className="h-20 rounded-xl object-cover border" />
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#173D32]/20 bg-white text-xs font-semibold cursor-pointer hover:bg-black/5">
+                      <Camera className="w-4 h-4 text-[#173D32]/70" />
+                      <span>{photoAttachment ? "Change Photo" : "Upload Photo"}</span>
+                      <input type="file" accept="image/*" onChange={handleFileAttach} className="hidden" />
+                    </label>
+                    {photoAttachment && (
+                      <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Attached</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
+
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={handleVerifyReport}
+                  className="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs transition-colors cursor-pointer"
+                >
+                  {isSubmitting ? "Submitting..." : "Verify and Save Ground Truth"}
+                </button>
               </div>
             )}
 
-            {/* Reject Report Modal */}
             {modalType === "rejectReport" && (
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-rose-800">
-                  Mandatory Rejection Justification:
-                </label>
+              <div className="space-y-3">
+                <p className="text-xs text-[#173D32]/80">
+                  Provide mandatory justification for rejecting this report.
+                </p>
                 <textarea
-                  rows={3}
                   value={modalInput}
                   onChange={(e) => setModalInput(e.target.value)}
-                  placeholder="Explain why this observation is a false alarm or non-hazard..."
-                  className="w-full bg-white border border-rose-300 rounded-2xl p-3 text-xs outline-none focus:border-rose-600"
+                  placeholder="e.g. Site inspected. Minor loose surface gravel with no slope failure risk."
+                  rows={3}
+                  className="w-full p-3 rounded-xl border border-[#173D32]/20 bg-white text-xs outline-none focus:ring-1 focus:ring-[#173D32]"
                 />
+                <button
+                  type="button"
+                  disabled={isSubmitting || !modalInput.trim()}
+                  onClick={handleRejectReport}
+                  className="w-full py-2.5 rounded-xl bg-slate-700 hover:bg-slate-800 text-white font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? "Submitting..." : "Submit Rejection"}
+                </button>
               </div>
             )}
 
-            {/* Escalate Report Modal */}
             {modalType === "escalateReport" && (
               <div className="space-y-3">
+                <p className="text-xs text-[#173D32]/80">
+                  Directly alert Disaster Command for emergency response dispatch.
+                </p>
                 <div>
-                  <label className="text-xs font-semibold text-[#173D32] block mb-1">
-                    Escalation Reason & Urgency:
+                  <label className="block text-[11px] font-bold text-[#173D32]/70 uppercase mb-1">
+                    Escalation Reason
                   </label>
                   <textarea
-                    rows={3}
                     value={modalInput}
                     onChange={(e) => setModalInput(e.target.value)}
-                    placeholder="Explain severity threatening human habitation or vital corridor..."
-                    className="w-full bg-white border border-[#173D32]/20 rounded-2xl p-3 text-xs outline-none focus:border-[#173D32]"
+                    placeholder="e.g. Rockfall path threatens village road and power lines."
+                    rows={3}
+                    className="w-full p-3 rounded-xl border border-[#173D32]/20 bg-white text-xs outline-none focus:ring-1 focus:ring-[#173D32]"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-[#173D32] block mb-1">
-                    Recommended Action (Optional):
+                  <label className="block text-[11px] font-bold text-[#173D32]/70 uppercase mb-1">
+                    Recommended Action
                   </label>
                   <input
                     type="text"
                     value={modalInputSecondary}
                     onChange={(e) => setModalInputSecondary(e.target.value)}
-                    placeholder="E.g. Deploy SDRF rescue team, pre-position loaders..."
-                    className="w-full bg-white border border-[#173D32]/20 rounded-xl p-2.5 text-xs outline-none focus:border-[#173D32]"
+                    placeholder="e.g. Deploy temporary barricades and earthmovers"
+                    className="w-full p-2.5 rounded-xl border border-[#173D32]/20 bg-white text-xs outline-none"
                   />
                 </div>
+                <button
+                  type="button"
+                  disabled={isSubmitting || !modalInput.trim()}
+                  onClick={handleEscalateReport}
+                  className="w-full py-2.5 rounded-xl bg-rose-700 hover:bg-rose-800 text-white font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? "Submitting..." : "Escalate to Command"}
+                </button>
               </div>
             )}
 
-            {/* Update Road Modal */}
             {modalType === "updateRoad" && (
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs font-semibold text-[#173D32] block mb-1">Road Condition (Strict Enum):</label>
+                  <label className="block text-[11px] font-bold text-[#173D32]/70 uppercase mb-1">
+                    Road Condition
+                  </label>
                   <select
                     value={roadCondition}
                     onChange={(e) => setRoadCondition(e.target.value as RoadCondition)}
-                    className="w-full bg-white border border-[#173D32]/20 rounded-xl p-2.5 text-xs font-bold text-[#173D32] outline-none"
+                    className="w-full p-2.5 rounded-xl border border-[#173D32]/20 bg-white text-xs font-semibold outline-none"
                   >
-                    <option value="Open">Open</option>
-                    <option value="Caution">Caution</option>
-                    <option value="Partially Blocked">Partially Blocked</option>
-                    <option value="Blocked">Blocked</option>
+                    <option value="Open">Open (All lanes clear)</option>
+                    <option value="Caution">Caution (Slow transit / Debris on shoulder)</option>
+                    <option value="Partially Blocked">Partially Blocked (Single lane alternating)</option>
+                    <option value="Blocked">Blocked (Full closure)</option>
                   </select>
                 </div>
+
                 <div>
-                  <label className="text-xs font-semibold text-[#173D32] block mb-1">Obstruction Reason Description:</label>
+                  <label className="block text-[11px] font-bold text-[#173D32]/70 uppercase mb-1">
+                    Description & Ground Findings
+                  </label>
                   <textarea
-                    rows={3}
                     value={modalInput}
                     onChange={(e) => setModalInput(e.target.value)}
-                    placeholder="E.g. Mudslide at KM 42, single-lane alternating convoy..."
-                    className="w-full bg-white border border-[#173D32]/20 rounded-2xl p-3 text-xs outline-none focus:border-[#173D32]"
+                    placeholder="e.g. Mudslide debris cleared from lane 1; wet mud remaining on shoulder."
+                    rows={3}
+                    className="w-full p-3 rounded-xl border border-[#173D32]/20 bg-white text-xs outline-none focus:ring-1 focus:ring-[#173D32]"
                   />
                 </div>
+
                 <div>
-                  <label className="text-xs font-semibold text-[#173D32] block mb-1">Attach Condition Photo:</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handlePhotoUpload}
-                    className="w-full text-xs text-[#173D32] file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-[#173D32] file:text-[#F8F4EC] cursor-pointer"
-                  />
-                  {photoAttachment && (
-                    <div className="mt-2">
-                      <span className="text-[10px] text-emerald-800 font-bold block mb-1">Image Preview:</span>
-                      <img src={photoAttachment} alt="Road condition" className="h-20 rounded-xl object-cover border" />
-                    </div>
-                  )}
+                  <label className="block text-[11px] font-bold text-[#173D32]/70 uppercase mb-1">
+                    Attach Verification Photo
+                  </label>
+                  <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#173D32]/20 bg-white text-xs font-semibold cursor-pointer hover:bg-black/5">
+                    <Camera className="w-4 h-4 text-[#173D32]/70" />
+                    <span>{photoAttachment ? "Photo Attached" : "Select Photo"}</span>
+                    <input type="file" accept="image/*" onChange={handleFileAttach} className="hidden" />
+                  </label>
                 </div>
+
+                <button
+                  type="button"
+                  disabled={isSubmitting || !modalInput.trim()}
+                  onClick={handleRoadUpdate}
+                  className="w-full py-2.5 rounded-xl bg-[#173D32] hover:bg-[#1f4e40] text-[#F8F4EC] font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? "Submitting..." : "Broadcast Road Update"}
+                </button>
               </div>
             )}
 
-            {/* Detailed View Modal: Task */}
             {modalType === "viewTask" && selectedTaskObj && (
               <div className="space-y-3 text-xs">
-                <div className="p-3 bg-white/70 rounded-2xl border border-[#173D32]/10 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-[#173D32]">Status:</span>
-                    <span className="font-bold px-2 py-0.5 rounded-full bg-[#173D32]/10">{selectedTaskObj.status}</span>
-                  </div>
-                  <div>
-                    <span className="font-bold text-[#173D32] block">Location:</span>
-                    <span>{getTaskLocation(selectedTaskObj)}</span>
-                  </div>
-                  <div>
-                    <span className="font-bold text-[#173D32] block">GPS Coordinates:</span>
-                    <span className="font-mono">{getTaskCoordinates(selectedTaskObj)}</span>
-                  </div>
-                  <div>
-                    <span className="font-bold text-[#173D32] block">Risk & Priority:</span>
-                    <span>{selectedTaskObj.riskLevel} Risk • Priority: {selectedTaskObj.priority || selectedTaskObj.riskLevel}</span>
-                  </div>
-                  <div>
-                    <span className="font-bold text-[#173D32] block">Inspection Reason:</span>
-                    <p className="leading-relaxed">{selectedTaskObj.reason}</p>
-                  </div>
-                  <div>
-                    <span className="font-bold text-[#173D32] block">Deadline:</span>
-                    <span>{new Date(selectedTaskObj.deadline).toLocaleString()}</span>
-                  </div>
-                  {getTaskNotes(selectedTaskObj) && (
-                    <div>
-                      <span className="font-bold text-[#173D32] block">Officer Notes:</span>
-                      <span>{getTaskNotes(selectedTaskObj)}</span>
-                    </div>
-                  )}
+                <div>
+                  <span className="text-[#173D32]/60 font-medium block">Title</span>
+                  <span className="font-bold text-sm text-[#173D32]">{selectedTaskObj.title || getTaskLocation(selectedTaskObj)}</span>
                 </div>
+                <div>
+                  <span className="text-[#173D32]/60 font-medium block">Location</span>
+                  <span>{getTaskLocation(selectedTaskObj)}</span>
+                  <span className="font-mono block text-[#173D32]/60">{getTaskCoordinates(selectedTaskObj)}</span>
+                </div>
+                <div>
+                  <span className="text-[#173D32]/60 font-medium block">Risk & Priority</span>
+                  <span>{selectedTaskObj.riskLevel} Risk • Priority: {selectedTaskObj.priority || selectedTaskObj.riskLevel}</span>
+                </div>
+                <div>
+                  <span className="text-[#173D32]/60 font-medium block">Reason</span>
+                  <p className="bg-white p-2.5 rounded-xl border border-[#173D32]/10">{selectedTaskObj.reason}</p>
+                </div>
+                {getTaskNotes(selectedTaskObj) && (
+                  <div>
+                    <span className="text-[#173D32]/60 font-medium block">Field Notes</span>
+                    <p className="bg-emerald-50 p-2.5 rounded-xl border border-emerald-200 text-emerald-900">{getTaskNotes(selectedTaskObj)}</p>
+                  </div>
+                )}
+                {getTaskEscalationReason(selectedTaskObj) && (
+                  <div>
+                    <span className="text-[#173D32]/60 font-medium block">Escalation Justification</span>
+                    <p className="bg-rose-50 p-2.5 rounded-xl border border-rose-200 text-rose-900">{getTaskEscalationReason(selectedTaskObj)}</p>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Detailed View Modal: Report */}
             {modalType === "viewReport" && selectedReportObj && (
               <div className="space-y-3 text-xs">
-                <div className="p-3 bg-white/70 rounded-2xl border border-[#173D32]/10 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-[#173D32]">Status:</span>
-                    <span className="font-bold px-2 py-0.5 rounded-full bg-[#173D32]/10">{selectedReportObj.status}</span>
-                  </div>
-                  <div>
-                    <span className="font-bold text-[#173D32] block">Hazard Type:</span>
-                    <span>{selectedReportObj.hazardType}</span>
-                  </div>
-                  <div>
-                    <span className="font-bold text-[#173D32] block">Description:</span>
-                    <p className="leading-relaxed">{selectedReportObj.locationDescription}</p>
-                  </div>
-                  <div>
-                    <span className="font-bold text-[#173D32] block">Reported By:</span>
-                    <span>{selectedReportObj.villagerName} ({selectedReportObj.contact})</span>
-                  </div>
-                  <div>
-                    <span className="font-bold text-[#173D32] block">Timestamp:</span>
-                    <span>{new Date(selectedReportObj.timestamp).toLocaleString()}</span>
-                  </div>
-                  {selectedReportObj.photoUrl && (
-                    <div>
-                      <span className="font-bold text-[#173D32] block mb-1">Citizen Photo:</span>
-                      <img src={selectedReportObj.photoUrl} alt="Hazard evidence" className="w-full h-44 object-cover rounded-xl border" />
-                    </div>
-                  )}
-                  {selectedReportObj.fieldNotes && (
-                    <div>
-                      <span className="font-bold text-[#173D32] block">Verification Field Notes:</span>
-                      <span>{selectedReportObj.fieldNotes}</span>
-                    </div>
-                  )}
+                <div>
+                  <span className="text-[#173D32]/60 font-medium block">Caller Name</span>
+                  <span className="font-bold text-[#173D32]">{selectedReportObj.villagerName} ({selectedReportObj.contact})</span>
                 </div>
+                <div>
+                  <span className="text-[#173D32]/60 font-medium block">Hazard</span>
+                  <span>{selectedReportObj.hazardType}</span>
+                </div>
+                <div>
+                  <span className="text-[#173D32]/60 font-medium block">Description</span>
+                  <p className="bg-white p-2.5 rounded-xl border border-[#173D32]/10">{selectedReportObj.locationDescription}</p>
+                </div>
+                {selectedReportObj.fieldNotes && (
+                  <div>
+                    <span className="text-[#173D32]/60 font-medium block">Field Officer Ground Truth</span>
+                    <p className="bg-emerald-50 p-2.5 rounded-xl border border-emerald-200 text-emerald-900">{selectedReportObj.fieldNotes}</p>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Detailed View Modal: Alert */}
             {modalType === "viewAlert" && selectedAlertObj && (
               <div className="space-y-3 text-xs">
-                <div className="p-3 bg-white/70 rounded-2xl border border-[#173D32]/10 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-[#173D32]">Severity:</span>
-                    <span className="font-black px-2 py-0.5 rounded-full bg-rose-600 text-white uppercase">{selectedAlertObj.severity}</span>
-                  </div>
-                  <div>
-                    <span className="font-bold text-[#173D32] block">Bulletin Title:</span>
-                    <span className="font-semibold text-sm">{selectedAlertObj.title}</span>
-                  </div>
-                  <div>
-                    <span className="font-bold text-[#173D32] block">Dispatched:</span>
-                    <span>{new Date(selectedAlertObj.createdAt).toLocaleString()}</span>
-                  </div>
-                  <div>
-                    <span className="font-bold text-[#173D32] block mb-1">Standard Action Protocol:</span>
-                    <pre className="whitespace-pre-wrap font-sans bg-white p-3 rounded-xl border text-[11px] leading-relaxed">
-                      {selectedAlertObj.instructions}
-                    </pre>
-                  </div>
+                <div>
+                  <span className="text-[#173D32]/60 font-medium block">Severity & Title</span>
+                  <span className="font-bold text-sm text-[#173D32]">{selectedAlertObj.severity} — {selectedAlertObj.title}</span>
+                </div>
+                <div>
+                  <span className="text-[#173D32]/60 font-medium block">Official Protocol Instructions</span>
+                  <p className="bg-white p-2.5 rounded-xl border border-[#173D32]/10">{selectedAlertObj.instructions}</p>
+                </div>
+                <div>
+                  <span className="text-[#173D32]/60 font-medium block">Acknowledgement Status</span>
+                  <span>{selectedAlertObj.acknowledged ? `Acknowledged at ${selectedAlertObj.acknowledgedAt}` : "Pending Officer Acknowledgment"}</span>
                 </div>
               </div>
             )}
 
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#173D32]/10">
+            <div className="pt-2">
               <button
                 type="button"
                 onClick={() => {
                   setModalType(null);
+                  setModalInput("");
+                  setModalInputSecondary("");
                   setPhotoAttachment(null);
                 }}
-                className="px-4 py-2 rounded-xl border border-[#173D32]/20 text-xs font-bold hover:bg-[#173D32]/5 cursor-pointer"
+                className="w-full py-2 rounded-xl border border-[#173D32]/20 text-[#173D32] text-xs font-semibold hover:bg-black/5 transition-colors cursor-pointer"
               >
-                {modalType.startsWith("view") ? "Close" : "Cancel"}
+                Close
               </button>
-
-              {!modalType.startsWith("view") && (
-                <button
-                  type="button"
-                  disabled={isSubmitting}
-                  onClick={() => {
-                    if (modalType === "completeTask") handleCompleteTask();
-                    if (modalType === "escalateTask") handleEscalateTask();
-                    if (modalType === "verifyReport") handleVerifyReport();
-                    if (modalType === "rejectReport") handleRejectReport();
-                    if (modalType === "escalateReport") handleEscalateReport();
-                    if (modalType === "updateRoad") handleRoadUpdate();
-                  }}
-                  className="px-4 py-2 rounded-xl bg-[#173D32] text-[#F8F4EC] text-xs font-bold hover:bg-[#1f4e40] cursor-pointer disabled:opacity-50"
-                >
-                  {isSubmitting ? "Submitting..." : "Confirm & Submit"}
-                </button>
-              )}
             </div>
           </div>
         </div>

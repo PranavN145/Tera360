@@ -5,6 +5,18 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useApp } from "@/context/AppContext";
 import { getRolePortalPath, ApiClientError } from "@/lib/api";
+import {
+  User as UserIcon,
+  ShieldAlert,
+  Radio,
+  Zap,
+  BarChart3,
+  Truck,
+  Info,
+  AlertCircle,
+  ArrowRight,
+  Loader2,
+} from "lucide-react";
 
 type RoleOption = "citizen" | "field-officer" | "disaster-command";
 
@@ -41,8 +53,11 @@ function LoginForm() {
   // If already logged in, redirect to appropriate portal
   React.useEffect(() => {
     if (user) {
-      if (user.role === "field_officer" || user.role === "officer") {
-        const destination = redirectParam || (user.role === "field_officer" ? "/officer" : "/officer/dashboard");
+      if (user.role === "field_officer" || (user.role as string) === "field-officer") {
+        const destination = redirectParam || "/field";
+        router.replace(destination);
+      } else if (user.role === "officer") {
+        const destination = redirectParam || "/officer/dashboard";
         router.replace(destination);
       } else {
         const destination = redirectParam || getRolePortalPath(user.role);
@@ -67,7 +82,7 @@ function LoginForm() {
 
       if (selectedRole === "field-officer") {
         roleHeader = "field-officer";
-        destination = redirectParam || "/officer";
+        destination = redirectParam || "/field";
       } else if (selectedRole === "disaster-command") {
         roleHeader = "officer";
         destination = redirectParam || "/officer/dashboard";
@@ -80,8 +95,8 @@ function LoginForm() {
       });
 
       if (!destination) {
-        if (selectedRole === "field-officer" || loggedInUser.role === "field_officer") {
-          destination = "/officer";
+        if (selectedRole === "field-officer" || loggedInUser.role === "field_officer" || (loggedInUser.role as string) === "field-officer") {
+          destination = "/field";
         } else {
           destination = getRolePortalPath(loggedInUser.role);
         }
@@ -95,7 +110,7 @@ function LoginForm() {
       } else if (err instanceof Error) {
         setErrorMessage(err.message);
       } else {
-        setErrorMessage("An unexpected error occurred. Please try again.");
+        setErrorMessage("An unexpected authentication error occurred. Please try again.");
       }
     } finally {
       setIsLoading(false);
@@ -115,7 +130,7 @@ function LoginForm() {
         password: "Password123!",
         role: "field-officer",
       });
-      router.push(redirectParam || "/officer");
+      router.push(redirectParam || "/field");
     } catch (err: unknown) {
       if (err instanceof ApiClientError) {
         setErrorMessage(err.message);
@@ -143,8 +158,8 @@ function LoginForm() {
 
       const destination =
         redirectParam ||
-        (roleType === "field-officer" || loggedInUser.role === "field_officer"
-          ? "/officer"
+        (roleType === "field-officer" || loggedInUser.role === "field_officer" || (loggedInUser.role as string) === "field-officer"
+          ? "/field"
           : getRolePortalPath(loggedInUser.role));
 
       router.push(destination);
@@ -152,7 +167,7 @@ function LoginForm() {
       if (err instanceof ApiClientError) {
         setErrorMessage(err.message);
       } else {
-        setErrorMessage("Demo login failed. Make sure the backend server is running.");
+        setErrorMessage("Demo login failed. Ensure the backend server is reachable.");
       }
     } finally {
       setIsLoading(false);
@@ -161,10 +176,10 @@ function LoginForm() {
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center p-4 sm:p-6 bg-[#FAF8F2]">
-      <div className="w-full max-w-lg bg-[#F8F4EC] border border-[#173D32]/15 rounded-3xl p-6 sm:p-8 shadow-xl text-[#173D32]">
-        {/* Brand / Header */}
+      <div className="w-full max-w-lg bg-[#F8F4EC] border border-[#173D32]/15 rounded-3xl p-6 sm:p-8 shadow-sm text-[#173D32]">
+        {/* Brand Header */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#DCE8D1]/70 text-[11px] font-bold text-[#173D32] mb-2 uppercase tracking-wider">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#DCE8D4]/70 text-[11px] font-bold text-[#173D32] mb-2 uppercase tracking-wider">
             Terra360 Platform
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#173D32]">
@@ -175,13 +190,13 @@ function LoginForm() {
           </p>
         </div>
 
-        {/* Informational Redirect Notice */}
+        {/* Informational Notice */}
         {noticeParam && (
-          <div className="mb-5 p-3.5 rounded-2xl bg-[#D6A65D]/15 border border-[#D6A65D]/40 text-xs sm:text-sm text-[#173D32] flex items-start gap-2.5 animate-in fade-in">
-            <span className="font-bold text-base leading-none text-[#173D32]">ℹ️</span>
+          <div className="mb-5 p-3.5 rounded-2xl bg-[#D6A65D]/15 border border-[#D6A65D]/40 text-xs text-[#173D32] flex items-start gap-2.5">
+            <Info className="w-4 h-4 text-[#D6A65D] shrink-0 mt-0.5" />
             <div className="flex-1 leading-relaxed">
               <span className="font-bold block mb-0.5">Field Officer Clearance Required</span>
-              The requested page (<code className="font-mono bg-white/60 px-1 py-0.5 rounded text-[11px]">{redirectParam || "/officer"}</code>) requires an active Field Officer or Operations clearance. Please sign in with your Field Officer credentials.
+              The requested view (<code className="font-mono bg-white/60 px-1 py-0.5 rounded text-[11px]">{redirectParam || "/field"}</code>) requires an active Field Officer dispatch session. Please authenticate below.
             </div>
           </div>
         )}
@@ -189,19 +204,13 @@ function LoginForm() {
         {/* Error Alert */}
         {errorMessage && (
           <div
-            className={`mb-5 p-3.5 rounded-2xl border text-xs sm:text-sm flex items-start gap-2.5 animate-in fade-in duration-200 ${
+            className={`mb-5 p-3.5 rounded-2xl border text-xs flex items-start gap-2.5 ${
               errorCode === "ACCOUNT_LOCKED"
                 ? "bg-amber-50 border-amber-300 text-amber-900"
                 : "bg-red-50 border-red-200 text-red-700"
             }`}
           >
-            <span
-              className={`font-bold text-base leading-none ${
-                errorCode === "ACCOUNT_LOCKED" ? "text-amber-700" : "text-red-800"
-              }`}
-            >
-              !
-            </span>
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <div className="flex-1 leading-relaxed">
               {errorCode === "ACCOUNT_LOCKED" && (
                 <div className="font-bold text-amber-950 mb-0.5">Account Temporarily Locked</div>
@@ -211,25 +220,25 @@ function LoginForm() {
           </div>
         )}
 
-        {/* ── 3-WAY ROLE SELECTOR TABS ─────────────────────────────────── */}
+        {/* 3-Way Role Selector */}
         <div className="mb-6">
           <label className="block text-[11px] font-bold text-[#173D32]/70 uppercase tracking-wider mb-2 text-center">
             Select Your Role
           </label>
-          <div className="grid grid-cols-3 gap-1.5 p-1.5 rounded-2xl bg-[#DCE8D1]/40 border border-[#173D32]/15">
+          <div className="grid grid-cols-3 gap-1.5 p-1.5 rounded-2xl bg-[#DCE8D4]/40 border border-[#173D32]/15">
             <button
               type="button"
               onClick={() => {
                 setSelectedRole("citizen");
                 setErrorMessage(null);
               }}
-              className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer ${
+              className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer ${
                 selectedRole === "citizen"
-                  ? "bg-[#173D32] text-[#F8F4EC] shadow-md"
+                  ? "bg-[#173D32] text-[#F8F4EC] shadow-sm"
                   : "text-[#173D32]/70 hover:text-[#173D32] hover:bg-white/40"
               }`}
             >
-              <span>👤</span>
+              <UserIcon className="w-3.5 h-3.5" />
               <span className="truncate">Citizen / User</span>
             </button>
 
@@ -239,14 +248,14 @@ function LoginForm() {
                 setSelectedRole("field-officer");
                 setErrorMessage(null);
               }}
-              className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer ${
+              className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer ${
                 selectedRole === "field-officer"
-                  ? "bg-[#173D32] text-[#F8F4EC] shadow-md ring-2 ring-[#D6A65D]/50"
+                  ? "bg-[#173D32] text-[#F8F4EC] shadow-sm ring-1 ring-[#D6A65D]/60"
                   : "text-[#173D32]/70 hover:text-[#173D32] hover:bg-white/40"
               }`}
             >
-              <span>👮</span>
-              <span className="truncate">Field Officer</span>
+              <ShieldAlert className="w-3.5 h-3.5" />
+              <span className="truncate">Field Direct View</span>
             </button>
 
             <button
@@ -255,21 +264,21 @@ function LoginForm() {
                 setSelectedRole("disaster-command");
                 setErrorMessage(null);
               }}
-              className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer ${
+              className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer ${
                 selectedRole === "disaster-command"
-                  ? "bg-[#173D32] text-[#F8F4EC] shadow-md"
+                  ? "bg-[#173D32] text-[#F8F4EC] shadow-sm"
                   : "text-[#173D32]/70 hover:text-[#173D32] hover:bg-white/40"
               }`}
             >
-              <span>📡</span>
+              <Radio className="w-3.5 h-3.5" />
               <span className="truncate">Disaster Command</span>
             </button>
           </div>
         </div>
 
-        {/* ── ROLE-SPECIFIC QUICK DEMO CARD ──────────────────────────── */}
+        {/* Demo Account Quick Access Card */}
         {selectedRole === "field-officer" ? (
-          <div className="mb-6 p-4 rounded-2xl bg-[#FAF8F2] border border-[#173D32]/15 shadow-xs">
+          <div className="mb-6 p-4 rounded-2xl bg-[#FAF8F2] border border-[#173D32]/15">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-bold uppercase tracking-wider text-[#173D32]/70">
                 Evaluation Access
@@ -282,18 +291,19 @@ function LoginForm() {
               type="button"
               disabled={isLoading}
               onClick={handleDemoOfficerLogin}
-              className="w-full text-left p-3 rounded-xl bg-gradient-to-r from-[#173D32] to-[#1f4e40] text-[#F8F4EC] hover:brightness-110 border border-[#D6A65D]/40 shadow-sm transition-all cursor-pointer disabled:opacity-60 group"
+              className="w-full text-left p-3 rounded-xl bg-[#173D32] text-[#F8F4EC] hover:bg-[#1f4e40] border border-[#D6A65D]/30 transition-all cursor-pointer disabled:opacity-60"
             >
               <div className="flex items-center justify-between">
-                <span className="font-extrabold text-xs sm:text-sm text-[#F8F4EC] flex items-center gap-1.5">
-                  ⚡ Demo Officer Login (Officer K. Patil)
+                <span className="font-bold text-xs sm:text-sm text-[#F8F4EC] flex items-center gap-1.5">
+                  <Zap className="w-3.5 h-3.5 text-[#D6A65D]" />
+                  <span>Demo Field Officer (Officer K. Patil)</span>
                 </span>
-                <span className="text-[10px] bg-[#D6A65D] text-[#173D32] font-black px-2 py-0.5 rounded-md uppercase">
+                <span className="text-[10px] bg-[#D6A65D] text-[#173D32] font-extrabold px-2 py-0.5 rounded uppercase">
                   Instant
                 </span>
               </div>
-              <p className="text-[11px] text-[#DCE8D1] mt-1 leading-relaxed">
-                Pre-fills ID <strong className="font-mono text-[#D6A65D]">OFF-2026-094</strong> • Sector 4 - Hill Highway Corridors • Disaster & Landslide Unit
+              <p className="text-[11px] text-[#DCE8D4] mt-1 leading-relaxed">
+                ID <strong className="font-mono text-[#D6A65D]">OFF-2026-094</strong> • Sector 4 - Hill Highway Corridors • Direct View
               </p>
             </button>
           </div>
@@ -309,7 +319,8 @@ function LoginForm() {
               className="w-full px-3 py-2 rounded-xl bg-[#F8F4EC] hover:bg-[#DCE8D1] border border-[#173D32]/20 text-[#173D32] transition-colors text-left flex items-center justify-between text-xs font-semibold cursor-pointer disabled:opacity-50"
             >
               <span className="flex items-center gap-1.5">
-                <span>📊</span> Vikram Sharma (Central Command)
+                <BarChart3 className="w-3.5 h-3.5 text-[#173D32]/70" />
+                <span>Vikram Sharma (Central Command)</span>
               </span>
               <span className="text-[10px] opacity-70 font-mono">officer@terra360.in</span>
             </button>
@@ -326,7 +337,8 @@ function LoginForm() {
                 onClick={() => handleDemoLogin("citizen@terra360.in", "citizen")}
                 className="px-2.5 py-2 rounded-xl bg-[#F8F4EC] hover:bg-[#DCE8D1] border border-[#173D32]/15 text-[#173D32] transition-colors text-left flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
               >
-                <span>👤</span> Citizen
+                <UserIcon className="w-3.5 h-3.5 text-[#173D32]/70" />
+                <span>Citizen</span>
               </button>
               <button
                 type="button"
@@ -334,13 +346,14 @@ function LoginForm() {
                 onClick={() => handleDemoLogin("driver@terra360.in", "citizen")}
                 className="px-2.5 py-2 rounded-xl bg-[#F8F4EC] hover:bg-[#DCE8D1] border border-[#173D32]/15 text-[#173D32] transition-colors text-left flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
               >
-                <span>🚛</span> Commercial Driver
+                <Truck className="w-3.5 h-3.5 text-[#173D32]/70" />
+                <span>Driver</span>
               </button>
             </div>
           </div>
         )}
 
-        {/* ── CREDENTIALS FORM ────────────────────────────────────────── */}
+        {/* Credentials Form */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
             <label
@@ -368,7 +381,7 @@ function LoginForm() {
               onChange={(e) => setIdentifier(e.target.value)}
               required
               disabled={isLoading}
-              className="w-full h-11 px-4 rounded-xl bg-[#FAF8F2] border border-[#173D32]/20 text-sm text-[#173D32] placeholder:text-[#173D32]/40 focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60"
+              className="w-full h-11 px-4 rounded-xl bg-[#FAF8F2] border border-[#173D32]/20 text-sm text-[#173D32] placeholder:text-[#173D32]/40 focus:outline-none focus:ring-1 focus:ring-[#173D32] disabled:opacity-60 font-sans"
             />
           </div>
 
@@ -382,7 +395,7 @@ function LoginForm() {
               </label>
               <Link
                 href="/forgot-password"
-                className="text-xs font-semibold text-[#173D32]/70 hover:text-[#173D32] hover:underline"
+                className="text-xs font-medium text-[#173D32]/70 hover:text-[#173D32] hover:underline"
               >
                 Forgot password?
               </Link>
@@ -396,26 +409,35 @@ function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
               required
               disabled={isLoading}
-              className="w-full h-11 px-4 rounded-xl bg-[#FAF8F2] border border-[#173D32]/20 text-sm text-[#173D32] focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60"
+              className="w-full h-11 px-4 rounded-xl bg-[#FAF8F2] border border-[#173D32]/20 text-sm text-[#173D32] focus:outline-none focus:ring-1 focus:ring-[#173D32] disabled:opacity-60"
             />
           </div>
 
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full h-12 mt-2 rounded-full bg-[#173D32] hover:bg-[#1f4e40] text-[#F8F4EC] text-sm font-bold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+            className="w-full h-11 mt-2 rounded-xl bg-[#173D32] hover:bg-[#1f4e40] text-[#F8F4EC] text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
           >
             {isLoading ? (
               <>
-                <div className="w-4 h-4 border-2 border-[#F8F4EC]/30 border-t-[#F8F4EC] rounded-full animate-spin" />
-                <span>Authenticating with Terra360...</span>
+                <Loader2 className="w-4 h-4 animate-spin text-[#F8F4EC]" />
+                <span>Authenticating...</span>
               </>
             ) : selectedRole === "field-officer" ? (
-              "Sign In to Field Operations (/officer)"
+              <>
+                <span>Sign In to Field Direct View</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </>
             ) : selectedRole === "disaster-command" ? (
-              "Sign In to Disaster Command Desk"
+              <>
+                <span>Sign In to Disaster Command</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </>
             ) : (
-              "Sign In as Citizen / User"
+              <>
+                <span>Sign In as Citizen</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </>
             )}
           </button>
         </form>
@@ -439,7 +461,7 @@ export default function LoginPage() {
     <Suspense
       fallback={
         <div className="min-h-[85vh] flex items-center justify-center bg-[#FAF8F2]">
-          <div className="w-8 h-8 border-2 border-[#173D32]/20 border-t-[#173D32] rounded-full animate-spin" />
+          <div className="w-6 h-6 border-2 border-[#173D32]/20 border-t-[#173D32] rounded-full animate-spin" />
         </div>
       }
     >
