@@ -131,3 +131,4 @@ export default function PortalMetricCard({
 
   return content;
 }
+
