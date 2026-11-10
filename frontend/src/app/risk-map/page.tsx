@@ -81,6 +81,7 @@ function resolveMapCoordinates(
 export default function RiskMapPage() {
   const { openAlertModal, openReportModal, addToast } = useApp();
   const [selectedState, setSelectedState] = useState("All States");
+  const [selectedCorridor, setSelectedCorridor] = useState<string | null>(null);
   const [selectedSeverity, setSelectedSeverity] = useState("All");
   const [search, setSearch] = useState("");
   const [activeLayer, setActiveLayer] = useState<"topo" | "rainfall">("topo");
@@ -146,6 +147,7 @@ export default function RiskMapPage() {
 
   const handleSelectState = (s: string) => {
     setSelectedState(s);
+    setSelectedCorridor(null);
     // Directly invoke map camera navigation for responsive feedback
     if (typeof window !== "undefined" && typeof (window as any).__riskMapFlyToState === "function") {
       (window as any).__riskMapFlyToState(s);
@@ -376,8 +378,10 @@ export default function RiskMapPage() {
           <RiskMap
             variant="full"
             selectedState={selectedState}
+            selectedCorridor={selectedCorridor}
             className="w-full h-full"
             onSelectCorridor={(corridorId) => {
+              setSelectedCorridor(corridorId);
               const matched = corridors.find(
                 (c) =>
                   c.code.toLowerCase().includes(corridorId.toLowerCase()) ||
@@ -477,7 +481,10 @@ export default function RiskMapPage() {
             return (
               <article
                 key={corridor.id}
-                onClick={() => openAlertModal(alert)}
+                onClick={() => {
+                  setSelectedCorridor(corridor.code || corridor.name);
+                  openAlertModal(alert);
+                }}
                 className="relative bg-[#FAF8F2]/95 backdrop-blur-sm rounded-[26px] border border-[#173D32]/12 p-6 sm:p-7 shadow-[0_6px_28px_-6px_rgba(23,61,50,0.07)] hover:shadow-[0_18px_36px_-6px_rgba(23,61,50,0.14)] hover:-translate-y-1.5 transition-all duration-300 flex flex-col justify-between group cursor-pointer overflow-hidden"
               >
                 {/* Top Status Glow Bar */}
@@ -567,6 +574,7 @@ export default function RiskMapPage() {
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
+                      setSelectedCorridor(corridor.code || corridor.name);
                       openAlertModal(alert);
                     }}
                     className="inline-flex items-center gap-1.5 text-xs font-bold text-[#F6F4EC] bg-[#173D32] group-hover:bg-[#1a4437] px-4 py-1.5 rounded-full transition-all duration-200 cursor-pointer shadow-xs group-hover:shadow"

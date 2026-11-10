@@ -6,9 +6,13 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import {
   rescueRoute,
   getStatePreset,
+  getCorridorTelemetry,
+  STATE_CORRIDOR_TELEMETRY,
   computeSimulatedCorridorRoutes,
   computeSimulatedSensors,
 } from "../data/mockLandslideData.js";
+
+export type CorridorTelemetryData = typeof STATE_CORRIDOR_TELEMETRY[keyof typeof STATE_CORRIDOR_TELEMETRY];
 
 // Read token securely from environment variable (Next.js or Vite)
 const MAPBOX_ACCESS_TOKEN: string =
@@ -225,6 +229,8 @@ export interface RiskMapProps {
   bearing?: number;
   /** Optional state filter to trigger camera fly-to */
   selectedState?: string;
+  /** Optional active corridor code or name to sync telemetry HUD */
+  selectedCorridor?: string | null;
   /** Override visibility of top-left Live Corridor HUD (defaults to true for 'full' and 'dashboard', false for 'mini') */
   showHud?: boolean;
   /** Optional legacy showPlayback flag (kept for backwards compatibility) */
@@ -236,7 +242,7 @@ export interface RiskMapProps {
   /** Position of Mapbox ScaleControl when enabled (defaults to 'bottom-right') */
   scalePosition?: "bottom-left" | "bottom-right";
   /** Optional corridor click callback */
-  onSelectCorridor?: (corridorId: string, properties: Record<string, any>) => void;
+  onSelectCorridor?: (corridorId: string, properties?: Record<string, any>) => void;
   /** Optional hotspots to display as interactive regional markers */
   hotspots?: RiskMapHotspot[];
   /** Currently focused hotspot id */
@@ -280,6 +286,7 @@ export default function RiskMap({
   pitch = 60,
   bearing = -20,
   selectedState,
+  selectedCorridor,
   showHud,
   showPlayback,
   showControls = true,
@@ -304,6 +311,15 @@ export default function RiskMap({
     terrainMode ? TERRAIN_STYLE_MAP[terrainMode] : "mapbox://styles/mapbox/light-v11"
   );
   const selectedStateRef = useRef<string | undefined>(selectedState);
+
+  // Unified active corridor telemetry state driving the Live Corridor HUD
+  const [activeTelemetry, setActiveTelemetry] = useState<CorridorTelemetryData>(() =>
+    getCorridorTelemetry(selectedCorridor || selectedState || "All States")
+  );
+
+  useEffect(() => {
+    setActiveTelemetry(getCorridorTelemetry(selectedCorridor || selectedState || "All States"));
+  }, [selectedState, selectedCorridor]);
 
   // Camera navigation helper with smooth flyTo animation across Northeast states
   const navigateToState = React.useCallback(
@@ -735,6 +751,7 @@ export default function RiskMap({
 
       el.addEventListener("click", (ev) => {
         ev.stopPropagation();
+        setActiveTelemetry(getCorridorTelemetry(hotspot.code || hotspot.state || hotspot.title));
         if (onSelectHotspotRef.current) {
           onSelectHotspotRef.current(hotspot);
         }
@@ -930,18 +947,8 @@ export default function RiskMap({
     [syncHotspotMarkers, syncObstacleMarkerVisibility]
   );
 
-  // Target segment (NH-29 Pherima Slide Cut) live telemetry values
-  const targetSegment = simulatedCorridorData.features.find(
-    (f: any) => f.properties?.id === "nh29-seg-3"
-  );
-  const targetProps = (targetSegment?.properties || {
-    status: "critical",
-    soil_moisture_pct: 84,
-    pore_water_pressure_kpa: 210,
-    tilt_rate_mm_h: 0.28,
-  }) as Record<string, any>;
-  const isPorePressureCritical = (targetProps.pore_water_pressure_kpa || 0) >= 200;
-  const rainfallIntensity = 84;
+  // Target segment & live telemetry values bound to unified activeTelemetry state
+  const isPorePressureCritical = activeTelemetry.isCritical;
 
   // Resolve initial camera position based on selectedState preset or passed center/zoom props
   const statePreset = selectedState ? getStatePreset(selectedState) : null;
@@ -1625,6 +1632,11 @@ export default function RiskMap({
         if (!e.features || !e.features[0]) return;
         const feature = e.features[0] as any;
         const props = (feature.properties || {}) as Record<string, any>;
+        const corridorKey = props.corridor || props.code || props.state || props.segment_name;
+
+        if (corridorKey) {
+          setActiveTelemetry(getCorridorTelemetry(corridorKey));
+        }
 
         if (onSelectCorridorRef.current) {
           onSelectCorridorRef.current(
@@ -1745,6 +1757,10 @@ export default function RiskMap({
       map.on("click", "regional-corridors-layer", (e) => {
         if (!e.features || !e.features[0]) return;
         const props = ((e.features[0] as any).properties || {}) as Record<string, any>;
+        const corridorKey = props.code || props.state || props.name || props.id;
+        if (corridorKey) {
+          setActiveTelemetry(getCorridorTelemetry(corridorKey));
+        }
         if (onSelectCorridorRef.current) {
           onSelectCorridorRef.current(props.code || props.id || "corridor", props);
         }
@@ -2232,6 +2248,43 @@ export default function RiskMap({
     }
   }, [simulatedCorridorData, simulatedSensorsData, isPorePressureCritical]);
 
+  // Dynamically highlight active corridor on regional corridors layer
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    try {
+      if (map.getLayer("regional-corridors-layer")) {
+        const badgeLower = (activeTelemetry.corridorBadge || "").toLowerCase();
+        map.setPaintProperty("regional-corridors-layer", "line-width", [
+          "case",
+          ["==", ["downcase", ["to-string", ["get", "code"]]], badgeLower],
+          8,
+          ["interpolate", ["linear"], ["zoom"], 6, 3, 12, 5],
+        ]);
+      }
+    } catch {
+      // non-blocking style synchronization
+    }
+  }, [activeTelemetry]);
+
+  // When an explicit corridor is selected, smoothly fly camera to its coordinates
+  useEffect(() => {
+    if (selectedCorridor && activeTelemetry?.coordinates) {
+      const map = mapInstanceRef.current;
+      if (map) {
+        map.flyTo({
+          center: activeTelemetry.coordinates as [number, number],
+          zoom: 10,
+          pitch: 55,
+          bearing: 0,
+          essential: true,
+          duration: 1800,
+        });
+      }
+    }
+  }, [selectedCorridor, activeTelemetry]);
+
   return (
     <div
       className={`relative w-full h-full min-h-[400px] overflow-hidden ${className}`}
@@ -2275,11 +2328,23 @@ export default function RiskMap({
           {variant === "mini" ? (
             <div className="flex items-center gap-2">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-600" />
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                  activeTelemetry.statusSeverity === "critical"
+                    ? "bg-red-400"
+                    : activeTelemetry.statusSeverity === "warning"
+                      ? "bg-amber-400"
+                      : "bg-emerald-400"
+                }`} />
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${
+                  activeTelemetry.statusSeverity === "critical"
+                    ? "bg-red-600"
+                    : activeTelemetry.statusSeverity === "warning"
+                      ? "bg-amber-500"
+                      : "bg-emerald-600"
+                }`} />
               </span>
               <span className="text-[10px] font-black uppercase tracking-wider text-[#173D32]">
-                3D GIS · NH-29
+                3D GIS · {activeTelemetry.corridorBadge || "NER"}
               </span>
             </div>
           ) : (
@@ -2288,8 +2353,20 @@ export default function RiskMap({
               <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-[#173D32]/10">
                 <div className="flex items-center gap-2">
                   <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-600" />
+                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                      activeTelemetry.statusSeverity === "critical"
+                        ? "bg-red-400"
+                        : activeTelemetry.statusSeverity === "warning"
+                          ? "bg-amber-400"
+                          : "bg-emerald-400"
+                    }`} />
+                    <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
+                      activeTelemetry.statusSeverity === "critical"
+                        ? "bg-red-600"
+                        : activeTelemetry.statusSeverity === "warning"
+                          ? "bg-amber-500"
+                          : "bg-emerald-600"
+                    }`} />
                   </span>
                   <span className="text-[11px] font-black uppercase tracking-wider text-[#173D32]">
                     Live Corridor HUD
@@ -2298,7 +2375,7 @@ export default function RiskMap({
 
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#173D32]/10 text-[#173D32]">
-                    NH-29
+                    {activeTelemetry.corridorBadge || "NER"}
                   </span>
                   <button
                     type="button"
@@ -2317,53 +2394,58 @@ export default function RiskMap({
             <div className="space-y-2 mt-3 mb-3.5">
               {/* 1. Active Corridor Alert Badge */}
               <div
-                className={`p-2.5 rounded-xl border flex items-start gap-2 shadow-2xs transition-colors ${isPorePressureCritical
+                className={`p-2.5 rounded-xl border flex items-start gap-2 shadow-2xs transition-colors ${
+                  activeTelemetry.statusSeverity === "critical"
                     ? "bg-red-50/95 border-red-300"
-                    : targetProps.status === "warning"
+                    : activeTelemetry.statusSeverity === "warning"
                       ? "bg-amber-50/95 border-amber-200"
                       : "bg-emerald-50/95 border-emerald-200"
-                  }`}
+                }`}
               >
                 <span className="text-sm mt-0.5 shrink-0" aria-hidden="true">
-                  {isPorePressureCritical ? "⛔" : targetProps.status === "warning" ? "⚠️" : "✅"}
+                  {activeTelemetry.statusSeverity === "critical" ? "⛔" : activeTelemetry.statusSeverity === "warning" ? "⚠️" : "✅"}
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-1">
                     <span
-                      className={`text-[10px] font-bold uppercase tracking-wider ${isPorePressureCritical
+                      className={`text-[10px] font-bold uppercase tracking-wider ${
+                        activeTelemetry.statusSeverity === "critical"
                           ? "text-red-800"
-                          : targetProps.status === "warning"
+                          : activeTelemetry.statusSeverity === "warning"
                             ? "text-amber-800"
                             : "text-emerald-800"
-                        }`}
+                      }`}
                     >
                       Active Corridor Alert
                     </span>
                     <span
-                      className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded text-white ${isPorePressureCritical
+                      className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded text-white ${
+                        activeTelemetry.statusSeverity === "critical"
                           ? "bg-red-600 animate-pulse"
-                          : targetProps.status === "warning"
+                          : activeTelemetry.statusSeverity === "warning"
                             ? "bg-amber-500"
                             : "bg-emerald-600"
-                        }`}
+                      }`}
                     >
-                      {isPorePressureCritical
-                        ? "BLOCKED"
-                        : targetProps.status === "warning"
-                          ? "WARNING"
-                          : "PASSABLE"}
+                      {activeTelemetry.alertStatus}
                     </span>
                   </div>
                   <p
-                    className={`text-xs font-bold mt-0.5 leading-snug ${isPorePressureCritical
+                    className={`text-xs font-bold mt-0.5 leading-snug ${
+                      activeTelemetry.statusSeverity === "critical"
                         ? "text-red-950"
-                        : targetProps.status === "warning"
+                        : activeTelemetry.statusSeverity === "warning"
                           ? "text-amber-950"
                           : "text-emerald-950"
-                      }`}
+                    }`}
                   >
-                    NH-29 Pherima Segment - {isPorePressureCritical ? "BLOCKED" : targetProps.status === "warning" ? "CAUTION" : "NORMAL TRANSIT"}
+                    {activeTelemetry.statusSummary}
                   </p>
+                  {activeTelemetry.alertDescription && (
+                    <p className="text-[10px] text-[#173D32]/75 mt-1 leading-snug font-medium">
+                      {activeTelemetry.alertDescription}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -2377,16 +2459,12 @@ export default function RiskMap({
                     <span className="text-[10px] font-bold uppercase text-cyan-800 tracking-wider">
                       Rainfall Intensity
                     </span>
-                    <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-cyan-700 text-white">
-                      {rainfallIntensity} mm/h
+                    <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-cyan-700 text-white font-mono">
+                      {activeTelemetry.rainfallIntensity} mm/h
                     </span>
                   </div>
                   <p className="text-xs font-bold text-cyan-950 mt-0.5 leading-snug">
-                    {isPorePressureCritical
-                      ? "Extreme Saturation (Doppler Peak)"
-                      : rainfallIntensity >= 45
-                        ? "Heavy Monsoon Downpour"
-                        : "Light Baseline Drizzle"}
+                    {activeTelemetry.rainfallDescription}
                   </p>
                 </div>
               </div>
@@ -2401,13 +2479,76 @@ export default function RiskMap({
                     <span className="text-[10px] font-bold uppercase text-blue-800 tracking-wider">
                       Alternate Rescue Route
                     </span>
-                    <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-blue-600 text-white">
-                      ACTIVE
+                    <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded text-white ${
+                      activeTelemetry.alternateRouteStatus === "ACTIVE"
+                        ? "bg-blue-600 animate-pulse"
+                        : activeTelemetry.alternateRouteStatus === "OPEN"
+                          ? "bg-emerald-600"
+                          : activeTelemetry.alternateRouteStatus === "STANDBY"
+                            ? "bg-amber-600"
+                            : "bg-slate-600"
+                    }`}>
+                      {activeTelemetry.alternateRouteStatus}
                     </span>
                   </div>
                   <p className="text-xs font-bold text-blue-950 mt-0.5 leading-snug">
-                    Peducha Bypass Open for Convoys
+                    {activeTelemetry.alternateRouteName}
                   </p>
+                  {activeTelemetry.alternateRouteDescription && (
+                    <p className="text-[10px] text-blue-900/75 mt-1 leading-snug font-medium">
+                      {activeTelemetry.alternateRouteDescription}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* 4. Live Sensor Telemetry Strip */}
+              <div className="p-2.5 rounded-xl bg-[#FAF8F2] border border-[#173D32]/15 shadow-2xs">
+                <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-[#173D32]/10">
+                  <span className="text-[10px] font-bold uppercase text-[#173D32]/70 tracking-wider">
+                    Sensor Telemetry
+                  </span>
+                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#173D32]/10 text-[#173D32]">
+                    {activeTelemetry.elevation ? `${activeTelemetry.elevation} · ${activeTelemetry.stretchLength}` : activeTelemetry.stretchLength}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5 text-center">
+                  <div className="bg-[#173D32]/5 rounded-lg p-1.5">
+                    <span className="text-[9px] uppercase font-bold text-[#173D32]/60 block leading-tight">Soil Moisture</span>
+                    <span className={`text-xs font-black block mt-0.5 font-mono ${
+                      (activeTelemetry.soilMoisturePct || 0) >= 80
+                        ? "text-red-700"
+                        : (activeTelemetry.soilMoisturePct || 0) >= 60
+                          ? "text-amber-700"
+                          : "text-emerald-700"
+                    }`}>
+                      {activeTelemetry.soilMoisture}
+                    </span>
+                  </div>
+                  <div className="bg-[#173D32]/5 rounded-lg p-1.5">
+                    <span className="text-[9px] uppercase font-bold text-[#173D32]/60 block leading-tight">Pore Press.</span>
+                    <span className={`text-xs font-black block mt-0.5 font-mono ${
+                      (activeTelemetry.poreWaterPressureKpa || 0) >= 200
+                        ? "text-red-700"
+                        : (activeTelemetry.poreWaterPressureKpa || 0) >= 120
+                          ? "text-amber-700"
+                          : "text-emerald-700"
+                    }`}>
+                      {activeTelemetry.poreWaterPressure}
+                    </span>
+                  </div>
+                  <div className="bg-[#173D32]/5 rounded-lg p-1.5">
+                    <span className="text-[9px] uppercase font-bold text-[#173D32]/60 block leading-tight">Tilt Rate</span>
+                    <span className={`text-xs font-black block mt-0.5 font-mono ${
+                      (activeTelemetry.tiltRateMmH || 0) >= 0.2
+                        ? "text-red-700"
+                        : (activeTelemetry.tiltRateMmH || 0) >= 0.1
+                          ? "text-amber-700"
+                          : "text-emerald-700"
+                    }`}>
+                      {activeTelemetry.tiltRate}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
