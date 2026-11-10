@@ -6,14 +6,33 @@ import Link from "next/link";
 import { useApp } from "@/context/AppContext";
 import { getRolePortalPath, ApiClientError } from "@/lib/api";
 
+type RoleOption = "citizen" | "field-officer" | "disaster-command";
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectParam = searchParams.get("redirect");
+  const roleParam = searchParams.get("role");
+  const noticeParam = searchParams.get("notice");
 
   const { login, user } = useApp();
 
-  const [email, setEmail] = useState("");
+  const isOfficerRequested =
+    roleParam === "field-officer" ||
+    roleParam === "field_officer" ||
+    redirectParam?.startsWith("/officer") ||
+    redirectParam?.startsWith("/field");
+
+  const isCommandRequested =
+    roleParam === "disaster-command" ||
+    roleParam === "officer" ||
+    redirectParam?.includes("/dashboard");
+
+  const [selectedRole, setSelectedRole] = useState<RoleOption>(
+    isOfficerRequested ? "field-officer" : isCommandRequested ? "disaster-command" : "citizen"
+  );
+
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -22,8 +41,13 @@ function LoginForm() {
   // If already logged in, redirect to appropriate portal
   React.useEffect(() => {
     if (user) {
-      const destination = redirectParam || getRolePortalPath(user.role);
-      router.replace(destination);
+      if (user.role === "field_officer" || user.role === "officer") {
+        const destination = redirectParam || (user.role === "field_officer" ? "/officer" : "/officer/dashboard");
+        router.replace(destination);
+      } else {
+        const destination = redirectParam || getRolePortalPath(user.role);
+        router.replace(destination);
+      }
     }
   }, [user, redirectParam, router]);
 
@@ -35,13 +59,34 @@ function LoginForm() {
     setErrorMessage(null);
     setErrorCode(null);
 
+    const enteredIdentifier = identifier.trim();
+
     try {
+      let roleHeader = "citizen";
+      let destination = redirectParam;
+
+      if (selectedRole === "field-officer") {
+        roleHeader = "field-officer";
+        destination = redirectParam || "/officer";
+      } else if (selectedRole === "disaster-command") {
+        roleHeader = "officer";
+        destination = redirectParam || "/officer/dashboard";
+      }
+
       const loggedInUser = await login({
-        email: email.trim().toLowerCase(),
+        email: enteredIdentifier || (selectedRole === "field-officer" ? "OFF-2026-094" : "citizen@terra360.in"),
         password,
+        role: roleHeader,
       });
 
-      const destination = redirectParam || getRolePortalPath(loggedInUser.role);
+      if (!destination) {
+        if (selectedRole === "field-officer" || loggedInUser.role === "field_officer") {
+          destination = "/officer";
+        } else {
+          destination = getRolePortalPath(loggedInUser.role);
+        }
+      }
+
       router.push(destination);
     } catch (err: unknown) {
       if (err instanceof ApiClientError) {
@@ -57,8 +102,34 @@ function LoginForm() {
     }
   };
 
-  const handleDemoLogin = async (demoEmail: string) => {
-    setEmail(demoEmail);
+  const handleDemoOfficerLogin = async () => {
+    setSelectedRole("field-officer");
+    setIdentifier("OFF-2026-094");
+    setPassword("Password123!");
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    try {
+      await login({
+        email: "OFF-2026-094",
+        password: "Password123!",
+        role: "field-officer",
+      });
+      router.push(redirectParam || "/officer");
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError) {
+        setErrorMessage(err.message);
+      } else {
+        setErrorMessage("Demo officer login failed. Backend service is starting up.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDemoLogin = async (demoEmail: string, roleType: RoleOption) => {
+    setSelectedRole(roleType);
+    setIdentifier(demoEmail);
     setPassword("Password123!");
     setIsLoading(true);
     setErrorMessage(null);
@@ -67,9 +138,15 @@ function LoginForm() {
       const loggedInUser = await login({
         email: demoEmail,
         password: "Password123!",
+        role: roleType === "field-officer" ? "field-officer" : roleType === "disaster-command" ? "officer" : "citizen",
       });
 
-      const destination = redirectParam || getRolePortalPath(loggedInUser.role);
+      const destination =
+        redirectParam ||
+        (roleType === "field-officer" || loggedInUser.role === "field_officer"
+          ? "/officer"
+          : getRolePortalPath(loggedInUser.role));
+
       router.push(destination);
     } catch (err: unknown) {
       if (err instanceof ApiClientError) {
@@ -84,24 +161,35 @@ function LoginForm() {
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center p-4 sm:p-6 bg-[#FAF8F2]">
-      <div className="w-full max-w-md bg-[#F6F4EC] border border-[#173D32]/15 rounded-3xl p-6 sm:p-8 shadow-xl text-[#173D32]">
+      <div className="w-full max-w-lg bg-[#F8F4EC] border border-[#173D32]/15 rounded-3xl p-6 sm:p-8 shadow-xl text-[#173D32]">
         {/* Brand / Header */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#DCE8D4]/70 text-[11px] font-bold text-[#173D32] mb-2 uppercase tracking-wider">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#DCE8D1]/70 text-[11px] font-bold text-[#173D32] mb-2 uppercase tracking-wider">
             Terra360 Platform
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#173D32]">
             Sign In
           </h1>
           <p className="text-xs sm:text-sm text-[#173D32]/70 mt-1">
-            Access real-time landslide telemetry and role portals
+            Access real-time landslide telemetry, sector operations, and role portals
           </p>
         </div>
+
+        {/* Informational Redirect Notice */}
+        {noticeParam && (
+          <div className="mb-5 p-3.5 rounded-2xl bg-[#D6A65D]/15 border border-[#D6A65D]/40 text-xs sm:text-sm text-[#173D32] flex items-start gap-2.5 animate-in fade-in">
+            <span className="font-bold text-base leading-none text-[#173D32]">ℹ️</span>
+            <div className="flex-1 leading-relaxed">
+              <span className="font-bold block mb-0.5">Field Officer Clearance Required</span>
+              The requested page (<code className="font-mono bg-white/60 px-1 py-0.5 rounded text-[11px]">{redirectParam || "/officer"}</code>) requires an active Field Officer or Operations clearance. Please sign in with your Field Officer credentials.
+            </div>
+          </div>
+        )}
 
         {/* Error Alert */}
         {errorMessage && (
           <div
-            className={`mb-5 p-3.5 rounded-xl border text-xs sm:text-sm flex items-start gap-2.5 animate-in fade-in duration-200 ${
+            className={`mb-5 p-3.5 rounded-2xl border text-xs sm:text-sm flex items-start gap-2.5 animate-in fade-in duration-200 ${
               errorCode === "ACCOUNT_LOCKED"
                 ? "bg-amber-50 border-amber-300 text-amber-900"
                 : "bg-red-50 border-red-200 text-red-700"
@@ -123,63 +211,161 @@ function LoginForm() {
           </div>
         )}
 
-        {/* Quick Demo Logins Bar */}
-        <div className="mb-6 p-3 rounded-2xl bg-[#FAF8F2] border border-[#173D32]/10">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-[#173D32]/60 text-center mb-2">
-            One-Click Demo Profiles (Seed Accounts)
-          </div>
-          <div className="grid grid-cols-2 gap-1.5 text-xs font-semibold">
+        {/* ── 3-WAY ROLE SELECTOR TABS ─────────────────────────────────── */}
+        <div className="mb-6">
+          <label className="block text-[11px] font-bold text-[#173D32]/70 uppercase tracking-wider mb-2 text-center">
+            Select Your Role
+          </label>
+          <div className="grid grid-cols-3 gap-1.5 p-1.5 rounded-2xl bg-[#DCE8D1]/40 border border-[#173D32]/15">
             <button
               type="button"
-              disabled={isLoading}
-              onClick={() => handleDemoLogin("citizen@terra360.in")}
-              className="px-2.5 py-1.5 rounded-lg bg-[#F6F4EC] hover:bg-[#DCE8D4] border border-[#173D32]/15 text-[#173D32] transition-colors text-left flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+              onClick={() => {
+                setSelectedRole("citizen");
+                setErrorMessage(null);
+              }}
+              className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer ${
+                selectedRole === "citizen"
+                  ? "bg-[#173D32] text-[#F8F4EC] shadow-md"
+                  : "text-[#173D32]/70 hover:text-[#173D32] hover:bg-white/40"
+              }`}
             >
-              <span>👤</span> Citizen
+              <span>👤</span>
+              <span className="truncate">Citizen / User</span>
             </button>
+
             <button
               type="button"
-              disabled={isLoading}
-              onClick={() => handleDemoLogin("driver@terra360.in")}
-              className="px-2.5 py-1.5 rounded-lg bg-[#F6F4EC] hover:bg-[#DCE8D4] border border-[#173D32]/15 text-[#173D32] transition-colors text-left flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+              onClick={() => {
+                setSelectedRole("field-officer");
+                setErrorMessage(null);
+              }}
+              className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer ${
+                selectedRole === "field-officer"
+                  ? "bg-[#173D32] text-[#F8F4EC] shadow-md ring-2 ring-[#D6A65D]/50"
+                  : "text-[#173D32]/70 hover:text-[#173D32] hover:bg-white/40"
+              }`}
             >
-              <span>🚛</span> Driver
+              <span>👮</span>
+              <span className="truncate">Field Officer</span>
             </button>
+
             <button
               type="button"
-              disabled={isLoading}
-              onClick={() => handleDemoLogin("officer@terra360.in")}
-              className="px-2.5 py-1.5 rounded-lg bg-[#F6F4EC] hover:bg-[#DCE8D4] border border-[#173D32]/15 text-[#173D32] transition-colors text-left flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+              onClick={() => {
+                setSelectedRole("disaster-command");
+                setErrorMessage(null);
+              }}
+              className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer ${
+                selectedRole === "disaster-command"
+                  ? "bg-[#173D32] text-[#F8F4EC] shadow-md"
+                  : "text-[#173D32]/70 hover:text-[#173D32] hover:bg-white/40"
+              }`}
             >
-              <span>📊</span> Officer
-            </button>
-            <button
-              type="button"
-              disabled={isLoading}
-              onClick={() => handleDemoLogin("field@terra360.in")}
-              className="px-2.5 py-1.5 rounded-lg bg-[#F6F4EC] hover:bg-[#DCE8D4] border border-[#173D32]/15 text-[#173D32] transition-colors text-left flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
-            >
-              <span>👮</span> Field Officer
+              <span>📡</span>
+              <span className="truncate">Disaster Command</span>
             </button>
           </div>
         </div>
 
-        {/* Credentials Form */}
+        {/* ── ROLE-SPECIFIC QUICK DEMO CARD ──────────────────────────── */}
+        {selectedRole === "field-officer" ? (
+          <div className="mb-6 p-4 rounded-2xl bg-[#FAF8F2] border border-[#173D32]/15 shadow-xs">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#173D32]/70">
+                Evaluation Access
+              </span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#D6A65D]/20 text-[#173D32] border border-[#D6A65D]/40">
+                Sector 4 Verified
+              </span>
+            </div>
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={handleDemoOfficerLogin}
+              className="w-full text-left p-3 rounded-xl bg-gradient-to-r from-[#173D32] to-[#1f4e40] text-[#F8F4EC] hover:brightness-110 border border-[#D6A65D]/40 shadow-sm transition-all cursor-pointer disabled:opacity-60 group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-extrabold text-xs sm:text-sm text-[#F8F4EC] flex items-center gap-1.5">
+                  ⚡ Demo Officer Login (Officer K. Patil)
+                </span>
+                <span className="text-[10px] bg-[#D6A65D] text-[#173D32] font-black px-2 py-0.5 rounded-md uppercase">
+                  Instant
+                </span>
+              </div>
+              <p className="text-[11px] text-[#DCE8D1] mt-1 leading-relaxed">
+                Pre-fills ID <strong className="font-mono text-[#D6A65D]">OFF-2026-094</strong> • Sector 4 - Hill Highway Corridors • Disaster & Landslide Unit
+              </p>
+            </button>
+          </div>
+        ) : selectedRole === "disaster-command" ? (
+          <div className="mb-6 p-3.5 rounded-2xl bg-[#FAF8F2] border border-[#173D32]/15">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-[#173D32]/70 text-center mb-2">
+              Disaster Headquarters Demo Profile
+            </div>
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() => handleDemoLogin("officer@terra360.in", "disaster-command")}
+              className="w-full px-3 py-2 rounded-xl bg-[#F8F4EC] hover:bg-[#DCE8D1] border border-[#173D32]/20 text-[#173D32] transition-colors text-left flex items-center justify-between text-xs font-semibold cursor-pointer disabled:opacity-50"
+            >
+              <span className="flex items-center gap-1.5">
+                <span>📊</span> Vikram Sharma (Central Command)
+              </span>
+              <span className="text-[10px] opacity-70 font-mono">officer@terra360.in</span>
+            </button>
+          </div>
+        ) : (
+          <div className="mb-6 p-3 rounded-2xl bg-[#FAF8F2] border border-[#173D32]/15">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-[#173D32]/70 text-center mb-2">
+              Citizen & Driver Demo Profiles
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={() => handleDemoLogin("citizen@terra360.in", "citizen")}
+                className="px-2.5 py-2 rounded-xl bg-[#F8F4EC] hover:bg-[#DCE8D1] border border-[#173D32]/15 text-[#173D32] transition-colors text-left flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+              >
+                <span>👤</span> Citizen
+              </button>
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={() => handleDemoLogin("driver@terra360.in", "citizen")}
+                className="px-2.5 py-2 rounded-xl bg-[#F8F4EC] hover:bg-[#DCE8D1] border border-[#173D32]/15 text-[#173D32] transition-colors text-left flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+              >
+                <span>🚛</span> Commercial Driver
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── CREDENTIALS FORM ────────────────────────────────────────── */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
             <label
-              htmlFor="email-input"
+              htmlFor="identifier-input"
               className="block text-xs font-bold text-[#173D32] uppercase tracking-wide mb-1.5"
             >
-              Email Address
+              {selectedRole === "field-officer"
+                ? "Officer ID / Email / Phone"
+                : selectedRole === "disaster-command"
+                ? "Command Officer Email"
+                : "Email Address"}
             </label>
             <input
-              id="email-input"
-              type="email"
-              autoComplete="email"
-              placeholder="e.g. citizen@terra360.in"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              id="identifier-input"
+              type={selectedRole === "field-officer" ? "text" : "email"}
+              autoComplete="username"
+              placeholder={
+                selectedRole === "field-officer"
+                  ? "e.g. OFF-2026-094, officer.patil@terra360.in or phone"
+                  : selectedRole === "disaster-command"
+                  ? "e.g. officer@terra360.in"
+                  : "e.g. citizen@terra360.in"
+              }
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               required
               disabled={isLoading}
               className="w-full h-11 px-4 rounded-xl bg-[#FAF8F2] border border-[#173D32]/20 text-sm text-[#173D32] placeholder:text-[#173D32]/40 focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60"
@@ -217,15 +403,19 @@ function LoginForm() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full h-11 mt-2 rounded-full bg-[#173D32] hover:bg-[#1f4e40] text-[#F6F4EC] text-sm font-bold shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+            className="w-full h-12 mt-2 rounded-full bg-[#173D32] hover:bg-[#1f4e40] text-[#F8F4EC] text-sm font-bold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
           >
             {isLoading ? (
               <>
-                <div className="w-4 h-4 border-2 border-[#F6F4EC]/30 border-t-[#F6F4EC] rounded-full animate-spin" />
-                <span>Authenticating...</span>
+                <div className="w-4 h-4 border-2 border-[#F8F4EC]/30 border-t-[#F8F4EC] rounded-full animate-spin" />
+                <span>Authenticating with Terra360...</span>
               </>
+            ) : selectedRole === "field-officer" ? (
+              "Sign In to Field Operations (/officer)"
+            ) : selectedRole === "disaster-command" ? (
+              "Sign In to Disaster Command Desk"
             ) : (
-              "Sign In"
+              "Sign In as Citizen / User"
             )}
           </button>
         </form>
@@ -248,7 +438,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-[85vh] flex items-center justify-center">
+        <div className="min-h-[85vh] flex items-center justify-center bg-[#FAF8F2]">
           <div className="w-8 h-8 border-2 border-[#173D32]/20 border-t-[#173D32] rounded-full animate-spin" />
         </div>
       }
@@ -257,4 +447,3 @@ export default function LoginPage() {
     </Suspense>
   );
 }
-

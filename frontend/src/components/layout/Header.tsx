@@ -19,6 +19,7 @@ const NAV_ITEMS: NavItem[] = [
   { name: "Alerts", href: "/#alerts", targetId: "alerts" },
   { name: "About", href: "/#about", targetId: "about" },
   { name: "Report", href: "/#report", targetId: "report" },
+  { name: "Field Officer", href: "/officer", targetId: "officer" },
 ];
 
 export default function Header() {
@@ -117,8 +118,15 @@ export default function Header() {
 
   const handleNavClick = (
     e: React.MouseEvent<HTMLAnchorElement>,
-    targetId: string
+    targetId: string,
+    href: string
   ) => {
+    if (!href.includes("#")) {
+      // Direct page navigation (e.g., /officer)
+      setMobileMenuOpen(false);
+      return;
+    }
+
     if (pathname === "/") {
       e.preventDefault();
       setMobileMenuOpen(false);
@@ -142,6 +150,9 @@ export default function Header() {
   };
 
   const isActive = (item: NavItem) => {
+    if (item.href === "/officer") {
+      return pathname === "/officer" || pathname.startsWith("/field");
+    }
     if (pathname === "/") {
       return activeSection === item.targetId;
     }
@@ -194,7 +205,7 @@ export default function Header() {
                 <Link
                   key={item.name}
                   href={item.href}
-                  onClick={(e) => handleNavClick(e, item.targetId)}
+                  onClick={(e) => handleNavClick(e, item.targetId, item.href)}
                   className={`relative py-1 text-[15px] transition-colors focus-visible:outline-2 focus-visible:outline-[#173D32] rounded-xs whitespace-nowrap cursor-pointer ${
                     active
                       ? "font-bold text-[#173D32]"
@@ -324,7 +335,7 @@ export default function Header() {
                   <Link
                     key={item.name}
                     href={item.href}
-                    onClick={(e) => handleNavClick(e, item.targetId)}
+                    onClick={(e) => handleNavClick(e, item.targetId, item.href)}
                     className={`min-h-[44px] flex items-center justify-between px-4 py-2.5 rounded-2xl text-[16px] transition-colors cursor-pointer ${
                       active
                         ? "bg-[#DCE8D4] text-[#173D32] font-bold"

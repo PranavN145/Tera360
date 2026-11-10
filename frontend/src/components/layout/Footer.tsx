@@ -61,6 +61,13 @@ export default function Footer() {
             </Link>
             <span className="text-[#F6F4EC]/30" aria-hidden="true">|</span>
             <Link
+              href="/officer"
+              className="hover:text-[#D6A65D] transition-colors py-1 focus-visible:outline-2 focus-visible:outline-white/60 rounded-xs font-semibold"
+            >
+              Field Officer Portal
+            </Link>
+            <span className="text-[#F6F4EC]/30" aria-hidden="true">|</span>
+            <Link
               href="/privacy"
               className="hover:text-white transition-colors py-1 focus-visible:outline-2 focus-visible:outline-white/60 rounded-xs"
             >

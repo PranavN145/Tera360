@@ -227,6 +227,7 @@ export const authApi = {
   async login(credentials: {
     email: string;
     password: string;
+    role?: string;
   }): Promise<AuthSuccessData> {
     const data = await apiClient<AuthSuccessData>('/api/v1/auth/login', {
       method: 'POST',
@@ -542,7 +543,8 @@ export function getRolePortalPath(role?: string): string {
     case 'driver':
       return '/driver/route-check';
     case 'field_officer':
-      return '/field/tasks';
+    case 'field-officer':
+      return '/officer';
     case 'officer':
       return '/officer/dashboard';
     case 'admin':
@@ -551,3 +553,115 @@ export function getRolePortalPath(role?: string): string {
       return '/';
   }
 }
+
+/**
+ * ── Field Officer Portal API Client ─────────────────────────────────────────
+ * Scoped under /api/field-officer (or /api/v1/field-officer)
+ */
+export const fieldOfficerApi = {
+  // Profile
+  async getProfile(): Promise<import('@/types/fieldOfficer').FieldOfficerProfile> {
+    return apiClient('/api/field-officer/profile');
+  },
+
+  async updateLanguage(language: string): Promise<import('@/types/fieldOfficer').FieldOfficerProfile> {
+    return apiClient('/api/field-officer/profile/language', {
+      method: 'PATCH',
+      body: JSON.stringify({ language }),
+    });
+  },
+
+  // Tasks
+  async getTasks(params?: { status?: string; riskLevel?: string }): Promise<import('@/types/fieldOfficer').FieldOfficerTask[]> {
+    const query = new URLSearchParams();
+    if (params?.status) query.set('status', params.status);
+    if (params?.riskLevel) query.set('riskLevel', params.riskLevel);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return apiClient(`/api/field-officer/tasks${qs}`);
+  },
+
+  async startTask(id: string): Promise<import('@/types/fieldOfficer').FieldOfficerTask> {
+    return apiClient(`/api/field-officer/tasks/${id}/start`, {
+      method: 'PATCH',
+    });
+  },
+
+  async completeTask(id: string, completionNotes?: string): Promise<import('@/types/fieldOfficer').FieldOfficerTask> {
+    return apiClient(`/api/field-officer/tasks/${id}/complete`, {
+      method: 'PATCH',
+      body: JSON.stringify({ completionNotes }),
+    });
+  },
+
+  async escalateTask(id: string, reason: string, priority = 'Critical'): Promise<any> {
+    return apiClient(`/api/field-officer/tasks/${id}/escalate`, {
+      method: 'POST',
+      body: JSON.stringify({ reason, priority }),
+    });
+  },
+
+  // Map Data
+  async getMapData(): Promise<import('@/types/fieldOfficer').FieldOfficerMapData> {
+    return apiClient('/api/field-officer/map/data');
+  },
+
+  // Reports
+  async getReports(params?: { status?: string; hazardType?: string }): Promise<import('@/types/fieldOfficer').VillagerReportItem[]> {
+    const query = new URLSearchParams();
+    if (params?.status) query.set('status', params.status);
+    if (params?.hazardType) query.set('hazardType', params.hazardType);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return apiClient(`/api/field-officer/reports${qs}`);
+  },
+
+  async verifyReport(id: string, fieldNotes?: string, inspectorPhotoUrl?: string): Promise<import('@/types/fieldOfficer').VillagerReportItem> {
+    return apiClient(`/api/field-officer/reports/${id}/verify`, {
+      method: 'PATCH',
+      body: JSON.stringify({ fieldNotes, inspectorPhotoUrl }),
+    });
+  },
+
+  async rejectReport(id: string, rejectionReason: string): Promise<import('@/types/fieldOfficer').VillagerReportItem> {
+    return apiClient(`/api/field-officer/reports/${id}/reject`, {
+      method: 'PATCH',
+      body: JSON.stringify({ rejectionReason }),
+    });
+  },
+
+  async escalateReport(id: string, payload: { escalationReason: string; urgency?: string; recommendedAction?: string }): Promise<any> {
+    return apiClient(`/api/field-officer/reports/${id}/escalate`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // Road Status
+  async getCurrentRoadStatus(): Promise<import('@/types/fieldOfficer').RoadStatusSegment[]> {
+    return apiClient('/api/field-officer/road-status/current');
+  },
+
+  async updateRoadStatus(payload: {
+    roadSegmentId?: string;
+    stretchName?: string;
+    condition: import('@/types/fieldOfficer').RoadCondition;
+    reason: string;
+    photoUrl?: string | null;
+  }): Promise<any> {
+    return apiClient('/api/field-officer/road-status/update', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // Alerts
+  async getAlerts(): Promise<import('@/types/fieldOfficer').SectorAlertItem[]> {
+    return apiClient('/api/field-officer/alerts');
+  },
+
+  async acknowledgeAlert(id: string): Promise<import('@/types/fieldOfficer').SectorAlertItem> {
+    return apiClient(`/api/field-officer/alerts/${id}/acknowledge`, {
+      method: 'PATCH',
+    });
+  },
+};
+

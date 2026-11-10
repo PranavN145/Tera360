@@ -36,7 +36,7 @@ interface AppContextType {
   authMode: "login" | "register";
   openAuthModal: (mode?: "login" | "register") => void;
   closeAuthModal: () => void;
-  login: (credentials: { email: string; password: string }) => Promise<User>;
+  login: (credentials: { email: string; password: string; role?: string }) => Promise<User>;
   register: (data: {
     name: string;
     email: string;
@@ -88,23 +88,45 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // Restore session silently on initial load or refresh via HttpOnly refresh cookie
+  // Restore session silently on initial load or refresh
   useEffect(() => {
     let isMounted = true;
 
     async function restoreSession() {
+      // First check local persisted user for instantaneous client hydration
+      try {
+        if (typeof window !== "undefined") {
+          const cachedUser = localStorage.getItem("terra360_user");
+          if (cachedUser && isMounted) {
+            setUser(JSON.parse(cachedUser));
+          }
+        }
+      } catch {
+        // Ignore JSON/storage errors
+      }
+
       try {
         const token = await authApi.refresh();
         if (token && isMounted) {
           const profile = await authApi.getMe();
           if (isMounted) {
             setUser(profile);
+            if (typeof window !== "undefined") {
+              localStorage.setItem("terra360_user", JSON.stringify(profile));
+            }
           }
         }
       } catch {
         // Not authenticated or refresh token expired
+        // If we didn't have cached user, ensure null
         if (isMounted) {
-          setUser(null);
+          try {
+            if (typeof window !== "undefined" && !localStorage.getItem("terra360_user")) {
+              setUser(null);
+            }
+          } catch {
+            setUser(null);
+          }
         }
       } finally {
         if (isMounted) {
@@ -120,9 +142,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const login = async (credentials: { email: string; password: string }): Promise<User> => {
+  const login = async (credentials: { email: string; password: string; role?: string }): Promise<User> => {
     const data = await authApi.login(credentials);
     setUser(data.user);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("terra360_user", JSON.stringify(data.user));
+      } catch {
+        // ignore
+      }
+    }
     setIsAuthModalOpen(false);
     addToast({
       title: `Welcome, ${data.user.name}!`,
@@ -166,6 +195,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Ignore network errors on logout
     } finally {
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.removeItem("terra360_user");
+        } catch {
+          // ignore
+        }
+      }
       setUser(null);
       addToast({
         title: "Signed Out",

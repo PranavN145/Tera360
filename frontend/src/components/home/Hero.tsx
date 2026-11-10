@@ -104,6 +104,15 @@ export default function Hero() {
               </svg>
               <span>Report Danger</span>
             </a>
+
+            {/* Tertiary Button: Field Officer Portal */}
+            <a
+              href="/officer"
+              className="h-[46px] sm:h-[48px] px-5 sm:px-5.5 rounded-full text-[14px] sm:text-[15px] font-semibold text-[#173D32] bg-[#DCE8D1]/70 hover:bg-[#DCE8D1] border border-[#173D32]/25 inline-flex items-center justify-center gap-2 transition-all duration-200 hover:-translate-y-0.5 shadow-xs hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173D32] cursor-pointer"
+            >
+              <span>👮</span>
+              <span>Officer Portal</span>
+            </a>
           </div>
         </div>
 

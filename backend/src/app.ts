@@ -12,6 +12,7 @@ import userRoutes from './modules/users/users.routes';
 import publicRoutes from './modules/public/public.routes';
 import reportRoutes from './modules/reports/report.routes';
 import contactRoutes from './modules/contact/contact.routes';
+import fieldOfficerRoutes from './modules/fieldOfficer/fieldOfficer.routes';
 
 const app: Express = express();
 
@@ -115,6 +116,8 @@ app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/public', publicRoutes);
 app.use('/api/v1/reports', reportRoutes);
 app.use('/api/v1/contact', contactRoutes);
+app.use('/api/field-officer', fieldOfficerRoutes);
+app.use('/api/v1/field-officer', fieldOfficerRoutes);
 
 // ── 5. 404 Route Handler ──────────────────────────────────────────────
 app.use((req: Request, res: Response) => {

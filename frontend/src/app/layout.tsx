@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Footer from "../components/layout/Footer";
 import { AppProvider } from "../context/AppContext";
@@ -8,15 +7,9 @@ import AuthModal from "../components/modals/AuthModal";
 import AlertDetailsModal from "../components/modals/AlertDetailsModal";
 import ToastContainer from "../components/common/ToastContainer";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+// Offline-safe font variables that map cleanly to globals.css tokens
+const geistSans = { variable: "font-sans" };
+const geistMono = { variable: "font-mono" };
 
 export const metadata: Metadata = {
   title: {

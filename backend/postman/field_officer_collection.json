@@ -1,0 +1,300 @@
+{
+  "info": {
+    "_postman_id": "fo-terra360-collection-v1",
+    "name": "Terra360 API - Field Officer Portal",
+    "description": "Comprehensive Postman & Thunder Client collection for the Terra360 Field Officer Portal backend.\nCovers Officer Profile, My Tasks, Assigned Area Map, Villager Reports, Real-Time Road Status, and Sector Emergency Alerts.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01. Officer Profile & Context",
+      "description": "Endpoints to inspect authenticated officer metadata and update language preferences.",
+      "item": [
+        {
+          "name": "GET Officer Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/field-officer/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "field-officer", "profile"]
+            },
+            "description": "Returns authenticated officer metadata (Name, Department, Assigned Area/Sector, Phone, Language, active duty status, badge number)."
+          }
+        },
+        {
+          "name": "PATCH Update Language Preference",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"language\": \"hi\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/field-officer/profile/language",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "field-officer", "profile", "language"]
+            },
+            "description": "Updates officer preferred language setting (e.g. 'en', 'hi', 'ao')."
+          }
+        }
+      ]
+    },
+    {
+      "name": "02. My Inspection Tasks",
+      "description": "Endpoints to manage inspection tasks assigned by the disaster officer.",
+      "item": [
+        {
+          "name": "GET Assigned Tasks",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/field-officer/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "field-officer", "tasks"]
+            },
+            "description": "Fetches inspection tasks assigned specifically to this officer by the disaster officer."
+          }
+        },
+        {
+          "name": "PATCH Start Task Inspection",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/field-officer/tasks/TSK-NH29-002/start",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "field-officer", "tasks", "TSK-NH29-002", "start"]
+            },
+            "description": "Transitions task status to 'In_Progress' and logs starting timestamp."
+          }
+        },
+        {
+          "name": "PATCH Complete Inspection Task",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completionNotes\": \"Rock anchors inspected, hillside tension bolts secured, surface drainage cleared of shale gravel.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/field-officer/tasks/TSK-NH29-002/complete",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "field-officer", "tasks", "TSK-NH29-002", "complete"]
+            },
+            "description": "Marks task as 'Completed' and logs completion notes with UTC timestamp."
+          }
+        },
+        {
+          "name": "POST Escalate Task to Central Dashboard",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Active slope deformation expanding past 40 meters. Tensile ground fissures widening by 8mm/hr. Heavy machinery required.\",\n  \"priority\": \"Critical\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/field-officer/tasks/TSK-NH29-001/escalate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "field-officer", "tasks", "TSK-NH29-001", "escalate"]
+            },
+            "description": "Updates status to 'Escalated' and dispatches immediate notification to central disaster officer dashboard."
+          }
+        }
+      ]
+    },
+    {
+      "name": "03. Assigned Area Map",
+      "description": "Spatial GeoJSON data for villages, road stretches, danger zones, hazard markers, and task routes.",
+      "item": [
+        {
+          "name": "GET Map Spatial Data",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/field-officer/map/data",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "field-officer", "map", "data"]
+            },
+            "description": "Returns GeoJSON boundaries, danger zones with risk weights, active villager markers, and navigation route endpoints."
+          }
+        }
+      ]
+    },
+    {
+      "name": "04. Villager Reports",
+      "description": "Endpoints to review, verify, reject, or escalate citizen landslide hazard reports.",
+      "item": [
+        {
+          "name": "GET Citizen Reports in Sector",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/field-officer/reports",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "field-officer", "reports"]
+            },
+            "description": "Retrieves citizen reports logged within the officer's assigned geographic boundary."
+          }
+        },
+        {
+          "name": "PATCH Verify Report Ground Truth",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fieldNotes\": \"Inspected on-site; 150m mudflow verified downslope of primary school. Pre-cautionary sandbags deployed.\",\n  \"inspectorPhotoUrl\": \"https://terra360.in/uploads/inspections/verified-mudflow.jpg\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/field-officer/reports/VREP-2026-104/verify",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "field-officer", "reports", "VREP-2026-104", "verify"]
+            },
+            "description": "Marks citizen report as 'Verified' with inspector notes and photo URL."
+          }
+        },
+        {
+          "name": "PATCH Reject Report (Mandatory Reason)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rejectionReason\": \"Minor topsoil movement due to local gardening on private terrace. No threat to highway or settlement.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/field-officer/reports/VREP-2026-105/reject",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "field-officer", "reports", "VREP-2026-105", "reject"]
+            },
+            "description": "Marks report as 'Rejected' with required mandatory rejection reason."
+          }
+        },
+        {
+          "name": "POST Escalate Report to High Command",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"urgency\": \"Critical\",\n  \"escalationReason\": \"Debris flow approaching stream culvert with risk of damming and sudden flash release into downhill village settlement.\",\n  \"recommendedAction\": \"Dispatch SDRF quick response unit and alert local civil defense.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/field-officer/reports/VREP-2026-098/escalate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "field-officer", "reports", "VREP-2026-098", "escalate"]
+            },
+            "description": "Escalates report straight to central disaster high command with urgency metadata."
+          }
+        }
+      ]
+    },
+    {
+      "name": "05. Real-Time Road Status",
+      "description": "Endpoints to view and broadcast road conditions to central dashboard.",
+      "item": [
+        {
+          "name": "GET Current Road Conditions",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/field-officer/road-status/current",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "field-officer", "road-status", "current"]
+            },
+            "description": "Returns latest real-time status of all road segments in the officer's area."
+          }
+        },
+        {
+          "name": "POST Update Road Condition & Sync",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roadSegmentId\": \"ROAD-NH29-S4\",\n  \"stretchName\": \"NH-29 KM 38 to KM 52 (Phesama – Dzüdza)\",\n  \"condition\": \"Partially Blocked\",\n  \"reason\": \"Single-lane traffic in effect. JCB excavator clearing outer lane debris at KM 42+300.\",\n  \"photoUrl\": \"https://terra360.in/uploads/roads/nh29-km42-partial.jpg\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/field-officer/road-status/update",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "field-officer", "road-status", "update"]
+            },
+            "description": "Pushes road condition (Open | Caution | Partially Blocked | Blocked) and syncs immediately with central dashboard."
+          }
+        }
+      ]
+    },
+    {
+      "name": "06. Sector Emergency Alerts",
+      "description": "Endpoints to fetch active disaster alerts and acknowledge protocols.",
+      "item": [
+        {
+          "name": "GET Sector Emergency Alerts",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/field-officer/alerts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "field-officer", "alerts"]
+            },
+            "description": "Returns active emergency alerts and disaster protocols relevant strictly to the officer's assigned area."
+          }
+        },
+        {
+          "name": "PATCH Acknowledge Emergency Alert",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/field-officer/alerts/ALT-SEC4-2026-01/acknowledge",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "field-officer", "alerts", "ALT-SEC4-2026-01", "acknowledge"]
+            },
+            "description": "Sets acknowledged: true with officer ID and UTC timestamp."
+          }
+        }
+      ]
+    }
+  ]
+}
+
