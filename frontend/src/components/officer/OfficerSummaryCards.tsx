@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import PortalMetricGrid from "@/components/portal/PortalMetricGrid";
-import PortalMetricCard from "@/components/portal/PortalMetricCard";
+import { Bell, ClipboardList, Houses, Mountain, Road } from "lucide-react";
+import OfficerKpiCard, { OfficerKpiCardProps } from "@/components/officer/OfficerKpiCard";
 
 export interface SummaryMetrics {
   criticalZonesCount: number;
@@ -26,102 +26,95 @@ export default function OfficerSummaryCards({
   metrics,
   isLoading = false,
 }: OfficerSummaryCardsProps) {
-  const cards = [
+  const cards: Array<OfficerKpiCardProps & { id: string }> = [
     {
       id: "critical-zones",
       title: "Critical Zones",
       value: metrics.criticalZonesCount,
+      icon: Mountain,
+      accent: "red",
       badge: metrics.criticalZonesCount > 0 ? "Red Alert" : "Stable",
-      badgeColor:
-        metrics.criticalZonesCount > 0
-          ? "bg-red-100 text-red-800 border-red-200"
-          : "bg-emerald-100 text-emerald-800 border-emerald-200",
+      badgeTone: metrics.criticalZonesCount > 0 ? "red" : "green",
       detail:
         metrics.criticalZonesCount > 0
           ? "High slope saturation & active displacement"
           : "All monitored zones within nominal thresholds",
       href: "/officer/map",
-      linkText: "GIS Hotspots",
-      icon: "⛰️",
-      pulse: metrics.criticalZonesCount > 0,
     },
     {
       id: "high-risk-roads",
       title: "High-Risk Roads",
       value: metrics.highRiskRoadsCount,
+      icon: Road,
+      accent: "amber",
       badge: `${metrics.blockedRoadsCount} Blocked`,
-      badgeColor:
-        metrics.blockedRoadsCount > 0
-          ? "bg-red-100 text-red-800 border-red-200"
-          : "bg-amber-100 text-amber-800 border-amber-200",
+      badgeTone:
+        metrics.blockedRoadsCount > 0 || metrics.cautionRoadsCount > 0
+          ? "amber"
+          : "green",
       detail: `${metrics.blockedRoadsCount} blocked, ${metrics.cautionRoadsCount} under caution`,
       href: "/officer/roads",
-      linkText: "Corridors",
-      icon: "🛣️",
-      pulse: metrics.blockedRoadsCount > 0,
     },
     {
       id: "active-alerts",
       title: "Active Alerts",
       value: metrics.activeAlertsCount,
+      icon: Bell,
+      accent: "red",
       badge: `${metrics.criticalAlertsCount} Critical`,
-      badgeColor:
+      badgeTone:
         metrics.criticalAlertsCount > 0
-          ? "bg-red-100 text-red-800 border-red-200"
-          : "bg-yellow-100 text-yellow-800 border-yellow-200",
+          ? "red"
+          : metrics.warningAlertsCount > 0
+          ? "amber"
+          : "green",
       detail: `${metrics.criticalAlertsCount} critical, ${metrics.warningAlertsCount} warning advisories`,
       href: "/officer/alerts",
-      linkText: "Alert Center",
-      icon: "📢",
-      pulse: metrics.criticalAlertsCount > 0,
     },
     {
       id: "villages-at-risk",
       title: "Villages at Risk",
       value: metrics.villagesAtRiskCount,
-      badge: "Vulnerable",
-      badgeColor: "bg-amber-100 text-amber-800 border-amber-200",
-      detail: "Settlements in steep drainage runoff corridors",
+      icon: Houses,
+      accent: "green",
+      badge: metrics.villagesAtRiskCount > 0 ? "Vulnerable" : "Nominal",
+      badgeTone: metrics.villagesAtRiskCount > 0 ? "amber" : "green",
+      detail:
+        metrics.villagesAtRiskCount > 0
+          ? "Settlements in steep drainage runoff corridors"
+          : "No settlements in active runoff alert zones",
       href: "/officer/villages",
-      linkText: "Shelters",
-      icon: "🏘️",
-      pulse: false,
     },
     {
       id: "pending-reports",
       title: "Pending Reports",
       value: metrics.pendingReportsCount,
+      icon: ClipboardList,
+      accent: "blue",
       badge: `${metrics.pendingReportsCount} New`,
-      badgeColor:
-        metrics.pendingReportsCount > 0
-          ? "bg-blue-100 text-blue-800 border-blue-200"
-          : "bg-gray-100 text-gray-700 border-gray-200",
+      badgeTone: metrics.pendingReportsCount > 0 ? "blue" : "neutral",
       detail: `${metrics.pendingReportsCount} awaiting officer verification (${metrics.totalReportsCount} total)`,
       href: "/officer/reports",
-      linkText: "Triage Queue",
-      icon: "📍",
-      pulse: metrics.pendingReportsCount > 0,
     },
   ];
 
   return (
-    <PortalMetricGrid columns={5} ariaLabel="Operational Summary Metrics">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3.5 xl:gap-4 w-full">
       {cards.map((card) => (
-        <PortalMetricCard
+        <OfficerKpiCard
           key={card.id}
           id={card.id}
           title={card.title}
           value={card.value}
           icon={card.icon}
+          accent={card.accent}
           badge={card.badge}
-          badgeColor={card.badgeColor}
+          badgeTone={card.badgeTone}
           detail={card.detail}
           href={card.href}
-          linkText={card.linkText}
-          pulse={card.pulse}
           isLoading={isLoading}
         />
       ))}
-    </PortalMetricGrid>
+    </div>
   );
 }

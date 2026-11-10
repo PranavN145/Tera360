@@ -31,8 +31,10 @@ export default function OfficerDashboardPage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [alertsError, setAlertsError] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isAiUpdatesExpanded, setIsAiUpdatesExpanded] = useState(false);
 
   const loadDashboard = useCallback(async () => {
     setIsLoading(true);
@@ -40,14 +42,23 @@ export default function OfficerDashboardPage() {
       const [statsRes, alertsRes, roadsRes, riskMapRes, reportsRes] =
         await Promise.allSettled([
           publicApi.getStats(),
-          publicApi.getAlerts({ limit: 6 }),
+          publicApi.getAlerts({ limit: 50 }),
           publicApi.getRoadStatus(),
           publicApi.getRiskMap(),
           reportsApi.getReports({ limit: 8 }),
         ]);
 
       if (statsRes.status === "fulfilled") setStats(statsRes.value);
-      if (alertsRes.status === "fulfilled") setAlerts(alertsRes.value.alerts);
+      if (alertsRes.status === "fulfilled") {
+        setAlerts(alertsRes.value.alerts);
+        setAlertsError(null);
+      } else {
+        setAlertsError(
+          alertsRes.reason instanceof Error
+            ? alertsRes.reason.message
+            : "Failed to load AI risk updates"
+        );
+      }
       if (roadsRes.status === "fulfilled") setRoads(roadsRes.value);
       if (riskMapRes.status === "fulfilled") setRiskMapCorridors(riskMapRes.value);
       if (reportsRes.status === "fulfilled") setReports(reportsRes.value);
@@ -71,6 +82,13 @@ export default function OfficerDashboardPage() {
 
   const handleManualRefresh = () => {
     setRefreshTrigger((prev) => prev + 1);
+  };
+
+  const handleToggleAiUpdatesView = (expanded: boolean) => {
+    setIsAiUpdatesExpanded(expanded);
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   };
 
   // Compute operational summary metrics cleanly
@@ -174,43 +192,71 @@ export default function OfficerDashboardPage() {
           </div>
         )}
 
-        {/* ── 1. Operational Summary Metrics ── */}
-        <section aria-label="Operational Summary Metrics" className="w-full">
-          <OfficerSummaryCards metrics={metrics} isLoading={isLoading} />
-        </section>
+        {isAiUpdatesExpanded ? (
+          /* ── Expanded AI Risk Updates Timeline View ── */
+          <section aria-label="All AI Risk Updates" className="w-full">
+            <OfficerAiRiskUpdates
+              alerts={alerts}
+              isLoading={isLoading}
+              error={alertsError}
+              onRetry={handleManualRefresh}
+              modelStatus={stats?.modelActive ?? stats?.modelStatus ?? null}
+              referenceTime={lastRefreshed}
+              view="expanded"
+              onBack={() => handleToggleAiUpdatesView(false)}
+            />
+          </section>
+        ) : (
+          <>
+            {/* ── 1. Operational Summary Metrics ── */}
+            <section aria-label="Operational Summary Metrics" className="w-full">
+              <OfficerSummaryCards metrics={metrics} isLoading={isLoading} />
+            </section>
 
-        {/* ── 2. Risk Hotspots, Corridors & 3D Terrain Mini Map ── */}
-        <section aria-label="Risk Hotspots & Corridors" className="w-full">
-          <OfficerMiniRiskMap
-            corridors={riskMapCorridors.length > 0 ? riskMapCorridors : (roads as unknown as PublicRiskMapItem[])}
-            isLoading={isLoading}
-            error={error}
-            onRetry={handleManualRefresh}
-          />
-        </section>
+            {/* ── 2. Risk Hotspots, Corridors & 3D Terrain Mini Map ── */}
+            <section aria-label="Risk Hotspots & Corridors" className="w-full">
+              <OfficerMiniRiskMap
+                corridors={riskMapCorridors.length > 0 ? riskMapCorridors : (roads as unknown as PublicRiskMapItem[])}
+                alerts={alerts}
+                isLoading={isLoading}
+                error={error}
+                onRetry={handleManualRefresh}
+              />
+            </section>
 
-        {/* ── 3. Recent AI Risk Updates ── */}
-        <section aria-label="Recent AI Risk Updates" className="w-full">
-          <OfficerAiRiskUpdates alerts={alerts} isLoading={isLoading} />
-        </section>
+            {/* ── 3. Recent AI Risk Updates ── */}
+            <section aria-label="Recent AI Risk Updates" className="w-full">
+              <OfficerAiRiskUpdates
+                alerts={alerts}
+                isLoading={isLoading}
+                error={alertsError}
+                onRetry={handleManualRefresh}
+                modelStatus={stats?.modelActive ?? stats?.modelStatus ?? null}
+                referenceTime={lastRefreshed}
+                view="compact"
+                onViewAll={() => handleToggleAiUpdatesView(true)}
+              />
+            </section>
 
-        {/* ── 4. Priority Action List ── */}
-        <section aria-label="Priority Action List" className="w-full">
-          <OfficerPriorityActions
-            reports={reports}
-            alerts={alerts}
-            isLoading={isLoading}
-          />
-        </section>
+            {/* ── 4. Priority Action List ── */}
+            <section aria-label="Priority Action List" className="w-full">
+              <OfficerPriorityActions
+                reports={reports}
+                alerts={alerts}
+                isLoading={isLoading}
+              />
+            </section>
 
-        {/* ── 5. Rainfall & SAR-Data Status ── */}
-        <section aria-label="Rainfall & SAR-Data Status" className="w-full">
-          <OfficerDataStatus
-            lastUpdated={lastRefreshed}
-            isLoading={isLoading}
-            onRefresh={handleManualRefresh}
-          />
-        </section>
+            {/* ── 5. Rainfall & SAR-Data Status ── */}
+            <section aria-label="Rainfall & SAR-Data Status" className="w-full">
+              <OfficerDataStatus
+                lastUpdated={lastRefreshed}
+                isLoading={isLoading}
+                onRefresh={handleManualRefresh}
+              />
+            </section>
+          </>
+        )}
       </div>
     </PortalLayout>
   );

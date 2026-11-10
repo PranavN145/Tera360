@@ -136,7 +136,7 @@ export default function PortalLayout({
   return (
     <ProtectedRoute allowedRoles={allowedRoles}>
       <PortalLayoutContext.Provider value={{ isInsidePortalLayout: true }}>
-        <div className="min-h-screen bg-[#F6F4EC] text-[#173D32] flex flex-col overflow-x-hidden selection:bg-[#DCE8D4] selection:text-[#173D32]">
+        <div className="min-h-screen bg-[#F6F4EC] text-[#173D32] flex flex-col overflow-x-clip selection:bg-[#DCE8D4] selection:text-[#173D32]">
           {/* Shared Portal Header (with header.png background) */}
           <PortalHeader
             portalConfig={portalConfig}

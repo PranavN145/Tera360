@@ -2,6 +2,24 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  Building2,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  CloudRain,
+  Home,
+  LayoutGrid,
+  List,
+  Megaphone,
+  Route,
+  Search,
+  Users,
+  X,
+} from "lucide-react";
 import PortalLayout from "@/components/portal/PortalLayout";
 import { publicApi, reportsApi } from "@/lib/api";
 import {
@@ -17,6 +35,11 @@ import {
 import { MONITORED_VILLAGES } from "@/data/villagesData";
 import VillageOverviewCards from "@/components/officer/VillageOverviewCards";
 import VillageDetailPanel from "@/components/officer/VillageDetailPanel";
+import VillageRiskHistoryBar from "@/components/officer/VillageRiskHistoryBar";
+import VillageRiskBadge, {
+  getSelectedRowTheme,
+} from "@/components/officer/VillageRiskBadge";
+import SettlementIcon from "@/components/officer/SettlementIcon";
 import PortalSplitLayout from "@/components/portal/PortalSplitLayout";
 
 type SortOption =
@@ -33,6 +56,25 @@ const RISK_WEIGHTS: Record<VillageRiskLevel, number> = {
   Medium: 2,
   Low: 1,
 };
+
+function getRiskBarClass(level: VillageRiskLevel): string {
+  switch (level) {
+    case "Critical":
+      return "bg-[#DC2626]";
+    case "High":
+      return "bg-[#D97706]";
+    case "Medium":
+      return "bg-[#16A34A]";
+    default:
+      return "bg-[#1E7A45]";
+  }
+}
+
+function getEvacStatusBadgeClass(status?: string): string {
+  if (status === "blocked") return "bg-[#FDE8E8] text-[#B91C1C]";
+  if (status === "caution") return "bg-[#FEEFD6] text-[#9A5B06]";
+  return "bg-[#DCFCE7] text-[#166534]";
+}
 
 export default function OfficerVillagesPage() {
   // Filters & Search State
@@ -57,42 +99,52 @@ export default function OfficerVillagesPage() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // ── Load Real Backend Data ──────────────────────────────────────────
-  const loadBackendData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const [alertsRes, roadsRes, reportsRes] = await Promise.allSettled([
-        publicApi.getAlerts({ limit: 50 }),
-        publicApi.getRoadStatus({}),
-        reportsApi.getReports({ limit: 50 }),
-      ]);
-
-      if (alertsRes.status === "fulfilled") {
-        setAlerts(alertsRes.value.alerts);
-      }
-      if (roadsRes.status === "fulfilled") {
-        setRoads(roadsRes.value);
-      }
-      if (reportsRes.status === "fulfilled") {
-        setReports(reportsRes.value);
-      }
-
-      setError(null);
-    } catch (err: unknown) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : "Failed to load live telemetry from server";
-      setError(msg);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    void loadBackendData();
-  }, [loadBackendData, refreshTrigger]);
+    let mounted = true;
+
+    async function fetchBackendData() {
+      try {
+        const [alertsRes, roadsRes, reportsRes] = await Promise.allSettled([
+          publicApi.getAlerts({ limit: 50 }),
+          publicApi.getRoadStatus({}),
+          reportsApi.getReports({ limit: 50 }),
+        ]);
+
+        if (!mounted) return;
+
+        if (alertsRes.status === "fulfilled") {
+          setAlerts(alertsRes.value.alerts);
+        }
+        if (roadsRes.status === "fulfilled") {
+          setRoads(roadsRes.value);
+        }
+        if (reportsRes.status === "fulfilled") {
+          setReports(reportsRes.value);
+        }
+
+        setError(null);
+      } catch (err: unknown) {
+        if (!mounted) return;
+        const msg =
+          err instanceof Error
+            ? err.message
+            : "Failed to load live telemetry from server";
+        setError(msg);
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void fetchBackendData();
+    return () => {
+      mounted = false;
+    };
+  }, [refreshTrigger]);
 
   const handleRetry = () => {
+    setIsLoading(true);
     setRefreshTrigger((prev) => prev + 1);
   };
 
@@ -120,7 +172,9 @@ export default function OfficerVillagesPage() {
           desc.includes(vDist);
 
         const matchCorridor =
-          vCorr && alertCorr && (alertCorr.includes(vCorr) || vCorr.includes(alertCorr));
+          vCorr &&
+          alertCorr &&
+          (alertCorr.includes(vCorr) || vCorr.includes(alertCorr));
 
         const matchState = alertState && alertState.includes(vState);
 
@@ -169,9 +223,13 @@ export default function OfficerVillagesPage() {
       }
 
       // Sync evacuation route clearance status with live road status
-      let routeWithLiveStatus = v.evacuationRoute ? { ...v.evacuationRoute } : null;
+      const routeWithLiveStatus = v.evacuationRoute
+        ? { ...v.evacuationRoute }
+        : null;
       if (routeWithLiveStatus) {
-        const matchingRoad = roads.find((r) => r.code === routeWithLiveStatus?.corridor);
+        const matchingRoad = roads.find(
+          (r) => r.code === routeWithLiveStatus.corridor
+        );
         if (matchingRoad) {
           if (matchingRoad.status === "blocked") {
             routeWithLiveStatus.status = "blocked";
@@ -227,22 +285,19 @@ export default function OfficerVillagesPage() {
 
   // ── Search & Filter Logic ───────────────────────────────────────────
   const filteredAndSortedVillages = useMemo(() => {
-    let result = enrichedVillages.filter((v) => {
-      // District filter
+    const result = enrichedVillages.filter((v) => {
       if (selectedDistrict !== "All" && v.district !== selectedDistrict) {
         return false;
       }
-      // State filter
       if (selectedState !== "All" && v.state !== selectedState) {
         return false;
       }
-      // Risk filter
       if (selectedRisk !== "All" && v.currentRiskLevel !== selectedRisk) {
         return false;
       }
-      // Text search
       const q = search.toLowerCase().trim();
       if (q) {
+        const matchesId = v.id.toLowerCase().includes(q);
         const matchesName = v.name.toLowerCase().includes(q);
         const matchesDistrict = v.district.toLowerCase().includes(q);
         const matchesState = v.state.toLowerCase().includes(q);
@@ -253,6 +308,7 @@ export default function OfficerVillagesPage() {
           v.safeShelter?.name.toLowerCase().includes(q) || false;
 
         if (
+          !matchesId &&
           !matchesName &&
           !matchesDistrict &&
           !matchesState &&
@@ -266,13 +322,16 @@ export default function OfficerVillagesPage() {
       return true;
     });
 
-    // Sorting
     result.sort((a, b) => {
       switch (sortBy) {
         case "risk-desc":
-          return RISK_WEIGHTS[b.currentRiskLevel] - RISK_WEIGHTS[a.currentRiskLevel];
+          return (
+            RISK_WEIGHTS[b.currentRiskLevel] - RISK_WEIGHTS[a.currentRiskLevel]
+          );
         case "risk-asc":
-          return RISK_WEIGHTS[a.currentRiskLevel] - RISK_WEIGHTS[b.currentRiskLevel];
+          return (
+            RISK_WEIGHTS[a.currentRiskLevel] - RISK_WEIGHTS[b.currentRiskLevel]
+          );
         case "pop-desc":
           return b.populationEstimate - a.populationEstimate;
         case "pop-asc":
@@ -296,14 +355,14 @@ export default function OfficerVillagesPage() {
     sortBy,
   ]);
 
-  // Ensure selected village remains valid when filters change
+  // Ensure selected village remains aligned with filtered directory
   const selectedVillage = useMemo(() => {
     return (
-      enrichedVillages.find((v) => v.id === selectedVillageId) ||
+      filteredAndSortedVillages.find((v) => v.id === selectedVillageId) ||
       filteredAndSortedVillages[0] ||
       null
     );
-  }, [enrichedVillages, selectedVillageId, filteredAndSortedVillages]);
+  }, [selectedVillageId, filteredAndSortedVillages]);
 
   const selectedVillageAlerts = useMemo(() => {
     return selectedVillage ? getVillageAlerts(selectedVillage) : [];
@@ -328,21 +387,6 @@ export default function OfficerVillagesPage() {
     setSortBy("risk-desc");
   };
 
-  const getRiskBadge = (level: VillageRiskLevel) => {
-    switch (level) {
-      case "Critical":
-        return "bg-red-100 text-red-800 border-red-200 ring-1 ring-red-300";
-      case "High":
-        return "bg-amber-100 text-amber-800 border-amber-200";
-      case "Medium":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      case "Low":
-        return "bg-emerald-100 text-emerald-800 border-emerald-200";
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
-    }
-  };
-
   return (
     <PortalLayout
       allowedRoles={["officer", "admin"]}
@@ -352,572 +396,678 @@ export default function OfficerVillagesPage() {
         <div className="flex items-center gap-2">
           <Link
             href="/officer/alerts"
-            className="px-3.5 py-1.5 rounded-full bg-[#D6A65D] hover:bg-[#c9984e] text-[#173D32] text-xs font-bold shadow-xs transition-all flex items-center gap-1.5"
+            className="px-3.5 py-1.5 rounded-full bg-[#D6A65D] hover:bg-[#c9984e] text-[#173D32] text-xs font-bold shadow-xs transition-all inline-flex items-center gap-1.5"
           >
-            <span>📢</span> Broadcast Alert
+            <Megaphone className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Broadcast Alert</span>
           </Link>
           <Link
             href="/officer/dashboard"
-            className="px-3.5 py-1.5 rounded-full bg-[#173D32] text-[#F6F4EC] text-xs font-bold hover:bg-[#1a4437] transition-all"
+            className="px-3.5 py-1.5 rounded-full bg-[#173D32] text-[#F6F4EC] text-xs font-bold hover:bg-[#1a4437] transition-all inline-flex items-center gap-1.5"
           >
-            ← Dashboard
+            <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Dashboard</span>
           </Link>
         </div>
       }
     >
-      <div className="space-y-6 sm:space-y-8 w-full">
+      <div className="space-y-6 w-full">
         {/* ── 1. Village Overview Summary Cards ─────────────────────────── */}
-      <VillageOverviewCards metrics={overviewMetrics} isLoading={isLoading} />
+        <VillageOverviewCards metrics={overviewMetrics} isLoading={isLoading} />
 
-      {/* ── Error Banner if Telemetry Sync Fails ──────────────────────── */}
-      {error && (
-        <div className="mb-6 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-semibold">
-          <div className="flex items-center gap-2">
-            <span>⚠️</span>
-            <span>{error} — Operating with offline cached village telemetry.</span>
-          </div>
-          <button
-            type="button"
-            onClick={handleRetry}
-            className="px-3 py-1 rounded-full bg-red-700 text-white font-bold self-start sm:self-auto cursor-pointer"
-          >
-            Retry Connection
-          </button>
-        </div>
-      )}
-
-      {/* ── 4. Search, Filter & Sorting Bar ──────────────────────────── */}
-      <div className="mb-6 bg-[#FAF8F2] border border-[#173D32]/12 rounded-3xl p-4 sm:p-5 shadow-xs space-y-4">
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-          {/* Search Input */}
-          <div className="relative flex-1">
-            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#173D32]/50 text-xs">
-              🔍
-            </span>
-            <input
-              type="text"
-              placeholder="Search village name, district, contact, shelter, corridor..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-10 pl-9 pr-8 rounded-xl bg-[#F6F4EC] border border-[#173D32]/20 text-xs text-[#173D32] placeholder:text-[#173D32]/50 focus:outline-none focus:ring-1 focus:ring-[#173D32]"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[#173D32]/50 hover:text-[#173D32] cursor-pointer"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-
-          {/* Filter Dropdowns */}
-          <div className="flex flex-wrap items-center gap-2">
-            {/* District Filter */}
-            <div className="flex items-center gap-1.5">
-              <label htmlFor="district-select" className="text-[11px] font-bold text-[#173D32]/65 uppercase">
-                District:
-              </label>
-              <select
-                id="district-select"
-                value={selectedDistrict}
-                onChange={(e) => setSelectedDistrict(e.target.value)}
-                className="h-9 px-3 rounded-xl bg-[#F6F4EC] border border-[#173D32]/20 text-xs font-bold text-[#173D32] focus:outline-none cursor-pointer"
-              >
-                <option value="All">All Districts</option>
-                {availableDistricts
-                  .filter((d) => d !== "All")
-                  .map((dist) => (
-                    <option key={dist} value={dist}>
-                      {dist}
-                    </option>
-                  ))}
-              </select>
+        {/* ── Error Banner if Telemetry Sync Fails ──────────────────────── */}
+        {error && (
+          <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-semibold">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+              <span>
+                {error} — Operating with offline cached village telemetry.
+              </span>
             </div>
-
-            {/* State Filter */}
-            <div className="flex items-center gap-1.5">
-              <label htmlFor="state-select" className="text-[11px] font-bold text-[#173D32]/65 uppercase">
-                State:
-              </label>
-              <select
-                id="state-select"
-                value={selectedState}
-                onChange={(e) => setSelectedState(e.target.value)}
-                className="h-9 px-3 rounded-xl bg-[#F6F4EC] border border-[#173D32]/20 text-xs font-bold text-[#173D32] focus:outline-none cursor-pointer"
-              >
-                <option value="All">All States</option>
-                {availableStates
-                  .filter((s) => s !== "All")
-                  .map((st) => (
-                    <option key={st} value={st}>
-                      {st}
-                    </option>
-                  ))}
-              </select>
-            </div>
-
-            {/* Risk Level Filter */}
-            <div className="flex items-center gap-1.5">
-              <label htmlFor="risk-select" className="text-[11px] font-bold text-[#173D32]/65 uppercase">
-                Risk:
-              </label>
-              <select
-                id="risk-select"
-                value={selectedRisk}
-                onChange={(e) => setSelectedRisk(e.target.value)}
-                className="h-9 px-3 rounded-xl bg-[#F6F4EC] border border-[#173D32]/20 text-xs font-bold text-[#173D32] focus:outline-none cursor-pointer"
-              >
-                <option value="All">All Risk Levels</option>
-                <option value="Critical">Critical</option>
-                <option value="High">High</option>
-                <option value="Medium">Medium</option>
-                <option value="Low">Low</option>
-              </select>
-            </div>
-
-            {/* Sorting Dropdown */}
-            <div className="flex items-center gap-1.5">
-              <label htmlFor="sort-select" className="text-[11px] font-bold text-[#173D32]/65 uppercase">
-                Sort:
-              </label>
-              <select
-                id="sort-select"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className="h-9 px-3 rounded-xl bg-[#F6F4EC] border border-[#173D32]/20 text-xs font-bold text-[#173D32] focus:outline-none cursor-pointer"
-              >
-                <option value="risk-desc">Risk (Highest First)</option>
-                <option value="risk-asc">Risk (Lowest First)</option>
-                <option value="pop-desc">Population (Highest First)</option>
-                <option value="pop-asc">Population (Lowest First)</option>
-                <option value="name-asc">Village Name (A–Z)</option>
-                <option value="district-asc">District (A–Z)</option>
-              </select>
-            </div>
-
-            {/* Reset Filters */}
-            {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={handleResetFilters}
-                className="h-9 px-3 rounded-xl bg-[#173D32]/10 hover:bg-[#173D32]/15 text-[#173D32] text-xs font-bold transition-all cursor-pointer"
-              >
-                Reset Filters
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* View Switcher & Result Count Bar */}
-        <div className="pt-2 border-t border-[#173D32]/8 flex items-center justify-between text-xs text-[#173D32]/70 font-medium">
-          <div>
-            Showing{" "}
-            <span className="font-extrabold text-[#173D32]">
-              {filteredAndSortedVillages.length}
-            </span>{" "}
-            of {enrichedVillages.length} monitored settlements
-          </div>
-
-          <div className="flex items-center gap-1 bg-[#F6F4EC] p-1 rounded-xl border border-[#173D32]/10">
             <button
               type="button"
-              onClick={() => setViewMode("table")}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                viewMode === "table"
-                  ? "bg-[#173D32] text-[#F6F4EC] shadow-2xs"
-                  : "text-[#173D32]/70 hover:text-[#173D32]"
-              }`}
+              onClick={handleRetry}
+              className="px-3.5 py-1.5 rounded-full bg-red-700 text-white font-bold self-start sm:self-auto cursor-pointer hover:bg-red-800 transition-colors"
             >
-              📑 Table
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("cards")}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                viewMode === "cards"
-                  ? "bg-[#173D32] text-[#F6F4EC] shadow-2xs"
-                  : "text-[#173D32]/70 hover:text-[#173D32]"
-              }`}
-            >
-              🗂️ Cards
+              Retry Connection
             </button>
           </div>
-        </div>
-      </div>
+        )}
 
-      {/* ── Main Workspace: Directory (Left) + Detail Panel (Right) ───── */}
-      <PortalSplitLayout
-        leftSpan={7}
-        stickyRight={true}
-        left={
-          <div className="space-y-4">
-          {/* Loading Skeleton */}
-          {isLoading && (
-            <div className="space-y-3">
-              {[1, 2, 3, 4].map((n) => (
-                <div
-                  key={n}
-                  className="h-24 bg-[#FAF8F2] border border-[#173D32]/10 rounded-2xl animate-pulse"
-                />
-              ))}
+        {/* ── 2. Search, Filter & Sorting Bar ───────────────────────────── */}
+        <div className="bg-[#FCFBF8] border border-[#173D32]/12 rounded-2xl p-3.5 sm:p-4 shadow-[0_2px_10px_-3px_rgba(23,61,50,0.06)]">
+          <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-2.5 xl:gap-3">
+            {/* Search Input */}
+            <div className="relative flex-1 min-w-[170px]">
+              <Search
+                className="w-3.5 h-3.5 text-[#173D32]/50 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                aria-hidden="true"
+              />
+              <input
+                id="village-search"
+                name="village-search"
+                type="text"
+                placeholder="Search village, corridor or ID..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                aria-label="Search village, corridor or ID"
+                className="w-full h-9.5 pl-8 pr-8 rounded-xl bg-[#F6F4EC]/75 border border-[#173D32]/15 text-xs text-[#173D32] placeholder:text-[#173D32]/50 focus:outline-none focus:ring-1 focus:ring-[#173D32] focus:bg-white transition-colors"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  aria-label="Clear search"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-[#173D32]/50 hover:text-[#173D32] hover:bg-[#173D32]/8 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
-          )}
 
-          {/* Empty Search Result State */}
-          {!isLoading && filteredAndSortedVillages.length === 0 && (
-            <div className="text-center py-16 bg-[#FAF8F2] border border-[#173D32]/12 rounded-3xl p-6">
-              <span className="text-3xl block mb-2">🔍</span>
-              <h4 className="text-base font-extrabold text-[#173D32]">
-                No Villages Found
-              </h4>
-              <p className="text-xs text-[#173D32]/70 mt-1 max-w-sm mx-auto leading-relaxed">
-                No monitored settlement matches the current filter criteria or
-                search keyword.
-              </p>
+            {/* Filter Dropdowns with Hairline Dividers */}
+            <div className="flex flex-wrap xl:flex-nowrap items-center gap-1.5 sm:gap-2 shrink-0">
+              {/* District Filter */}
+              <div className="flex items-center gap-1">
+                <label
+                  htmlFor="district-select"
+                  className="text-[11px] font-medium text-[#173D32]/70 whitespace-nowrap"
+                >
+                  District:
+                </label>
+                <div className="relative inline-flex items-center">
+                  <select
+                    id="district-select"
+                    value={selectedDistrict}
+                    onChange={(e) => setSelectedDistrict(e.target.value)}
+                    className="appearance-none h-9 max-w-[114px] pl-2.5 pr-6 rounded-xl bg-white border border-[#173D32]/15 text-[11px] font-bold text-[#173D32] shadow-2xs truncate focus:outline-none focus:ring-1 focus:ring-[#173D32] cursor-pointer"
+                  >
+                    <option value="All">All Districts</option>
+                    {availableDistricts
+                      .filter((d) => d !== "All")
+                      .map((dist) => (
+                        <option key={dist} value={dist}>
+                          {dist}
+                        </option>
+                      ))}
+                  </select>
+                  <ChevronDown
+                    className="w-3.5 h-3.5 text-[#173D32]/65 pointer-events-none absolute right-2"
+                    aria-hidden="true"
+                  />
+                </div>
+              </div>
+
+              <span
+                className="hidden xl:block h-4 w-px bg-[#173D32]/12"
+                aria-hidden="true"
+              />
+
+              {/* State Filter */}
+              <div className="flex items-center gap-1">
+                <label
+                  htmlFor="state-select"
+                  className="text-[11px] font-medium text-[#173D32]/70 whitespace-nowrap"
+                >
+                  State:
+                </label>
+                <div className="relative inline-flex items-center">
+                  <select
+                    id="state-select"
+                    value={selectedState}
+                    onChange={(e) => setSelectedState(e.target.value)}
+                    className="appearance-none h-9 max-w-[116px] pl-2.5 pr-6 rounded-xl bg-white border border-[#173D32]/15 text-[11px] font-bold text-[#173D32] shadow-2xs truncate focus:outline-none focus:ring-1 focus:ring-[#173D32] cursor-pointer"
+                  >
+                    <option value="All">All States</option>
+                    {availableStates
+                      .filter((s) => s !== "All")
+                      .map((st) => (
+                        <option key={st} value={st}>
+                          {st}
+                        </option>
+                      ))}
+                  </select>
+                  <ChevronDown
+                    className="w-3.5 h-3.5 text-[#173D32]/65 pointer-events-none absolute right-2"
+                    aria-hidden="true"
+                  />
+                </div>
+              </div>
+
+              <span
+                className="hidden xl:block h-4 w-px bg-[#173D32]/12"
+                aria-hidden="true"
+              />
+
+              {/* Risk Level Filter */}
+              <div className="flex items-center gap-1">
+                <label
+                  htmlFor="risk-select"
+                  className="text-[11px] font-medium text-[#173D32]/70 whitespace-nowrap"
+                >
+                  Risk:
+                </label>
+                <div className="relative inline-flex items-center">
+                  <select
+                    id="risk-select"
+                    value={selectedRisk}
+                    onChange={(e) => setSelectedRisk(e.target.value)}
+                    className="appearance-none h-9 max-w-[120px] pl-2.5 pr-6 rounded-xl bg-white border border-[#173D32]/15 text-[11px] font-bold text-[#173D32] shadow-2xs truncate focus:outline-none focus:ring-1 focus:ring-[#173D32] cursor-pointer"
+                  >
+                    <option value="All">All Risk Levels</option>
+                    <option value="Critical">Critical</option>
+                    <option value="High">High</option>
+                    <option value="Medium">Moderate</option>
+                    <option value="Low">Low</option>
+                  </select>
+                  <ChevronDown
+                    className="w-3.5 h-3.5 text-[#173D32]/65 pointer-events-none absolute right-2"
+                    aria-hidden="true"
+                  />
+                </div>
+              </div>
+
+              <span
+                className="hidden xl:block h-4 w-px bg-[#173D32]/12"
+                aria-hidden="true"
+              />
+
+              {/* Sorting Dropdown */}
+              <div className="flex items-center gap-1">
+                <label
+                  htmlFor="sort-select"
+                  className="text-[11px] font-medium text-[#173D32]/70 whitespace-nowrap"
+                >
+                  Sort:
+                </label>
+                <div className="relative inline-flex items-center">
+                  <select
+                    id="sort-select"
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as SortOption)}
+                    className="appearance-none h-9 max-w-[146px] pl-2.5 pr-6 rounded-xl bg-white border border-[#173D32]/15 text-[11px] font-bold text-[#173D32] shadow-2xs truncate focus:outline-none focus:ring-1 focus:ring-[#173D32] cursor-pointer"
+                  >
+                    <option value="risk-desc">Risk (Highest First)</option>
+                    <option value="risk-asc">Risk (Lowest First)</option>
+                    <option value="pop-desc">Population (Highest First)</option>
+                    <option value="pop-asc">Population (Lowest First)</option>
+                    <option value="name-asc">Village Name (A–Z)</option>
+                    <option value="district-asc">District (A–Z)</option>
+                  </select>
+                  <ChevronDown
+                    className="w-3.5 h-3.5 text-[#173D32]/65 pointer-events-none absolute right-2"
+                    aria-hidden="true"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* View Switcher & Result Count Bar */}
+          <div className="pt-3 mt-3 border-t border-[#173D32]/10 flex flex-wrap items-center justify-between gap-2 text-xs text-[#173D32]/70 font-medium">
+            <div className="flex flex-wrap items-center gap-3">
+              <span>
+                Showing{" "}
+                <span className="font-bold text-[#173D32]">
+                  {filteredAndSortedVillages.length}
+                </span>{" "}
+                of{" "}
+                <span className="font-bold text-[#173D32]">
+                  {enrichedVillages.length}
+                </span>{" "}
+                monitored settlements
+              </span>
+
               {hasActiveFilters && (
                 <button
                   type="button"
                   onClick={handleResetFilters}
-                  className="mt-4 px-4 py-2 rounded-xl bg-[#173D32] text-[#F6F4EC] text-xs font-bold hover:bg-[#1a4437] transition-all cursor-pointer"
+                  className="px-2.5 py-1 rounded-lg bg-[#173D32]/8 hover:bg-[#173D32]/14 text-[#173D32] text-[11px] font-bold transition-colors cursor-pointer"
                 >
-                  Clear All Filters
+                  Reset filters
                 </button>
               )}
             </div>
-          )}
 
-          {/* Directory Content: Table View */}
-          {!isLoading &&
-            filteredAndSortedVillages.length > 0 &&
-            viewMode === "table" && (
-              <div className="bg-[#FAF8F2] border border-[#173D32]/12 rounded-3xl shadow-xs overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-[#173D32]/5 border-b border-[#173D32]/10 text-[11px] font-black uppercase tracking-wider text-[#173D32]">
-                        <th className="py-3.5 px-4">Village & Corridor</th>
-                        <th className="py-3.5 px-3">District</th>
-                        <th className="py-3.5 px-3">Risk Level</th>
-                        <th className="py-3.5 px-3 text-right">Population</th>
-                        <th className="py-3.5 px-3">Nearest Safe Shelter</th>
-                        <th className="py-3.5 px-3">Evacuation Route</th>
-                        <th className="py-3.5 px-3 text-center">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#173D32]/8 font-medium text-[#173D32]">
+            <div className="inline-flex items-center rounded-xl border border-[#173D32]/15 bg-white p-0.5 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setViewMode("table")}
+                aria-pressed={viewMode === "table"}
+                className={`px-3 py-1.5 rounded-[9px] text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
+                  viewMode === "table"
+                    ? "bg-[#173D32] text-[#F6F4EC] shadow-2xs"
+                    : "text-[#173D32]/75 hover:text-[#173D32]"
+                }`}
+              >
+                <List className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>Table</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("cards")}
+                aria-pressed={viewMode === "cards"}
+                className={`px-3 py-1.5 rounded-[9px] text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
+                  viewMode === "cards"
+                    ? "bg-[#173D32] text-[#F6F4EC] shadow-2xs"
+                    : "text-[#173D32]/75 hover:text-[#173D32]"
+                }`}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>Cards</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── 3. Main Workspace: Directory (Left) + Village Dossier (Right) ─ */}
+        <PortalSplitLayout
+          leftSpan={7}
+          stickyRight={true}
+          left={
+            <div className="space-y-4">
+              {/* Loading Skeleton */}
+              {isLoading && (
+                <div className="bg-[#FCFBF8] border border-[#173D32]/12 rounded-2xl p-4 space-y-3 shadow-[0_2px_10px_-3px_rgba(23,61,50,0.06)]">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <div
+                      key={n}
+                      className="h-16 bg-[#F5F2E9]/70 rounded-xl animate-pulse"
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Empty Search Result State */}
+              {!isLoading && filteredAndSortedVillages.length === 0 && (
+                <div className="text-center py-14 bg-[#FCFBF8] border border-[#173D32]/12 rounded-2xl p-6 shadow-[0_2px_10px_-3px_rgba(23,61,50,0.06)]">
+                  <div className="w-12 h-12 rounded-2xl bg-[#EAF0E6] border border-[#173D32]/10 flex items-center justify-center text-[#173D32] mx-auto mb-3">
+                    <Search className="w-5 h-5" />
+                  </div>
+                  <h4 className="text-base font-extrabold text-[#173D32]">
+                    No Settlements Found
+                  </h4>
+                  <p className="text-xs text-[#173D32]/65 mt-1.5 max-w-sm mx-auto leading-relaxed">
+                    No monitored settlement matches the current filter criteria or
+                    search keyword.
+                  </p>
+                  {hasActiveFilters && (
+                    <button
+                      type="button"
+                      onClick={handleResetFilters}
+                      className="mt-4 px-4 py-2 rounded-xl bg-[#173D32] text-[#F6F4EC] text-xs font-bold hover:bg-[#1a4437] transition-all cursor-pointer"
+                    >
+                      Clear All Filters
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Directory Content: Table View */}
+              {!isLoading &&
+                filteredAndSortedVillages.length > 0 &&
+                viewMode === "table" && (
+                  <div className="bg-[#FCFBF8] border border-[#173D32]/12 rounded-2xl shadow-[0_2px_10px_-3px_rgba(23,61,50,0.06)] overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-[#F5F2E9] border-b border-[#173D32]/10 text-[11px] font-semibold text-[#173D32]/85">
+                            <th className="py-3 pl-3.5 pr-1.5 whitespace-nowrap">
+                              Settlement &amp; Corridor
+                            </th>
+                            <th className="py-3 px-1.5 whitespace-nowrap">
+                              District
+                            </th>
+                            <th className="py-3 px-1.5 whitespace-nowrap">
+                              Risk Level
+                            </th>
+                            <th className="py-3 px-1.5 whitespace-nowrap">
+                              Population
+                            </th>
+                            <th className="py-3 px-1.5 whitespace-nowrap">
+                              Nearest Safe Shelter
+                            </th>
+                            <th className="py-3 pr-2.5 pl-1 w-8">
+                              <span className="sr-only">Inspect</span>
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#173D32]/8 text-[#173D32]">
+                          {filteredAndSortedVillages.map((village) => {
+                            const isSelected = selectedVillage?.id === village.id;
+                            const selectedTheme = getSelectedRowTheme(
+                              village.currentRiskLevel
+                            );
+
+                            return (
+                              <tr
+                                key={village.id}
+                                tabIndex={0}
+                                aria-selected={isSelected}
+                                onClick={() => setSelectedVillageId(village.id)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    setSelectedVillageId(village.id);
+                                  }
+                                }}
+                                className={`transition-colors cursor-pointer group focus:outline-none focus-visible:bg-[#EEF4EB] ${
+                                  isSelected
+                                    ? selectedTheme.rowBg
+                                    : "bg-[#FCFBF8] hover:bg-[#F6F4EC]/75"
+                                }`}
+                              >
+                                {/* Settlement & Corridor */}
+                                <td className="py-3.5 pl-3.5 pr-1.5 relative max-w-[158px]">
+                                  {isSelected && (
+                                    <span
+                                      aria-hidden="true"
+                                      className={`absolute left-0.5 top-1.5 bottom-1.5 w-1 rounded-full ${selectedTheme.barBg}`}
+                                    />
+                                  )}
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <SettlementIcon
+                                      villageId={village.id}
+                                      villageName={village.name}
+                                      selectedBoxBg={
+                                        isSelected
+                                          ? selectedTheme.iconBoxBg
+                                          : undefined
+                                      }
+                                    />
+                                    <div className="min-w-0">
+                                      <span
+                                        title={village.name}
+                                        className="font-bold text-[12.5px] text-[#173D32] leading-snug block truncate"
+                                      >
+                                        {village.name}
+                                      </span>
+                                      <span className="text-[10.5px] font-medium text-[#173D32]/60 block mt-0.5 whitespace-nowrap">
+                                        {village.id} &bull; {village.corridor}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </td>
+
+                                {/* District */}
+                                <td className="py-3 px-1.5 whitespace-nowrap">
+                                  <span className="font-medium text-[11px] text-[#173D32]/85">
+                                    {village.district}
+                                  </span>
+                                </td>
+
+                                {/* Risk Level */}
+                                <td className="py-3 px-1.5 whitespace-nowrap">
+                                  <VillageRiskBadge
+                                    level={village.currentRiskLevel}
+                                    compact
+                                  />
+                                </td>
+
+                                {/* Population */}
+                                <td className="py-3 px-1.5 whitespace-nowrap">
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#173D32] tabular-nums">
+                                    <Users
+                                      className="w-3.5 h-3.5 text-[#173D32]/65 shrink-0"
+                                      aria-hidden="true"
+                                    />
+                                    <span>
+                                      {village.populationEstimate.toLocaleString()}
+                                    </span>
+                                  </span>
+                                </td>
+
+                                {/* Nearest Safe Shelter */}
+                                <td className="py-3 px-1.5 max-w-[144px]">
+                                  {village.safeShelter ? (
+                                    <div className="min-w-0">
+                                      <span
+                                        className="font-bold text-[11px] text-[#173D32] inline-flex items-center gap-1 max-w-full"
+                                        title={village.safeShelter.name}
+                                      >
+                                        <Home
+                                          className="w-3.5 h-3.5 text-[#2E6041] shrink-0"
+                                          aria-hidden="true"
+                                        />
+                                        <span className="truncate">
+                                          {village.safeShelter.name}
+                                        </span>
+                                      </span>
+                                      <span className="text-[10px] text-[#173D32]/60 block mt-0.5 pl-4.5 whitespace-nowrap">
+                                        {village.safeShelter.distanceKm} km &bull;
+                                        Capacity: {village.safeShelter.capacity}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-[11px] text-[#173D32]/45 italic">
+                                      — Not designated
+                                    </span>
+                                  )}
+                                </td>
+
+                                {/* Inspect Chevron Button */}
+                                <td className="py-3 pr-2.5 pl-1 text-right whitespace-nowrap">
+                                  <button
+                                    type="button"
+                                    aria-label={`Inspect ${village.name}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedVillageId(village.id);
+                                    }}
+                                    className={`w-6.5 h-6.5 rounded-full border inline-flex items-center justify-center transition-all cursor-pointer ${
+                                      isSelected
+                                        ? "bg-white border-[#173D32]/20 text-[#173D32] shadow-2xs"
+                                        : "bg-white/90 border-[#173D32]/12 text-[#173D32]/60 group-hover:border-[#173D32]/25 group-hover:text-[#173D32]"
+                                    }`}
+                                  >
+                                    <ChevronRight
+                                      className="w-3.5 h-3.5"
+                                      aria-hidden="true"
+                                    />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+              {/* Directory Content: Card Grid View */}
+              {!isLoading &&
+                filteredAndSortedVillages.length > 0 &&
+                viewMode === "cards" && (
+                  <div className="bg-[#FCFBF8] border border-[#173D32]/12 rounded-2xl p-4 sm:p-5 shadow-[0_2px_10px_-3px_rgba(23,61,50,0.06)]">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {filteredAndSortedVillages.map((village) => {
                         const isSelected = selectedVillage?.id === village.id;
                         const vAlerts = getVillageAlerts(village);
                         const vReports = getVillageReports(village);
 
                         return (
-                          <tr
+                          <button
+                            type="button"
                             key={village.id}
                             onClick={() => setSelectedVillageId(village.id)}
-                            className={`transition-colors cursor-pointer ${
+                            className={`text-left p-4 rounded-2xl border bg-white transition-all cursor-pointer flex flex-col justify-between ${
                               isSelected
-                                ? "bg-[#173D32]/8 font-semibold"
-                                : "hover:bg-[#173D32]/4"
+                                ? "border-[#173D32] shadow-[0_6px_20px_-6px_rgba(23,61,50,0.16)] ring-1 ring-[#173D32]/25"
+                                : "border-[#173D32]/10 shadow-[0_2px_10px_-3px_rgba(23,61,50,0.05)] hover:border-[#173D32]/25"
                             }`}
                           >
-                            {/* Village Name & ID */}
-                            <td className="py-3.5 px-4">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="font-extrabold text-sm text-[#173D32]">
-                                  {village.name}
-                                </span>
-                                {vAlerts.length > 0 && (
-                                  <span
-                                    className="px-1.5 py-0.2 rounded-full text-[9px] font-black uppercase bg-red-600 text-white animate-pulse"
-                                    title={`${vAlerts.length} active alert(s)`}
-                                  >
-                                    Alert
-                                  </span>
-                                )}
-                                {vReports.length > 0 && (
-                                  <span
-                                    className="px-1.5 py-0.2 rounded-full text-[9px] font-black uppercase bg-blue-600 text-white"
-                                    title={`${vReports.length} ground report(s)`}
-                                  >
-                                    Report
-                                  </span>
-                                )}
-                              </div>
-                              <span className="text-[10px] text-[#173D32]/60 block font-mono">
-                                {village.id} · {village.state} ({village.corridor})
-                              </span>
-                            </td>
-
-                            {/* District */}
-                            <td className="py-3.5 px-3 whitespace-nowrap">
-                              <span className="font-semibold">
-                                {village.district}
-                              </span>
-                            </td>
-
-                            {/* Risk Level */}
-                            <td className="py-3.5 px-3 whitespace-nowrap">
-                              <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase border ${getRiskBadge(
+                            <div className="flex items-stretch gap-3 w-full">
+                              <div
+                                className={`w-1 rounded-full shrink-0 ${getRiskBarClass(
                                   village.currentRiskLevel
                                 )}`}
-                              >
-                                {village.currentRiskLevel}
-                              </span>
-                            </td>
+                              />
 
-                            {/* Population */}
-                            <td className="py-3.5 px-3 text-right whitespace-nowrap">
-                              <span className="font-extrabold">
-                                {village.populationEstimate.toLocaleString()}
-                              </span>
-                            </td>
+                              <div className="flex-1 min-w-0">
+                                {/* Card Header */}
+                                <div className="flex items-start justify-between gap-2 mb-2.5">
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <SettlementIcon
+                                      villageId={village.id}
+                                      villageName={village.name}
+                                    />
+                                    <div className="min-w-0">
+                                      <h4 className="text-sm font-bold text-[#173D32] truncate">
+                                        {village.name}
+                                      </h4>
+                                      <span className="text-[11px] text-[#173D32]/65 font-medium block truncate">
+                                        {village.district} &bull; {village.corridor}
+                                      </span>
+                                    </div>
+                                  </div>
 
-                            {/* Nearest Safe Shelter */}
-                            <td className="py-3.5 px-3 max-w-[160px]">
-                              {village.safeShelter ? (
-                                <div className="truncate">
-                                  <span
-                                    className="font-bold text-[#173D32] truncate block"
-                                    title={village.safeShelter.name}
-                                  >
-                                    🏫 {village.safeShelter.name}
-                                  </span>
-                                  <span className="text-[10px] text-[#173D32]/65 block">
-                                    {village.safeShelter.distanceKm} km · Cap:{" "}
-                                    {village.safeShelter.capacity}
-                                  </span>
+                                  <VillageRiskBadge
+                                    level={village.currentRiskLevel}
+                                  />
                                 </div>
-                              ) : (
-                                <span className="text-[11px] text-[#173D32]/50 italic">
-                                  — Not designated
-                                </span>
-                              )}
-                            </td>
 
-                            {/* Evacuation Route */}
-                            <td className="py-3.5 px-3 max-w-[170px]">
-                              {village.evacuationRoute ? (
-                                <div className="truncate">
-                                  <span
-                                    className="font-bold text-[#173D32] truncate block"
-                                    title={village.evacuationRoute.name}
-                                  >
-                                    🛣️ {village.evacuationRoute.name}
-                                  </span>
-                                  <div className="flex items-center gap-1.5 mt-0.5">
-                                    <span
-                                      className={`px-1.5 py-0.2 rounded-md text-[9px] font-black uppercase ${
-                                        village.evacuationRoute.status ===
-                                        "blocked"
-                                          ? "bg-red-100 text-red-800"
-                                          : village.evacuationRoute.status ===
-                                            "caution"
-                                          ? "bg-amber-100 text-amber-800"
-                                          : "bg-emerald-100 text-emerald-800"
-                                      }`}
-                                    >
-                                      {village.evacuationRoute.status}
+                                {/* Badges for active alerts/reports */}
+                                {(vAlerts.length > 0 || vReports.length > 0) && (
+                                  <div className="flex items-center gap-1.5 mb-3 flex-wrap">
+                                    {vAlerts.length > 0 && (
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#EA5B5B] text-white">
+                                        {vAlerts.length} Active{" "}
+                                        {vAlerts.length === 1 ? "Alert" : "Alerts"}
+                                      </span>
+                                    )}
+                                    {vReports.length > 0 && (
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-600 text-white">
+                                        {vReports.length}{" "}
+                                        {vReports.length === 1
+                                          ? "Report"
+                                          : "Reports"}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Metric Bar */}
+                                <div className="py-2.5 border-y border-[#173D32]/10 grid grid-cols-2 gap-2 text-xs mb-3">
+                                  <div>
+                                    <span className="text-[#173D32]/55 inline-flex items-center gap-1 text-[11px]">
+                                      <Users className="w-3.5 h-3.5 text-[#173D32]/50" />
+                                      <span>Population</span>
                                     </span>
-                                    <span className="text-[10px] text-[#173D32]/65">
-                                      {village.evacuationRoute.distanceKm} km
+                                    <span className="font-extrabold text-[#173D32] block mt-0.5 tabular-nums">
+                                      {village.populationEstimate.toLocaleString()}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-[#173D32]/55 inline-flex items-center gap-1 text-[11px]">
+                                      <CloudRain className="w-3.5 h-3.5 text-[#1D4ED8]" />
+                                      <span>24h Rainfall</span>
+                                    </span>
+                                    <span className="font-extrabold text-[#173D32] block mt-0.5">
+                                      {village.lastRainfall || "N/A"}
                                     </span>
                                   </div>
                                 </div>
-                              ) : (
-                                <span className="text-[11px] text-[#173D32]/50 italic">
-                                  — Route unmapped
-                                </span>
-                              )}
-                            </td>
 
-                            {/* Action */}
-                            <td className="py-3.5 px-3 text-center whitespace-nowrap">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedVillageId(village.id);
-                                }}
-                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                                  isSelected
-                                    ? "bg-[#173D32] text-[#F6F4EC]"
-                                    : "bg-[#173D32]/10 hover:bg-[#173D32]/20 text-[#173D32]"
-                                }`}
-                              >
-                                {isSelected ? "Active" : "Inspect →"}
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+                                {/* Shelter Information */}
+                                <div className="p-2.5 rounded-xl bg-[#FAF8F2] border border-[#173D32]/10 text-xs mb-2">
+                                  <span className="text-[10px] font-bold text-[#173D32]/55 uppercase block tracking-wider">
+                                    Nearest Safe Shelter
+                                  </span>
+                                  {village.safeShelter ? (
+                                    <div className="mt-1">
+                                      <span className="font-bold text-[#173D32] inline-flex items-center gap-1 max-w-full">
+                                        <Building2 className="w-3.5 h-3.5 text-[#173D32]/60 shrink-0" />
+                                        <span className="truncate">
+                                          {village.safeShelter.name}
+                                        </span>
+                                      </span>
+                                      <span className="text-[10px] text-[#173D32]/65 block mt-0.5">
+                                        {village.safeShelter.distanceKm} km &bull;
+                                        Capacity: {village.safeShelter.capacity}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-[11px] text-[#173D32]/45 italic block mt-0.5">
+                                      No designated safe shelter recorded
+                                    </span>
+                                  )}
+                                </div>
 
-          {/* Directory Content: Card Grid View */}
-          {!isLoading &&
-            filteredAndSortedVillages.length > 0 &&
-            viewMode === "cards" && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {filteredAndSortedVillages.map((village) => {
-                  const isSelected = selectedVillage?.id === village.id;
-                  const vAlerts = getVillageAlerts(village);
-                  const vReports = getVillageReports(village);
-
-                  return (
-                    <div
-                      key={village.id}
-                      onClick={() => setSelectedVillageId(village.id)}
-                      className={`p-5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
-                        isSelected
-                          ? "bg-[#FAF8F2] border-[#173D32] shadow-sm ring-1 ring-[#173D32]/30"
-                          : "bg-[#FAF8F2] border-[#173D32]/12 hover:border-[#173D32]/30"
-                      }`}
-                    >
-                      <div>
-                        {/* Card Header */}
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <div>
-                            <h4 className="text-base font-black text-[#173D32]">
-                              {village.name}
-                            </h4>
-                            <span className="text-[11px] text-[#173D32]/70 font-medium">
-                              {village.district} District · {village.state}
-                            </span>
-                          </div>
-
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${getRiskBadge(
-                              village.currentRiskLevel
-                            )}`}
-                          >
-                            {village.currentRiskLevel}
-                          </span>
-                        </div>
-
-                        {/* Badges for active alerts/reports */}
-                        <div className="flex items-center gap-1.5 mb-3 flex-wrap">
-                          {vAlerts.length > 0 && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-red-600 text-white animate-pulse">
-                              {vAlerts.length} Active Alert
-                            </span>
-                          )}
-                          {vReports.length > 0 && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-blue-600 text-white">
-                              {vReports.length} Report
-                            </span>
-                          )}
-                          <span className="px-2 py-0.5 rounded-md bg-[#173D32]/5 text-[#173D32] text-[10px] font-bold">
-                            {village.corridor}
-                          </span>
-                        </div>
-
-                        {/* Metric Bar */}
-                        <div className="py-2 border-y border-[#173D32]/8 grid grid-cols-2 gap-2 text-xs mb-3">
-                          <div>
-                            <span className="text-[#173D32]/60 block text-[11px]">
-                              Population Est.
-                            </span>
-                            <span className="font-extrabold text-[#173D32]">
-                              👥 {village.populationEstimate.toLocaleString()}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-[#173D32]/60 block text-[11px]">
-                              24h Rainfall
-                            </span>
-                            <span className="font-extrabold text-[#173D32]">
-                              🌧️ {village.lastRainfall || "N/A"}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Shelter Information */}
-                        <div className="p-2.5 rounded-xl bg-[#F6F4EC] border border-[#173D32]/10 text-xs mb-2.5">
-                          <span className="text-[10px] font-bold text-[#173D32]/60 uppercase block">
-                            Nearest Safe Shelter:
-                          </span>
-                          {village.safeShelter ? (
-                            <div className="mt-0.5">
-                              <span className="font-extrabold text-[#173D32] block">
-                                🏫 {village.safeShelter.name}
-                              </span>
-                              <span className="text-[10px] text-[#173D32]/70 block mt-0.5">
-                                {village.safeShelter.distanceKm} km · Capacity:{" "}
-                                {village.safeShelter.capacity}
-                              </span>
+                                {/* Evacuation Route */}
+                                <div className="p-2.5 rounded-xl bg-[#FAF8F2] border border-[#173D32]/10 text-xs">
+                                  <span className="text-[10px] font-bold text-[#173D32]/55 uppercase block tracking-wider">
+                                    Evacuation Corridor
+                                  </span>
+                                  {village.evacuationRoute ? (
+                                    <div className="mt-1 flex items-center justify-between gap-1.5">
+                                      <span className="font-bold text-[#173D32] truncate inline-flex items-center gap-1">
+                                        <Route className="w-3.5 h-3.5 text-[#173D32]/60 shrink-0" />
+                                        <span className="truncate">
+                                          {village.evacuationRoute.name}
+                                        </span>
+                                      </span>
+                                      <span
+                                        className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase shrink-0 ${getEvacStatusBadgeClass(
+                                          village.evacuationRoute.status
+                                        )}`}
+                                      >
+                                        {village.evacuationRoute.status}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-[11px] text-[#173D32]/45 italic block mt-0.5">
+                                      Evacuation route unmapped
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                          ) : (
-                            <span className="text-[11px] text-[#173D32]/50 italic block mt-0.5">
-                              No designated safe shelter recorded
-                            </span>
-                          )}
-                        </div>
 
-                        {/* Evacuation Route */}
-                        <div className="p-2.5 rounded-xl bg-[#F6F4EC] border border-[#173D32]/10 text-xs">
-                          <span className="text-[10px] font-bold text-[#173D32]/60 uppercase block">
-                            Evacuation Corridor:
-                          </span>
-                          {village.evacuationRoute ? (
-                            <div className="mt-0.5 flex items-center justify-between gap-1">
-                              <span className="font-bold text-[#173D32] truncate">
-                                🛣️ {village.evacuationRoute.name}
+                            {/* Card Footer */}
+                            <div className="mt-3 pt-2.5 border-t border-[#173D32]/10 flex items-center justify-between text-xs w-full">
+                              <span className="text-[10px] text-[#173D32]/55 font-mono">
+                                {village.id} &bull; {village.state}
                               </span>
                               <span
-                                className={`px-1.5 py-0.2 rounded text-[9px] font-black uppercase shrink-0 ${
-                                  village.evacuationRoute.status === "blocked"
-                                    ? "bg-red-100 text-red-800"
-                                    : village.evacuationRoute.status ===
-                                      "caution"
-                                    ? "bg-amber-100 text-amber-800"
-                                    : "bg-emerald-100 text-emerald-800"
+                                className={`font-bold inline-flex items-center gap-1 ${
+                                  isSelected
+                                    ? "text-[#173D32]"
+                                    : "text-[#173D32]/75"
                                 }`}
                               >
-                                {village.evacuationRoute.status}
+                                {isSelected ? (
+                                  <>
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-[#1E7A45]" />
+                                    <span>Inspecting</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span>Review Dossier</span>
+                                    <ArrowRight className="w-3.5 h-3.5" />
+                                  </>
+                                )}
                               </span>
                             </div>
-                          ) : (
-                            <span className="text-[11px] text-[#173D32]/50 italic block mt-0.5">
-                              Evacuation route unmapped
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Card Footer */}
-                      <div className="mt-4 pt-3 border-t border-[#173D32]/8 flex items-center justify-between text-xs">
-                        <span className="text-[10px] text-[#173D32]/60 font-mono">
-                          ID: {village.id}
-                        </span>
-                        <span
-                          className={`font-bold ${
-                            isSelected ? "text-[#173D32]" : "text-[#173D32]/70"
-                          }`}
-                        >
-                          {isSelected ? "Inspecting ✓" : "Review Dossier →"}
-                        </span>
-                      </div>
+                          </button>
+                        );
+                      })}
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        }
-        right={
-          <VillageDetailPanel
-            village={selectedVillage}
-            activeAlerts={selectedVillageAlerts}
-            reportedIssues={selectedVillageReports}
-          />
-        }
-      />
+                  </div>
+                )}
+            </div>
+          }
+          right={
+            <VillageDetailPanel
+              village={selectedVillage}
+              activeAlerts={selectedVillageAlerts}
+              reportedIssues={selectedVillageReports}
+            />
+          }
+        />
+
+        {/* ── 4. Horizontal Recent Risk History Strip ────────────────────── */}
+        {!isLoading && <VillageRiskHistoryBar village={selectedVillage} />}
       </div>
     </PortalLayout>
   );

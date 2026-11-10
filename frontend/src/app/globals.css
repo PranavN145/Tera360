@@ -111,3 +111,68 @@ a {
     animation: none;
   }
 }
+
+/* Scoped Mapbox ScaleControl polish for Officer Dashboard radar card */
+.officer-radar-map .mapboxgl-ctrl-bottom-right {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 8px 0;
+}
+
+.officer-radar-map .mapboxgl-ctrl-bottom-right .mapboxgl-ctrl {
+  margin: 0;
+  float: none;
+}
+
+.officer-radar-map .mapboxgl-ctrl-scale {
+  background-color: rgba(14, 40, 33, 0.78);
+  backdrop-filter: blur(6px);
+  color: #f6f4ec;
+  border: 1.5px solid rgba(246, 244, 236, 0.75);
+  border-top: none;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 1px 6px 2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+}
+
+.officer-radar-map .mapboxgl-ctrl-attrib.mapboxgl-compact {
+  min-height: 22px;
+  background-color: rgba(250, 248, 242, 0.85);
+}
+
+/* Scoped Mapbox ScaleControl & Attribution polish for Officer Live Risk Map */
+.officer-live-map .mapboxgl-ctrl-bottom-left {
+  padding: 0 0 12px 14px;
+}
+
+.officer-live-map .mapboxgl-ctrl-bottom-left .mapboxgl-ctrl {
+  margin: 0;
+}
+
+.officer-live-map .mapboxgl-ctrl-scale {
+  background-color: rgba(15, 42, 34, 0.72);
+  backdrop-filter: blur(6px);
+  color: #f6f4ec;
+  border: 1.5px solid rgba(246, 244, 236, 0.85);
+  border-top: none;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 2px 7px 3px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.officer-live-map .mapboxgl-ctrl-bottom-right {
+  padding: 0 14px 10px 0;
+}
+
+.officer-live-map .mapboxgl-ctrl-attrib.mapboxgl-compact {
+  min-height: 20px;
+  background-color: rgba(250, 248, 242, 0.75);
+}

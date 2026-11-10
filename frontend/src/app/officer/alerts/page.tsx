@@ -2,9 +2,18 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Megaphone,
+  Radio,
+  ScrollText,
+  ShieldAlert,
+  Zap,
+} from 'lucide-react';
 import PortalLayout from '@/components/portal/PortalLayout';
 import PortalMetricGrid from '@/components/portal/PortalMetricGrid';
-import PortalMetricCard from '@/components/portal/PortalMetricCard';
+import OfficerKpiCard from '@/components/officer/OfficerKpiCard';
 import AlertComposer from '@/components/officer/alerts/AlertComposer';
 import AlertHistoryFeed from '@/components/officer/alerts/AlertHistoryFeed';
 import { publicApi } from '@/lib/api';
@@ -21,7 +30,7 @@ export default function OfficerAlertsPage() {
     let mounted = true;
     async function loadMetrics() {
       try {
-        const res = await publicApi.getAlerts({ limit: 100 });
+        const res = await publicApi.getAlerts({ limit: 50 });
         if (mounted) {
           setAlerts(res.alerts);
         }
@@ -52,9 +61,10 @@ export default function OfficerAlertsPage() {
         <div className="flex items-center gap-2">
           <Link
             href="/officer/dashboard"
-            className="px-3.5 py-1.5 rounded-full bg-[#173D32] text-[#F6F4EC] text-xs font-bold hover:bg-[#1a4437] transition-all"
+            className="px-3.5 py-1.5 rounded-full bg-[#173D32] text-[#F6F4EC] text-xs font-bold hover:bg-[#1a4437] transition-all inline-flex items-center gap-1.5"
           >
-            ← Dashboard
+            <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Dashboard</span>
           </Link>
         </div>
       }
@@ -62,81 +72,96 @@ export default function OfficerAlertsPage() {
       <div className="space-y-6 sm:space-y-8 w-full">
         {/* ── 1. Top Metric Summary Cards (4-column responsive grid) ── */}
         <PortalMetricGrid columns={4} ariaLabel="Alert Center Metric Summary">
-          <PortalMetricCard
+          <OfficerKpiCard
             id="metric-critical-alerts"
+            variant="summary"
             title="Critical Bulletins"
             value={criticalCount}
             unit="Evacuation / Red"
-            icon="🔴"
+            icon={ShieldAlert}
+            accent={criticalCount > 0 ? 'red' : 'green'}
             badge="Red Alert"
-            badgeVariant="critical"
+            badgeTone="red"
             detail="Life-safety danger advisories and mandatory evacuation orders"
-            pulse={criticalCount > 0}
             isLoading={isLoadingMetrics}
           />
 
-          <PortalMetricCard
+          <OfficerKpiCard
             id="metric-warning-alerts"
+            variant="summary"
             title="Warning Advisories"
             value={warningCount}
             unit="Amber Stage"
-            icon="🟡"
+            icon={AlertTriangle}
+            accent={warningCount > 0 ? 'amber' : 'green'}
             badge="Amber Notice"
-            badgeVariant="warning"
+            badgeTone="amber"
             detail="Highway transit restrictions and active slope clearance warnings"
             isLoading={isLoadingMetrics}
           />
 
-          <PortalMetricCard
+          <OfficerKpiCard
             id="metric-watch-alerts"
+            variant="summary"
             title="Watch State"
             value={watchCount}
             unit="Yellow Stage"
-            icon="⚡"
+            icon={Zap}
+            accent={watchCount > 0 ? 'amber' : 'green'}
             badge="Yellow Watch"
-            badgeVariant="watch"
+            badgeTone={watchCount > 0 ? 'amber' : 'green'}
             detail="Early pore-water saturation and meteorological watch bulletins"
             isLoading={isLoadingMetrics}
           />
 
-          <PortalMetricCard
+          <OfficerKpiCard
             id="metric-gateway-status"
+            variant="summary"
             title="Telecom Gateway"
             value="In-App Active"
-            icon="📡"
+            icon={Radio}
+            accent="blue"
             badge="Local Sync"
-            badgeColor="bg-amber-100 text-amber-900 border-amber-300"
+            badgeTone="blue"
             detail="Push notifications operational; cellular SMS/IVR running locally"
             isLoading={false}
           />
         </PortalMetricGrid>
 
         {/* ── 2. Tab Navigation Switcher ── */}
-        <div className="flex rounded-2xl bg-[#FAF8F2] border border-[#173D32]/12 p-1.5 max-w-md shadow-2xs">
+        <div
+          role="tablist"
+          aria-label="Alert Center sections"
+          className="flex flex-wrap items-center gap-2.5"
+        >
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === 'compose'}
             onClick={() => setActiveTab('compose')}
-            className={`flex-1 py-2 px-4 rounded-xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+            className={`py-2 px-4 sm:px-5 rounded-full text-xs sm:text-[13px] font-bold transition-all cursor-pointer inline-flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'compose'
                 ? 'bg-[#173D32] text-[#F6F4EC] shadow-xs'
-                : 'text-[#173D32]/75 hover:bg-[#173D32]/5'
+                : 'bg-[#FAF8F2] text-[#173D32]/85 border border-[#173D32]/15 hover:bg-white hover:text-[#173D32]'
             }`}
           >
-            <span>📢</span>
-            <span>Create & Review Alert</span>
+            <Megaphone className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+            <span>Create &amp; Review Alert</span>
           </button>
 
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === 'history'}
             onClick={() => setActiveTab('history')}
-            className={`flex-1 py-2 px-4 rounded-xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+            className={`py-2 px-4 sm:px-5 rounded-full text-xs sm:text-[13px] font-bold transition-all cursor-pointer inline-flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'history'
                 ? 'bg-[#173D32] text-[#F6F4EC] shadow-xs'
-                : 'text-[#173D32]/75 hover:bg-[#173D32]/5'
+                : 'bg-[#FAF8F2] text-[#173D32]/85 border border-[#173D32]/15 hover:bg-white hover:text-[#173D32]'
             }`}
           >
-            <span>📜</span>
-            <span>Alert History & Logs</span>
+            <ScrollText className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+            <span>Alert History &amp; Logs</span>
           </button>
         </div>
 

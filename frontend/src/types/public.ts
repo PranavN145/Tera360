@@ -32,6 +32,8 @@ export interface PublicAlertItem {
   status: string;
   publishedAt: string;
   createdAt: string;
+  confidence?: number | null;
+  modelName?: string | null;
 }
 
 export interface PublicRoadStatusItem {
@@ -57,6 +59,8 @@ export interface PublicStats {
   totalMonitoredCorridors: number;
   communityReportsSubmitted: number;
   lastUpdated: string;
+  modelStatus?: string | null;
+  modelActive?: boolean | null;
 }
 
 export interface PublicPagination {

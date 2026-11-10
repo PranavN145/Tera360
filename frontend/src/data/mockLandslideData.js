@@ -10,6 +10,7 @@ export const STATE_PRESETS = {
   'Assam': { center: [92.95, 25.18], zoom: 12.5, pitch: 58, bearing: -25 },
   'Meghalaya': { center: [91.89, 25.57], zoom: 12.5, pitch: 55, bearing: -10 },
   'Arunachal': { center: [93.60, 27.10], zoom: 12.0, pitch: 60, bearing: -20 },
+  'Arunachal Pradesh': { center: [93.60, 27.10], zoom: 12.0, pitch: 60, bearing: -20 },
   'Manipur': { center: [93.93, 24.81], zoom: 12.5, pitch: 55, bearing: -15 },
   'Mizoram': { center: [92.71, 23.72], zoom: 12.5, pitch: 58, bearing: -20 },
   'Tripura': { center: [91.98, 23.83], zoom: 12.0, pitch: 50, bearing: -10 },

@@ -26,6 +26,131 @@ const hasValidToken = Boolean(
   !MAPBOX_ACCESS_TOKEN.includes("your_mapbox_access_token")
 );
 
+export const isMapboxTokenConfigured = hasValidToken;
+
+export interface RiskMapHotspot {
+  id: string;
+  code: string;
+  title: string;
+  region: string;
+  state?: string;
+  severity: "Critical" | "Warning" | "Normal";
+  riskLevel: string;
+  status: string;
+  coordinates: [number, number]; // [lng, lat]
+  routeCoordinates?: [number, number][]; // optional real LineString path
+  rainfall24h?: string | null;
+  statusReason?: string | null;
+}
+
+export interface RiskMapLayerVisibility {
+  hotspots: boolean;
+  corridors: boolean;
+  susceptibility: boolean;
+  rainfall: boolean;
+  slopeElevation: boolean;
+  hillshade?: boolean;
+  hazardHeatmap?: boolean;
+  rescueRoute?: boolean;
+  fieldSensors?: boolean;
+}
+
+export type RiskMapTerrainMode = "terrain" | "satellite" | "light" | "flat";
+
+const TERRAIN_STYLE_MAP: Record<RiskMapTerrainMode, string> = {
+  terrain: "mapbox://styles/mapbox/outdoors-v12",
+  satellite: "mapbox://styles/mapbox/satellite-streets-v12",
+  light: "mapbox://styles/mapbox/light-v11",
+  flat: "mapbox://styles/mapbox/outdoors-v12",
+};
+
+const REGIONAL_CORRIDOR_ARCS = [
+  {
+    id: "reg-nh29",
+    code: "NH-29",
+    name: "Dimapur – Kohima – Mao Highway",
+    defaultRisk: "critical",
+    coordinates: [
+      [93.72, 25.91],
+      [93.88, 25.78],
+      [94.025, 25.685],
+      [94.11, 25.67],
+      [94.15, 25.52],
+    ],
+  },
+  {
+    id: "reg-nh10",
+    code: "NH-10",
+    name: "Sevoke – Teesta Gorge – Gangtok Highway",
+    defaultRisk: "warning",
+    coordinates: [
+      [88.43, 26.86],
+      [88.485, 27.05],
+      [88.54, 27.20],
+      [88.61, 27.33],
+    ],
+  },
+  {
+    id: "reg-nh27",
+    code: "NH-27",
+    name: "Guwahati – Haflong – Jatinga – Silchar Highway",
+    defaultRisk: "warning",
+    coordinates: [
+      [91.78, 26.14],
+      [92.42, 25.95],
+      [92.95, 25.55],
+      [93.02, 25.17],
+      [92.80, 24.83],
+    ],
+  },
+  {
+    id: "reg-nh6",
+    code: "NH-6",
+    name: "Shillong – Jowai – Sonapur – Silchar Highway",
+    defaultRisk: "warning",
+    coordinates: [
+      [91.89, 25.57],
+      [92.20, 25.44],
+      [92.36, 25.105],
+      [92.62, 24.92],
+      [92.80, 24.83],
+    ],
+  },
+];
+
+const SUSCEPTIBILITY_BASELINE_ZONES: Array<{
+  coordinates: [number, number];
+  weight: number;
+  label: string;
+}> = [
+  { coordinates: [94.025, 25.685], weight: 0.95, label: "Kohima – Pherima Belt" },
+  { coordinates: [88.485, 27.05], weight: 0.9, label: "Teesta Gorge Shear Zone" },
+  { coordinates: [93.02, 25.17], weight: 0.82, label: "Barail Hill Range" },
+  { coordinates: [92.36, 25.105], weight: 0.78, label: "East Jaintia Escarpment" },
+  { coordinates: [93.81, 27.12], weight: 0.65, label: "Papum Pare Foothills" },
+  { coordinates: [93.63, 24.84], weight: 0.68, label: "Noney – Tupul Valley" },
+  { coordinates: [92.72, 23.73], weight: 0.6, label: "Aizawl Steep Ridge" },
+];
+
+function parseRainfallMm(rainfallText?: string | null, severity?: string): number {
+  if (rainfallText) {
+    const match = rainfallText.match(/(\d+(?:\.\d+)?)/);
+    if (match) return Number(match[1]);
+  }
+  if (severity === "Critical") return 168;
+  if (severity === "Warning") return 112;
+  return 42;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export interface RiskMapProps {
   /**
    * Layout presentation variant:
@@ -51,12 +176,30 @@ export interface RiskMapProps {
   showPlayback?: boolean;
   /** Override visibility of Mapbox Navigation Controls (defaults to true) */
   showControls?: boolean;
+  /** Optional Mapbox ScaleControl (defaults to false) */
+  showScaleControl?: boolean;
+  /** Position of Mapbox ScaleControl when enabled (defaults to 'bottom-right') */
+  scalePosition?: "bottom-left" | "bottom-right";
   /** Optional corridor click callback */
   onSelectCorridor?: (corridorId: string, properties: Record<string, any>) => void;
+  /** Optional hotspots to display as interactive regional markers */
+  hotspots?: RiskMapHotspot[];
+  /** Currently focused hotspot id */
+  activeHotspotId?: string | null;
+  /** Callback when a regional hotspot marker is clicked */
+  onSelectHotspot?: (hotspot: RiskMapHotspot) => void;
+  /** Controlled layer visibility flags (optional; when provided, overrides internal HUD layer toggles) */
+  layerVisibility?: Partial<RiskMapLayerVisibility>;
+  /** Controlled terrain/base-map mode */
+  terrainMode?: RiskMapTerrainMode;
+  /** Optional risk filter applied to hotspots and corridor layers */
+  riskFilter?: "all" | "critical";
   /** Optional container CSS class name */
   className?: string;
   /** Optional callback triggered once map style has loaded */
   onMapLoaded?: (map: mapboxgl.Map) => void;
+  /** Optional callback triggered if Mapbox GL reports an initialization/runtime error */
+  onMapError?: (message: string) => void;
 }
 
 /**
@@ -85,12 +228,27 @@ export default function RiskMap({
   showHud,
   showPlayback,
   showControls = true,
+  showScaleControl = false,
+  scalePosition = "bottom-right",
   onSelectCorridor,
+  hotspots,
+  activeHotspotId = null,
+  onSelectHotspot,
+  layerVisibility,
+  terrainMode,
+  riskFilter = "all",
   className = "",
   onMapLoaded,
+  onMapError,
 }: RiskMapProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<mapboxgl.Map | null>(null);
+  const obstacleMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const hotspotMarkersRef = useRef<Map<string, { marker: mapboxgl.Marker; el: HTMLDivElement }>>(new Map());
+  const activeStyleUrlRef = useRef<string>(
+    terrainMode ? TERRAIN_STYLE_MAP[terrainMode] : "mapbox://styles/mapbox/light-v11"
+  );
+  const prevSelectedStateRef = useRef<string | undefined>(selectedState);
 
   const effectiveShowHud =
     showHud !== undefined
@@ -102,27 +260,566 @@ export default function RiskMap({
       ? showPlayback
       : variant === "full";
 
-  // Layer visibility toggle states
+  // Layer visibility toggle states (used by internal HUD when layerVisibility prop is not supplied)
   const [terrainEnabled, setTerrainEnabled] = useState<boolean>(true);
   const [riskHeatmapEnabled, setRiskHeatmapEnabled] = useState<boolean>(true);
   const [rescueRouteEnabled, setRescueRouteEnabled] = useState<boolean>(true);
   const [fieldSensorsEnabled, setFieldSensorsEnabled] = useState<boolean>(true);
   const [isHudCollapsed, setIsHudCollapsed] = useState<boolean>(false);
 
+  const isControlledLayers = layerVisibility !== undefined;
+  const effectiveLayers: RiskMapLayerVisibility = useMemo(
+    () => ({
+      hotspots: layerVisibility?.hotspots ?? true,
+      corridors: layerVisibility?.corridors ?? riskHeatmapEnabled,
+      susceptibility: layerVisibility?.susceptibility ?? false,
+      rainfall: layerVisibility?.rainfall ?? false,
+      slopeElevation: layerVisibility?.slopeElevation ?? false,
+      hillshade: layerVisibility?.hillshade,
+      hazardHeatmap: layerVisibility?.hazardHeatmap,
+      rescueRoute: layerVisibility?.rescueRoute,
+      fieldSensors: layerVisibility?.fieldSensors,
+    }),
+    [layerVisibility, riskHeatmapEnabled]
+  );
+
+  // Refs so style.load and map callbacks always observe latest controlled props
+  const effectiveLayersRef = useRef(effectiveLayers);
+  const isControlledLayersRef = useRef(isControlledLayers);
+  const terrainModeRef = useRef(terrainMode);
+  const riskFilterRef = useRef(riskFilter);
+  const hotspotsRef = useRef(hotspots);
+  const activeHotspotIdRef = useRef(activeHotspotId);
+  const onSelectHotspotRef = useRef(onSelectHotspot);
+  const onSelectCorridorRef = useRef(onSelectCorridor);
+  const onMapLoadedRef = useRef(onMapLoaded);
+  const onMapErrorRef = useRef(onMapError);
+  const terrainEnabledRef = useRef(terrainEnabled);
+  const riskHeatmapEnabledRef = useRef(riskHeatmapEnabled);
+  const rescueRouteEnabledRef = useRef(rescueRouteEnabled);
+  const fieldSensorsEnabledRef = useRef(fieldSensorsEnabled);
+
   // ── Monsoon Simulation Playback State ─────────────────────────
   const [simulationHour, setSimulationHour] = useState<number>(14); // 00:00 to 24:00 (default peak hour 14)
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const playbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Compute dynamic simulated corridor routes GeoJSON based on simulation hour
+  // Compute dynamic simulated corridor routes GeoJSON based on simulation hour (or sync live backend statuses when hotspots are supplied without playback)
   const simulatedCorridorData = useMemo(() => {
-    return computeSimulatedCorridorRoutes(simulationHour);
-  }, [simulationHour]);
+    const base = computeSimulatedCorridorRoutes(simulationHour);
+    if (effectiveShowPlayback || hotspots === undefined) {
+      return base;
+    }
+
+    const activeStateLower = (selectedState || "").trim().toLowerCase();
+    const isStateFiltered = Boolean(activeStateLower && activeStateLower !== "all states");
+
+    const filteredFeatures = base.features
+      .filter((feat: any) => {
+        if (!isStateFiltered) return true;
+        const featState = String(feat.properties?.state || "").toLowerCase();
+        return featState === activeStateLower || activeStateLower.startsWith(featState);
+      })
+      .map((feat: any) => {
+        const props = feat.properties || {};
+        const codeUpper = String(props.corridor || "").toUpperCase();
+        const matched = hotspots.find((h) => h.code.toUpperCase() === codeUpper);
+        if (!matched) return feat;
+
+        // Preserve NH-29's multi-segment hazard gradient when NH-29 is Critical
+        if (codeUpper === "NH-29" && matched.severity === "Critical") {
+          return feat;
+        }
+
+        const syncedStatus =
+          matched.severity === "Critical"
+            ? "critical"
+            : matched.severity === "Warning"
+            ? "warning"
+            : "safe";
+
+        return {
+          ...feat,
+          properties: {
+            ...props,
+            status: syncedStatus,
+            riskStatus: matched.severity === "Normal" ? "Safe" : matched.severity,
+          },
+        };
+      });
+
+    return {
+      ...base,
+      features: filteredFeatures,
+    };
+  }, [simulationHour, effectiveShowPlayback, hotspots, selectedState]);
 
   // Compute dynamic simulated field sensor telemetry along NH-29 Pherima slope
   const simulatedSensorsData = useMemo(() => {
     return computeSimulatedSensors(simulationHour);
   }, [simulationHour]);
+
+  const simulatedCorridorDataRef = useRef(simulatedCorridorData);
+  const simulatedSensorsDataRef = useRef(simulatedSensorsData);
+
+  // Regional highway arcs colored by matching live hotspot risk level
+  const regionalCorridorsGeoJson = useMemo(() => {
+    const list = hotspots || [];
+    const activeStateLower = (selectedState || "").trim().toLowerCase();
+    const isStateFiltered = Boolean(activeStateLower && activeStateLower !== "all states");
+
+    // Include real LineString geometries from backend hotspots when present
+    const customFeatures = list
+      .filter((h) => Array.isArray(h.routeCoordinates) && h.routeCoordinates.length >= 2)
+      .map((h) => ({
+        type: "Feature" as const,
+        properties: {
+          id: h.id,
+          code: h.code,
+          name: h.title,
+          riskLevel:
+            h.severity === "Critical"
+              ? "critical"
+              : h.severity === "Warning"
+              ? "warning"
+              : "safe",
+        },
+        geometry: {
+          type: "LineString" as const,
+          coordinates: h.routeCoordinates as [number, number][],
+        },
+      }));
+
+    const customCodes = new Set(customFeatures.map((f) => f.properties.code.toUpperCase()));
+
+    const arcFeatures = REGIONAL_CORRIDOR_ARCS.filter((arc) => {
+      if (customCodes.has(arc.code.toUpperCase())) return false;
+      if (!isStateFiltered) return true;
+      return list.some((h) => h.code.toUpperCase() === arc.code.toUpperCase());
+    }).map((arc) => {
+      const matched = list.find(
+        (h) => h.code.toUpperCase() === arc.code.toUpperCase()
+      );
+      const risk = matched
+        ? matched.severity === "Critical"
+          ? "critical"
+          : matched.severity === "Warning"
+          ? "warning"
+          : "safe"
+        : arc.defaultRisk;
+
+      return {
+        type: "Feature" as const,
+        properties: {
+          id: arc.id,
+          code: arc.code,
+          name: arc.name,
+          riskLevel: risk,
+        },
+        geometry: {
+          type: "LineString" as const,
+          coordinates: arc.coordinates,
+        },
+      };
+    });
+
+    return {
+      type: "FeatureCollection" as const,
+      features: [...customFeatures, ...arcFeatures],
+    };
+  }, [hotspots, selectedState]);
+
+  const regionalCorridorsRef = useRef(regionalCorridorsGeoJson);
+
+  // Landslide susceptibility heatmap points derived from regional belts + active hotspots
+  const susceptibilityGeoJson = useMemo(() => {
+    const hotspotFeatures = (hotspots || []).map((h) => ({
+      type: "Feature" as const,
+      properties: {
+        weight: h.severity === "Critical" ? 1 : h.severity === "Warning" ? 0.78 : 0.4,
+        label: h.title,
+      },
+      geometry: {
+        type: "Point" as const,
+        coordinates: h.coordinates,
+      },
+    }));
+
+    const baselineFeatures = SUSCEPTIBILITY_BASELINE_ZONES.map((z) => ({
+      type: "Feature" as const,
+      properties: {
+        weight: z.weight,
+        label: z.label,
+      },
+      geometry: {
+        type: "Point" as const,
+        coordinates: z.coordinates,
+      },
+    }));
+
+    return {
+      type: "FeatureCollection" as const,
+      features: [...baselineFeatures, ...hotspotFeatures],
+    };
+  }, [hotspots]);
+
+  const susceptibilityRef = useRef(susceptibilityGeoJson);
+
+  // 24h Rainfall intensity GeoJSON derived from active hotspots & regional telemetry
+  const rainfallGeoJson = useMemo(() => {
+    const basePoints =
+      hotspots && hotspots.length > 0
+        ? hotspots.map((h) => ({
+            coordinates: h.coordinates,
+            mm: parseRainfallMm(h.rainfall24h, h.severity),
+            label: `${h.code}: ${h.rainfall24h || `${parseRainfallMm(h.rainfall24h, h.severity)} mm / 24h`}`,
+          }))
+        : SUSCEPTIBILITY_BASELINE_ZONES.slice(0, 4).map((z, idx) => ({
+            coordinates: z.coordinates,
+            mm: [172, 148, 118, 96][idx] || 72,
+            label: z.label,
+          }));
+
+    return {
+      type: "FeatureCollection" as const,
+      features: basePoints.map((pt, i) => ({
+        type: "Feature" as const,
+        properties: {
+          id: `rain-${i}`,
+          mm: pt.mm,
+          intensity: Math.min(1, Math.max(0.2, pt.mm / 180)),
+          label: pt.label,
+        },
+        geometry: {
+          type: "Point" as const,
+          coordinates: pt.coordinates,
+        },
+      })),
+    };
+  }, [hotspots]);
+
+  const rainfallRef = useRef(rainfallGeoJson);
+
+  // Synchronize latest prop/state values into refs outside render
+  useEffect(() => {
+    effectiveLayersRef.current = effectiveLayers;
+    isControlledLayersRef.current = isControlledLayers;
+    terrainModeRef.current = terrainMode;
+    riskFilterRef.current = riskFilter;
+    hotspotsRef.current = hotspots;
+    activeHotspotIdRef.current = activeHotspotId;
+    onSelectHotspotRef.current = onSelectHotspot;
+    onSelectCorridorRef.current = onSelectCorridor;
+    onMapLoadedRef.current = onMapLoaded;
+    onMapErrorRef.current = onMapError;
+    terrainEnabledRef.current = terrainEnabled;
+    riskHeatmapEnabledRef.current = riskHeatmapEnabled;
+    rescueRouteEnabledRef.current = rescueRouteEnabled;
+    fieldSensorsEnabledRef.current = fieldSensorsEnabled;
+    simulatedCorridorDataRef.current = simulatedCorridorData;
+    simulatedSensorsDataRef.current = simulatedSensorsData;
+    regionalCorridorsRef.current = regionalCorridorsGeoJson;
+    susceptibilityRef.current = susceptibilityGeoJson;
+    rainfallRef.current = rainfallGeoJson;
+  });
+
+  // Helper: sync interactive regional hotspot HTML markers
+  const syncHotspotMarkers = React.useCallback((map: mapboxgl.Map) => {
+    const list = hotspotsRef.current;
+    const markersMap = hotspotMarkersRef.current;
+
+    if (!list) {
+      markersMap.forEach(({ marker }) => marker.remove());
+      markersMap.clear();
+      return;
+    }
+
+    const showMarkers = effectiveLayersRef.current.hotspots;
+    const onlyCritical = riskFilterRef.current === "critical";
+    const activeId = activeHotspotIdRef.current;
+
+    const visibleList = showMarkers
+      ? onlyCritical
+        ? list.filter((h) => h.severity === "Critical")
+        : list
+      : [];
+
+    const visibleIds = new Set(visibleList.map((h) => h.id));
+
+    // Remove markers no longer visible
+    markersMap.forEach((entry, id) => {
+      if (!visibleIds.has(id)) {
+        entry.marker.remove();
+        markersMap.delete(id);
+      }
+    });
+
+    // Add or update visible hotspot markers
+    visibleList.forEach((hotspot) => {
+      const existing = markersMap.get(hotspot.id);
+      if (existing) {
+        existing.marker.remove();
+        markersMap.delete(hotspot.id);
+      }
+
+      const isFocused = activeId === hotspot.id;
+      const isCrit = hotspot.severity === "Critical";
+      const isWarn = hotspot.severity === "Warning";
+
+      const coreColor = isCrit ? "#DC2626" : isWarn ? "#EAB308" : "#16A34A";
+      const haloInner = isCrit
+        ? "rgba(220, 38, 38, 0.34)"
+        : isWarn
+        ? "rgba(245, 158, 11, 0.32)"
+        : "rgba(22, 163, 74, 0.28)";
+      const haloOuter = isCrit
+        ? "rgba(220, 38, 38, 0.14)"
+        : isWarn
+        ? "rgba(245, 158, 11, 0.14)"
+        : "rgba(22, 163, 74, 0.12)";
+
+      const el = document.createElement("div");
+      el.className = "terra-hotspot-marker";
+      el.style.cursor = "pointer";
+      el.style.display = "flex";
+      el.style.alignItems = "center";
+      el.style.justifyContent = "center";
+      el.setAttribute("role", "button");
+      el.setAttribute("aria-label", `${hotspot.title} (${hotspot.severity})`);
+
+      const outerSize = isFocused ? 54 : isCrit ? 48 : 42;
+      const midSize = isFocused ? 38 : isCrit ? 34 : 30;
+      const coreSize = isFocused ? 28 : 24;
+
+      const markerGlyph = isCrit
+        ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="12" x2="18" y2="12"/></svg>`
+        : isWarn
+        ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`
+        : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>`;
+
+      el.innerHTML = `
+        <div style="position:relative;display:flex;align-items:center;justify-content:center;width:${outerSize}px;height:${outerSize}px;">
+          <span style="position:absolute;inset:0;border-radius:9999px;background:${haloOuter};${
+            isCrit || isFocused ? "animation:obstacle-beacon-pulse 2.2s ease-in-out infinite;" : ""
+          }"></span>
+          <span style="position:absolute;width:${midSize}px;height:${midSize}px;border-radius:9999px;background:${haloInner};"></span>
+          <span style="position:relative;width:${coreSize}px;height:${coreSize}px;border-radius:9999px;background:${coreColor};border:${
+            isFocused ? "2.5px solid #FAF8F2" : "2px solid #FFFFFF"
+          };box-shadow:0 3px 10px rgba(0,0,0,0.28)${
+            isFocused ? `, 0 0 0 3px ${coreColor}` : ""
+          };display:flex;align-items:center;justify-content:center;transition:transform 0.18s ease;">
+            ${markerGlyph}
+          </span>
+        </div>
+      `;
+
+      const badgeBg = isCrit ? "#FEE2E2" : isWarn ? "#FEF3C7" : "#DCFCE7";
+      const badgeText = isCrit ? "#B91C1C" : isWarn ? "#B45309" : "#166534";
+
+      const popup = new mapboxgl.Popup({
+        offset: 18,
+        closeButton: true,
+        maxWidth: "260px",
+      }).setHTML(`
+        <div style="font-family:system-ui,-apple-system,sans-serif;padding:4px 6px;color:#173D32;min-width:190px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;">
+            <strong style="font-size:12px;font-weight:800;color:#173D32;">${escapeHtml(hotspot.title)}</strong>
+            <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:9999px;background:${badgeBg};color:${badgeText};white-space:nowrap;">
+              ${escapeHtml(hotspot.severity === "Normal" ? "Safe" : hotspot.severity)}
+            </span>
+          </div>
+          <div style="font-size:11px;color:#4B5563;font-weight:600;">${escapeHtml(hotspot.region)}</div>
+          ${
+            hotspot.statusReason
+              ? `<div style="font-size:10.5px;color:#374151;margin-top:5px;line-height:1.4;background:#F6F4EC;padding:5px 7px;border-radius:6px;">${escapeHtml(hotspot.statusReason)}</div>`
+              : ""
+          }
+        </div>
+      `);
+
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        if (onSelectHotspotRef.current) {
+          onSelectHotspotRef.current(hotspot);
+        }
+      });
+
+      const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
+        .setLngLat(hotspot.coordinates)
+        .setPopup(popup)
+        .addTo(map);
+
+      markersMap.set(hotspot.id, { marker, el });
+    });
+  }, []);
+
+  // Helper: sync obstacle marker visibility (hide at low regional zoom when regional hotspots are active)
+  const syncObstacleMarkerVisibility = React.useCallback((map: mapboxgl.Map) => {
+    const obstacleMarker = obstacleMarkerRef.current;
+    if (!obstacleMarker) return;
+    const el = obstacleMarker.getElement();
+    if (!el) return;
+
+    const hasRegionalHotspots = hotspotsRef.current !== undefined;
+    const hotspotsVisible = effectiveLayersRef.current.hotspots;
+    if (!hotspotsVisible) {
+      el.style.display = "none";
+      return;
+    }
+    if (hasRegionalHotspots) {
+      el.style.display = map.getZoom() >= 9.5 ? "flex" : "none";
+    } else {
+      el.style.display = "flex";
+    }
+  }, []);
+
+  // Helper: synchronize all controlled & internal layer visibilities, terrain, and filters
+  const syncAllLayersAndFilters = React.useCallback(
+    (map: mapboxgl.Map) => {
+      if (!map.isStyleLoaded()) return;
+
+      const controlled = isControlledLayersRef.current;
+      const layers = effectiveLayersRef.current;
+      const mode = terrainModeRef.current;
+      const onlyCritical = riskFilterRef.current === "critical";
+
+      const isFlatMode = mode === "flat";
+      const showTerrainDem = controlled
+        ? layers.hillshade !== undefined
+          ? layers.hillshade
+          : !isFlatMode
+        : terrainEnabledRef.current;
+      const showHillshade = controlled
+        ? layers.hillshade !== undefined
+          ? layers.hillshade
+          : !isFlatMode && (layers.slopeElevation || mode === "terrain" || mode === "light")
+        : terrainEnabledRef.current;
+      const showCorridors = controlled ? layers.corridors : riskHeatmapEnabledRef.current;
+      const showHazardHeatmap = controlled
+        ? layers.hazardHeatmap !== undefined
+          ? layers.hazardHeatmap
+          : layers.corridors
+        : riskHeatmapEnabledRef.current;
+      const showRescue = controlled
+        ? layers.rescueRoute !== undefined
+          ? layers.rescueRoute
+          : layers.corridors
+        : rescueRouteEnabledRef.current;
+      const showSensors = controlled
+        ? layers.fieldSensors !== undefined
+          ? layers.fieldSensors
+          : layers.hotspots
+        : fieldSensorsEnabledRef.current;
+
+      try {
+        if (map.getSource("mapbox-dem")) {
+          const exaggeration = layers.slopeElevation ? 2.1 : 1.5;
+          map.setTerrain(showTerrainDem ? { source: "mapbox-dem", exaggeration } : null);
+        }
+        if (map.getLayer("terrain-hillshade")) {
+          map.setLayoutProperty("terrain-hillshade", "visibility", showHillshade ? "visible" : "none");
+          map.setPaintProperty(
+            "terrain-hillshade",
+            "hillshade-exaggeration",
+            layers.slopeElevation ? 0.88 : 0.65
+          );
+        }
+
+        // Corridor line layers
+        ["corridor-layer", "corridor-lines"].forEach((layerId) => {
+          if (map.getLayer(layerId)) {
+            map.setLayoutProperty(layerId, "visibility", showCorridors ? "visible" : "none");
+            map.setFilter(
+              layerId,
+              onlyCritical
+                ? ["==", ["downcase", ["to-string", ["get", "status"]]], "critical"]
+                : null
+            );
+          }
+        });
+
+        // Hazard risk heatmap glow layer
+        if (map.getLayer("hazard-risk-heatmap")) {
+          map.setLayoutProperty("hazard-risk-heatmap", "visibility", showHazardHeatmap ? "visible" : "none");
+          map.setFilter(
+            "hazard-risk-heatmap",
+            onlyCritical
+              ? ["==", ["downcase", ["to-string", ["get", "status"]]], "critical"]
+              : null
+          );
+        }
+
+        if (map.getLayer("regional-corridors-layer")) {
+          map.setLayoutProperty(
+            "regional-corridors-layer",
+            "visibility",
+            showCorridors && hotspotsRef.current !== undefined ? "visible" : "none"
+          );
+          map.setFilter(
+            "regional-corridors-layer",
+            onlyCritical
+              ? ["==", ["downcase", ["to-string", ["get", "riskLevel"]]], "critical"]
+              : null
+          );
+        }
+
+        // Rescue detour routes
+        ["rescue-route-lines", "rescue-route-line"].forEach((layerId) => {
+          if (map.getLayer(layerId)) {
+            map.setLayoutProperty(layerId, "visibility", showRescue ? "visible" : "none");
+          }
+        });
+
+        // Field sensor nodes
+        ["field-sensors-glow", "field-sensors-point"].forEach((layerId) => {
+          if (map.getLayer(layerId)) {
+            map.setLayoutProperty(layerId, "visibility", showSensors ? "visible" : "none");
+            map.setFilter(
+              layerId,
+              onlyCritical
+                ? ["in", ["downcase", ["to-string", ["get", "status"]]], ["literal", ["exceeding", "critical"]]]
+                : null
+            );
+          }
+        });
+
+        // Landslide susceptibility layer
+        ["landslide-susceptibility-heat", "landslide-susceptibility-zones"].forEach((layerId) => {
+          if (map.getLayer(layerId)) {
+            const susVisible =
+              layers.susceptibility || (controlled && layers.hazardHeatmap === true);
+            map.setLayoutProperty(
+              layerId,
+              "visibility",
+              susVisible ? "visible" : "none"
+            );
+          }
+        });
+
+        // Rainfall (24h) layer
+        ["rainfall-24h-heat", "rainfall-24h-points"].forEach((layerId) => {
+          if (map.getLayer(layerId)) {
+            map.setLayoutProperty(layerId, "visibility", layers.rainfall ? "visible" : "none");
+          }
+        });
+
+        // Slope / Elevation contours layer
+        if (map.getLayer("slope-elevation-contours")) {
+          map.setLayoutProperty(
+            "slope-elevation-contours",
+            "visibility",
+            layers.slopeElevation ? "visible" : "none"
+          );
+        }
+      } catch (err) {
+        console.warn("Layer sync warning:", err);
+      }
+
+      syncHotspotMarkers(map);
+      syncObstacleMarkerVisibility(map);
+    },
+    [syncHotspotMarkers, syncObstacleMarkerVisibility]
+  );
 
   // Target segment (NH-29 Pherima Slide Cut) live telemetry values
   const targetSegment = simulatedCorridorData.features.find(
@@ -159,6 +856,9 @@ export default function RiskMap({
     };
   }, [isPlaying]);
 
+  const initialCenterLng = center[0];
+  const initialCenterLat = center[1];
+
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
@@ -173,15 +873,31 @@ export default function RiskMap({
     mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
 
     // Initialize Mapbox map instance
-    const map = new mapboxgl.Map({
-      container: mapContainerRef.current,
-      style: "mapbox://styles/mapbox/light-v11",
-      center,
-      zoom,
-      pitch,
-      bearing,
-      antialias: true,
-    });
+    const initialStyle = terrainModeRef.current
+      ? TERRAIN_STYLE_MAP[terrainModeRef.current]
+      : "mapbox://styles/mapbox/light-v11";
+    activeStyleUrlRef.current = initialStyle;
+
+    let map: mapboxgl.Map;
+    try {
+      map = new mapboxgl.Map({
+        container: mapContainerRef.current,
+        style: initialStyle,
+        center: [initialCenterLng, initialCenterLat],
+        zoom,
+        pitch,
+        bearing,
+        antialias: true,
+      });
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Unable to initialize interactive Mapbox terrain engine.";
+      console.warn("Mapbox initialization error:", msg);
+      onMapErrorRef.current?.(msg);
+      return;
+    }
 
     mapInstanceRef.current = map;
     if (typeof window !== "undefined") {
@@ -196,7 +912,47 @@ export default function RiskMap({
       );
     }
 
+    // Optional metric scale bar
+    if (showScaleControl) {
+      map.addControl(
+        new mapboxgl.ScaleControl({ maxWidth: 110, unit: "metric" }),
+        scalePosition
+      );
+    }
+
+    const handleMapError = (event: mapboxgl.ErrorEvent) => {
+      const message = event?.error?.message || "";
+      if (message && /token|unauthorized|401|403|webgl/i.test(message)) {
+        onMapErrorRef.current?.(message);
+      }
+    };
+    map.on("error", handleMapError);
+
+    let listenersAttached = false;
+    let sensorTooltipPopup: mapboxgl.Popup | null = null;
+    const hotspotMarkers = hotspotMarkersRef.current;
+
+    const handleZoomChange = () => {
+      syncObstacleMarkerVisibility(map);
+    };
+    map.on("zoom", handleZoomChange);
+
     map.on("style.load", () => {
+      const layersState = effectiveLayersRef.current;
+      const controlled = isControlledLayersRef.current;
+      const isTerrainActive = controlled
+        ? terrainModeRef.current !== "flat"
+        : terrainEnabledRef.current;
+      const isCorridorsActive = controlled
+        ? layersState.corridors
+        : riskHeatmapEnabledRef.current;
+      const isRescueActive = controlled
+        ? layersState.corridors
+        : rescueRouteEnabledRef.current;
+      const isSensorsActive = controlled
+        ? layersState.hotspots
+        : fieldSensorsEnabledRef.current;
+
       // 1. Add 3D Mountain Terrain (mapbox-dem raster-dem with 1.5 exaggeration)
       if (!map.getSource("mapbox-dem")) {
         map.addSource("mapbox-dem", {
@@ -206,8 +962,11 @@ export default function RiskMap({
         });
       }
 
-      if (terrainEnabled) {
-        map.setTerrain({ source: "mapbox-dem", exaggeration: 1.5 });
+      if (isTerrainActive) {
+        map.setTerrain({
+          source: "mapbox-dem",
+          exaggeration: layersState.slopeElevation ? 2.1 : 1.5,
+        });
       }
 
       // 2. Locate first symbol layer to preserve clean label visibility
@@ -243,10 +1002,10 @@ export default function RiskMap({
             type: "hillshade",
             source: "mapbox-dem-hillshade",
             layout: {
-              visibility: terrainEnabled ? "visible" : "none",
+              visibility: isTerrainActive ? "visible" : "none",
             },
             paint: {
-              "hillshade-exaggeration": 0.65,
+              "hillshade-exaggeration": layersState.slopeElevation ? 0.88 : 0.65,
               "hillshade-shadow-color": "#173D32",
               "hillshade-highlight-color": "#ffffff",
             },
@@ -255,8 +1014,8 @@ export default function RiskMap({
         );
       }
 
-      // 4. Insert fill-extrusion 3D building layer beneath labels
-      if (!map.getLayer("3d-buildings")) {
+      // 4. Insert fill-extrusion 3D building layer beneath labels (when composite source exists)
+      if (map.getSource("composite") && !map.getLayer("3d-buildings")) {
         map.addLayer(
           {
             id: "3d-buildings",
@@ -283,39 +1042,198 @@ export default function RiskMap({
         intensity: 0.35,
       });
 
-      // 6. Custom layer tints: water #98ddf2, greenways #d7ebd6
-      if (map.getLayer("water")) {
-        try {
-          map.setPaintProperty("water", "fill-color", "#98ddf2");
-        } catch {
-          // ignore
-        }
-      }
-
-      const greenwayLayerIds = [
-        "landcover",
-        "landuse",
-        "national-park",
-        "park",
-        "greenway",
-        "natural-point-label",
-      ];
-      greenwayLayerIds.forEach((layerId) => {
-        if (map.getLayer(layerId)) {
+      // 6. Custom layer tints for light-v11 base style: water #98ddf2, greenways #d7ebd6
+      if (activeStyleUrlRef.current.includes("light-v11")) {
+        if (map.getLayer("water")) {
           try {
-            map.setPaintProperty(layerId, "fill-color", "#d7ebd6");
+            map.setPaintProperty("water", "fill-color", "#98ddf2");
           } catch {
             // ignore
           }
         }
-      });
+
+        const greenwayLayerIds = [
+          "landcover",
+          "landuse",
+          "national-park",
+          "park",
+          "greenway",
+          "natural-point-label",
+        ];
+        greenwayLayerIds.forEach((layerId) => {
+          if (map.getLayer(layerId)) {
+            try {
+              map.setPaintProperty(layerId, "fill-color", "#d7ebd6");
+            } catch {
+              // ignore
+            }
+          }
+        });
+      }
 
       // 7. Add corridorRoutes GeoJSON source
       if (!map.getSource("corridor-routes")) {
         map.addSource("corridor-routes", {
           type: "geojson",
-          data: simulatedCorridorData as any,
+          data: simulatedCorridorDataRef.current as mapboxgl.GeoJSONSourceSpecification["data"],
         });
+      }
+
+      // 7b. Add Regional Highway Corridor Arcs source & layer (for Northeast sector overview)
+      if (!map.getSource("regional-corridors")) {
+        map.addSource("regional-corridors", {
+          type: "geojson",
+          data: regionalCorridorsRef.current as mapboxgl.GeoJSONSourceSpecification["data"],
+        });
+      }
+
+      if (!map.getLayer("regional-corridors-layer")) {
+        map.addLayer(
+          {
+            id: "regional-corridors-layer",
+            type: "line",
+            source: "regional-corridors",
+            layout: {
+              visibility:
+                isCorridorsActive && hotspotsRef.current !== undefined
+                  ? "visible"
+                  : "none",
+              "line-join": "round",
+              "line-cap": "round",
+            },
+            paint: {
+              "line-width": ["interpolate", ["linear"], ["zoom"], 6, 3, 12, 5],
+              "line-opacity": 0.9,
+              "line-color": [
+                "match",
+                ["downcase", ["to-string", ["get", "riskLevel"]]],
+                "critical",
+                "#EF4444",
+                "warning",
+                "#F59E0B",
+                "safe",
+                "#22C55E",
+                "#F59E0B",
+              ],
+            },
+          },
+          labelLayerId
+        );
+      }
+
+      // 7c. Landslide Susceptibility heatmap + soft zone circles
+      if (!map.getSource("landslide-susceptibility")) {
+        map.addSource("landslide-susceptibility", {
+          type: "geojson",
+          data: susceptibilityRef.current as mapboxgl.GeoJSONSourceSpecification["data"],
+        });
+      }
+
+      if (!map.getLayer("landslide-susceptibility-heat")) {
+        map.addLayer(
+          {
+            id: "landslide-susceptibility-heat",
+            type: "heatmap",
+            source: "landslide-susceptibility",
+            layout: {
+              visibility: layersState.susceptibility ? "visible" : "none",
+            },
+            paint: {
+              "heatmap-weight": ["coalesce", ["get", "weight"], 0.7],
+              "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 4, 0.9, 11, 1.8],
+              "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 4, 28, 11, 52],
+              "heatmap-opacity": 0.72,
+              "heatmap-color": [
+                "interpolate",
+                ["linear"],
+                ["heatmap-density"],
+                0,
+                "rgba(22, 163, 74, 0)",
+                0.25,
+                "rgba(34, 197, 94, 0.45)",
+                0.55,
+                "rgba(245, 158, 11, 0.72)",
+                0.85,
+                "rgba(220, 38, 38, 0.88)",
+              ],
+            },
+          },
+          labelLayerId
+        );
+      }
+
+      // 7d. Rainfall (24h) heatmap overlay
+      if (!map.getSource("rainfall-24h")) {
+        map.addSource("rainfall-24h", {
+          type: "geojson",
+          data: rainfallRef.current as mapboxgl.GeoJSONSourceSpecification["data"],
+        });
+      }
+
+      if (!map.getLayer("rainfall-24h-heat")) {
+        map.addLayer(
+          {
+            id: "rainfall-24h-heat",
+            type: "heatmap",
+            source: "rainfall-24h",
+            layout: {
+              visibility: layersState.rainfall ? "visible" : "none",
+            },
+            paint: {
+              "heatmap-weight": ["coalesce", ["get", "intensity"], 0.6],
+              "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 4, 1, 11, 2],
+              "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 4, 34, 11, 60],
+              "heatmap-opacity": 0.75,
+              "heatmap-color": [
+                "interpolate",
+                ["linear"],
+                ["heatmap-density"],
+                0,
+                "rgba(56, 189, 248, 0)",
+                0.3,
+                "rgba(56, 189, 248, 0.45)",
+                0.65,
+                "rgba(37, 99, 235, 0.75)",
+                1,
+                "rgba(30, 58, 138, 0.92)",
+              ],
+            },
+          },
+          labelLayerId
+        );
+      }
+
+      // 7e. Slope / Elevation topographic contour lines
+      try {
+        if (!map.getSource("mapbox-terrain-contours")) {
+          map.addSource("mapbox-terrain-contours", {
+            type: "vector",
+            url: "mapbox://mapbox.mapbox-terrain-v2",
+          });
+        }
+        if (!map.getLayer("slope-elevation-contours")) {
+          map.addLayer(
+            {
+              id: "slope-elevation-contours",
+              type: "line",
+              source: "mapbox-terrain-contours",
+              "source-layer": "contour",
+              layout: {
+                visibility: layersState.slopeElevation ? "visible" : "none",
+                "line-join": "round",
+                "line-cap": "round",
+              },
+              paint: {
+                "line-color": "#D6A65D",
+                "line-opacity": 0.62,
+                "line-width": ["interpolate", ["linear"], ["zoom"], 5, 0.6, 12, 1.3],
+              },
+            },
+            labelLayerId
+          );
+        }
+      } catch {
+        // Non-blocking fallback if contour vector source is unavailable
       }
 
       // 8. Hazard Risk Heatmap Glow Layer (underneath main corridor lines)
@@ -326,7 +1244,7 @@ export default function RiskMap({
             type: "line",
             source: "corridor-routes",
             layout: {
-              visibility: riskHeatmapEnabled ? "visible" : "none",
+              visibility: isCorridorsActive ? "visible" : "none",
               "line-join": "round",
               "line-cap": "round",
             },
@@ -360,7 +1278,7 @@ export default function RiskMap({
             type: "line",
             source: "corridor-routes",
             layout: {
-              visibility: riskHeatmapEnabled ? "visible" : "none",
+              visibility: isCorridorsActive ? "visible" : "none",
               "line-join": "round",
               "line-cap": "round",
             },
@@ -391,7 +1309,7 @@ export default function RiskMap({
             type: "line",
             source: "corridor-routes",
             layout: {
-              visibility: riskHeatmapEnabled ? "visible" : "none",
+              visibility: isCorridorsActive ? "visible" : "none",
               "line-join": "round",
               "line-cap": "round",
             },
@@ -430,7 +1348,7 @@ export default function RiskMap({
             type: "line",
             source: "rescue-route",
             layout: {
-              visibility: rescueRouteEnabled ? "visible" : "none",
+              visibility: isRescueActive ? "visible" : "none",
               "line-join": "round",
               "line-cap": "round",
             },
@@ -448,7 +1366,7 @@ export default function RiskMap({
       if (!map.getSource("field-sensors")) {
         map.addSource("field-sensors", {
           type: "geojson",
-          data: simulatedSensorsData as any,
+          data: simulatedSensorsDataRef.current as mapboxgl.GeoJSONSourceSpecification["data"],
         });
       }
 
@@ -460,7 +1378,7 @@ export default function RiskMap({
             type: "circle",
             source: "field-sensors",
             layout: {
-              visibility: fieldSensorsEnabled ? "visible" : "none",
+              visibility: isSensorsActive ? "visible" : "none",
             },
             paint: {
               "circle-radius": [
@@ -499,7 +1417,7 @@ export default function RiskMap({
             type: "circle",
             source: "field-sensors",
             layout: {
-              visibility: fieldSensorsEnabled ? "visible" : "none",
+              visibility: isSensorsActive ? "visible" : "none",
             },
             paint: {
               "circle-radius": [
@@ -532,8 +1450,9 @@ export default function RiskMap({
         );
       }
 
-      // 10c. Hover Mini-Tooltip for Field Sensor Nodes
-      let sensorTooltipPopup: mapboxgl.Popup | null = null;
+      // 10c. Hover & click handlers (attach once per map instance across style switches)
+      if (!listenersAttached) {
+        listenersAttached = true;
 
       const handleSensorMouseEnter = (e: mapboxgl.MapLayerMouseEvent) => {
         map.getCanvas().style.cursor = "pointer";
@@ -613,8 +1532,11 @@ export default function RiskMap({
         const feature = e.features[0] as any;
         const props = (feature.properties || {}) as Record<string, any>;
 
-        if (onSelectCorridor) {
-          onSelectCorridor(props.id || props.segment_name || "corridor", props);
+        if (onSelectCorridorRef.current) {
+          onSelectCorridorRef.current(
+            props.corridor || props.code || props.id || props.segment_name || "corridor",
+            props
+          );
         }
 
         const segmentName = props.segment_name || props.name || "NH-29 Pherima Slide Cut";
@@ -727,6 +1649,13 @@ export default function RiskMap({
 
       map.on("click", "corridor-layer", handleCorridorClick);
       map.on("click", "corridor-lines", handleCorridorClick);
+      map.on("click", "regional-corridors-layer", (e) => {
+        if (!e.features || !e.features[0]) return;
+        const props = ((e.features[0] as any).properties || {}) as Record<string, any>;
+        if (onSelectCorridorRef.current) {
+          onSelectCorridorRef.current(props.code || props.id || "corridor", props);
+        }
+      });
 
       // Cursor styling on hover over corridor lines
       map.on("mouseenter", "corridor-layer", () => {
@@ -739,6 +1668,12 @@ export default function RiskMap({
         map.getCanvas().style.cursor = "pointer";
       });
       map.on("mouseleave", "corridor-lines", () => {
+        map.getCanvas().style.cursor = "";
+      });
+      map.on("mouseenter", "regional-corridors-layer", () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+      map.on("mouseleave", "regional-corridors-layer", () => {
         map.getCanvas().style.cursor = "";
       });
 
@@ -774,77 +1709,162 @@ export default function RiskMap({
       map.on("mouseleave", "rescue-route-lines", () => {
         map.getCanvas().style.cursor = "";
       });
+      } // end listenersAttached
 
       // 12. Custom Pulsing HTML Marker at [94.02, 25.72] (Break point / Slide collapse)
-      const obstacleEl = document.createElement("div");
-      obstacleEl.className = "obstacle-pulsing-marker";
-      obstacleEl.style.display = "flex";
-      obstacleEl.style.flexDirection = "column";
-      obstacleEl.style.alignItems = "center";
-      obstacleEl.style.cursor = "pointer";
-      obstacleEl.style.pointerEvents = "auto";
+      if (!obstacleMarkerRef.current) {
+        const obstacleEl = document.createElement("div");
+        obstacleEl.className = "obstacle-pulsing-marker";
+        obstacleEl.style.display = "flex";
+        obstacleEl.style.flexDirection = "column";
+        obstacleEl.style.alignItems = "center";
+        obstacleEl.style.cursor = "pointer";
+        obstacleEl.style.pointerEvents = "auto";
 
-      obstacleEl.innerHTML = `
-        <style>
-          @keyframes obstacle-beacon-ping {
-            0% { transform: scale(0.9); opacity: 0.9; }
-            70%, 100% { transform: scale(2.4); opacity: 0; }
-          }
-          @keyframes obstacle-beacon-pulse {
-            0%, 100% { transform: scale(1); opacity: 0.85; }
-            50% { transform: scale(1.35); opacity: 0.35; }
-          }
-        </style>
-        <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px;">
-          <span style="position: absolute; width: 42px; height: 42px; border-radius: 9999px; background-color: rgba(220, 38, 38, 0.45); animation: obstacle-beacon-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;"></span>
-          <span style="position: absolute; width: 28px; height: 28px; border-radius: 9999px; background-color: rgba(239, 68, 68, 0.6); animation: obstacle-beacon-pulse 2s ease-in-out infinite;"></span>
-          <div style="position: relative; width: 24px; height: 24px; border-radius: 9999px; background-color: #DC2626; border: 2.5px solid #FFFFFF; box-shadow: 0 4px 14px rgba(220, 38, 38, 0.7); display: flex; align-items: center; justify-content: center; font-size: 11px;">
-            ⛔
+        obstacleEl.innerHTML = `
+          <style>
+            @keyframes obstacle-beacon-ping {
+              0% { transform: scale(0.9); opacity: 0.9; }
+              70%, 100% { transform: scale(2.4); opacity: 0; }
+            }
+            @keyframes obstacle-beacon-pulse {
+              0%, 100% { transform: scale(1); opacity: 0.85; }
+              50% { transform: scale(1.35); opacity: 0.35; }
+            }
+          </style>
+          <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px;">
+            <span style="position: absolute; width: 42px; height: 42px; border-radius: 9999px; background-color: rgba(220, 38, 38, 0.45); animation: obstacle-beacon-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;"></span>
+            <span style="position: absolute; width: 28px; height: 28px; border-radius: 9999px; background-color: rgba(239, 68, 68, 0.6); animation: obstacle-beacon-pulse 2s ease-in-out infinite;"></span>
+            <div style="position: relative; width: 24px; height: 24px; border-radius: 9999px; background-color: #DC2626; border: 2.5px solid #FFFFFF; box-shadow: 0 4px 14px rgba(220, 38, 38, 0.7); display: flex; align-items: center; justify-content: center; font-size: 11px;">
+              ⛔
+            </div>
           </div>
-        </div>
-        <div style="margin-top: 2px; background-color: #173D32; color: #FEE2E2; padding: 3px 9px; border-radius: 6px; font-size: 10px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); border: 1.5px solid #EF4444; white-space: nowrap; display: flex; align-items: center; gap: 4px;">
-          <span style="display: inline-block; width: 6px; height: 6px; border-radius: 9999px; background-color: #EF4444; animation: obstacle-beacon-pulse 1s infinite;"></span>
-          SLIDE COLLAPSE - NO PASSAGE
-        </div>
-      `;
-
-      const obstaclePopup = new mapboxgl.Popup({
-        offset: 16,
-        closeButton: true,
-        maxWidth: "290px",
-      }).setHTML(`
-        <div style="font-family: system-ui, -apple-system, sans-serif; padding: 6px; color: #173D32;">
-          <div style="display: flex; align-items: center; gap: 6px; color: #DC2626; font-weight: 800; font-size: 12px; margin-bottom: 4px;">
-            <span>⛔</span> SLIDE COLLAPSE - NO PASSAGE
+          <div style="margin-top: 2px; background-color: #173D32; color: #FEE2E2; padding: 3px 9px; border-radius: 6px; font-size: 10px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); border: 1.5px solid #EF4444; white-space: nowrap; display: flex; align-items: center; gap: 4px;">
+            <span style="display: inline-block; width: 6px; height: 6px; border-radius: 9999px; background-color: #EF4444; animation: obstacle-beacon-pulse 1s infinite;"></span>
+            SLIDE COLLAPSE - NO PASSAGE
           </div>
-          <div style="font-size: 11px; line-height: 1.5; color: #374151; background: #FEF2F2; padding: 6px 8px; border-radius: 6px; border: 1px solid #FECACA;">
-            <strong>Exact Obstacle Location:</strong> [94.02, 25.72]<br/>
-            <strong>Highway:</strong> NH-29 Pherima / Dzüdza Gorge<br/>
-            <strong>Severity:</strong> Road Severed (60m Collapse)<br/>
-            <strong>Action:</strong> Divert via Peducha Alternate Bypass
+        `;
+
+        const obstaclePopup = new mapboxgl.Popup({
+          offset: 16,
+          closeButton: true,
+          maxWidth: "290px",
+        }).setHTML(`
+          <div style="font-family: system-ui, -apple-system, sans-serif; padding: 6px; color: #173D32;">
+            <div style="display: flex; align-items: center; gap: 6px; color: #DC2626; font-weight: 800; font-size: 12px; margin-bottom: 4px;">
+              <span>⛔</span> SLIDE COLLAPSE - NO PASSAGE
+            </div>
+            <div style="font-size: 11px; line-height: 1.5; color: #374151; background: #FEF2F2; padding: 6px 8px; border-radius: 6px; border: 1px solid #FECACA;">
+              <strong>Exact Obstacle Location:</strong> [94.02, 25.72]<br/>
+              <strong>Highway:</strong> NH-29 Pherima / Dzüdza Gorge<br/>
+              <strong>Severity:</strong> Road Severed (60m Collapse)<br/>
+              <strong>Action:</strong> Divert via Peducha Alternate Bypass
+            </div>
           </div>
-        </div>
-      `);
+        `);
 
-      new mapboxgl.Marker({ element: obstacleEl, anchor: "center" })
-        .setLngLat([94.02, 25.72])
-        .setPopup(obstaclePopup)
-        .addTo(map);
+        obstacleMarkerRef.current = new mapboxgl.Marker({ element: obstacleEl, anchor: "center" })
+          .setLngLat([94.02, 25.72])
+          .setPopup(obstaclePopup)
+          .addTo(map);
+      }
 
-      if (onMapLoaded) {
-        onMapLoaded(map);
+      syncAllLayersAndFilters(map);
+
+      if (onMapLoadedRef.current) {
+        onMapLoadedRef.current(map);
       }
     });
 
     // Cleanup map instance on unmount
     return () => {
+      map.off("zoom", handleZoomChange);
+      map.off("error", handleMapError);
+      if (sensorTooltipPopup) {
+        sensorTooltipPopup.remove();
+      }
+      if (obstacleMarkerRef.current) {
+        obstacleMarkerRef.current.remove();
+        obstacleMarkerRef.current = null;
+      }
+      hotspotMarkers.forEach(({ marker }) => marker.remove());
+      hotspotMarkers.clear();
+
       if (typeof window !== "undefined" && (window as any).__riskMap === map) {
         delete (window as any).__riskMap;
       }
       map.remove();
       mapInstanceRef.current = null;
     };
-  }, [center, zoom, pitch, bearing, onMapLoaded]);
+  }, [initialCenterLng, initialCenterLat, zoom, pitch, bearing, showControls, showScaleControl, scalePosition, syncAllLayersAndFilters, syncObstacleMarkerVisibility]);
+
+  // React to controlled terrainMode changes (switching Mapbox style & 2D/3D pitch cleanly)
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !terrainMode) return;
+
+    const targetStyleUrl = TERRAIN_STYLE_MAP[terrainMode];
+    if (targetStyleUrl !== activeStyleUrlRef.current) {
+      activeStyleUrlRef.current = targetStyleUrl;
+      map.setStyle(targetStyleUrl);
+    }
+
+    if (map.isStyleLoaded()) {
+      syncAllLayersAndFilters(map);
+    }
+
+    map.easeTo({
+      pitch: terrainMode === "flat" ? 0 : Math.max(pitch, 35),
+      duration: 500,
+    });
+  }, [terrainMode, pitch, syncAllLayersAndFilters]);
+
+  // React to controlled layer visibility, hotspots, active hotspot, and risk filter changes
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    if (map.isStyleLoaded()) {
+      try {
+        const regSource = map.getSource("regional-corridors") as mapboxgl.GeoJSONSource | undefined;
+        if (regSource && typeof regSource.setData === "function") {
+          regSource.setData(
+            regionalCorridorsGeoJson as mapboxgl.GeoJSONSourceSpecification["data"]
+          );
+        }
+        const susSource = map.getSource("landslide-susceptibility") as mapboxgl.GeoJSONSource | undefined;
+        if (susSource && typeof susSource.setData === "function") {
+          susSource.setData(
+            susceptibilityGeoJson as mapboxgl.GeoJSONSourceSpecification["data"]
+          );
+        }
+        const rainSource = map.getSource("rainfall-24h") as mapboxgl.GeoJSONSource | undefined;
+        if (rainSource && typeof rainSource.setData === "function") {
+          rainSource.setData(
+            rainfallGeoJson as mapboxgl.GeoJSONSourceSpecification["data"]
+          );
+        }
+      } catch {
+        // ignore source update errors during style transition
+      }
+      syncAllLayersAndFilters(map);
+    } else {
+      // Markers can still sync even if style hasn't finished transitioning
+      syncHotspotMarkers(map);
+      syncObstacleMarkerVisibility(map);
+    }
+  }, [
+    effectiveLayers,
+    hotspots,
+    activeHotspotId,
+    riskFilter,
+    regionalCorridorsGeoJson,
+    susceptibilityGeoJson,
+    rainfallGeoJson,
+    syncAllLayersAndFilters,
+    syncHotspotMarkers,
+    syncObstacleMarkerVisibility,
+  ]);
 
   // Direct HUD Layer Toggle Handlers
   const handleToggleTerrain = (active: boolean) => {
@@ -948,8 +1968,9 @@ export default function RiskMap({
     }
   };
 
-  // React to 3D Terrain Hillshade toggle switch
+  // React to 3D Terrain Hillshade toggle switch (uncontrolled HUD mode)
   useEffect(() => {
+    if (isControlledLayers) return;
     const map = mapInstanceRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
@@ -965,10 +1986,11 @@ export default function RiskMap({
         terrainEnabled ? "visible" : "none"
       );
     }
-  }, [terrainEnabled]);
+  }, [terrainEnabled, isControlledLayers]);
 
-  // React to Hazard Risk Heatmap toggle switch
+  // React to Hazard Risk Heatmap toggle switch (uncontrolled HUD mode)
   useEffect(() => {
+    if (isControlledLayers) return;
     const map = mapInstanceRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
@@ -993,10 +2015,11 @@ export default function RiskMap({
         riskHeatmapEnabled ? "visible" : "none"
       );
     }
-  }, [riskHeatmapEnabled]);
+  }, [riskHeatmapEnabled, isControlledLayers]);
 
-  // React to Emergency Rescue Reroute toggle switch
+  // React to Emergency Rescue Reroute toggle switch (uncontrolled HUD mode)
   useEffect(() => {
+    if (isControlledLayers) return;
     const map = mapInstanceRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
@@ -1014,10 +2037,11 @@ export default function RiskMap({
         rescueRouteEnabled ? "visible" : "none"
       );
     }
-  }, [rescueRouteEnabled]);
+  }, [rescueRouteEnabled, isControlledLayers]);
 
-  // React to Field Sensor Nodes toggle switch
+  // React to Field Sensor Nodes toggle switch (uncontrolled HUD mode)
   useEffect(() => {
+    if (isControlledLayers) return;
     const map = mapInstanceRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
@@ -1035,12 +2059,15 @@ export default function RiskMap({
         fieldSensorsEnabled ? "visible" : "none"
       );
     }
-  }, [fieldSensorsEnabled]);
+  }, [fieldSensorsEnabled, isControlledLayers]);
 
   // React to selectedState fly-to triggers
   useEffect(() => {
     const map = mapInstanceRef.current;
+    const prevState = prevSelectedStateRef.current;
+    prevSelectedStateRef.current = selectedState;
     if (!map || !selectedState) return;
+    if (prevState === selectedState && selectedState === "All States") return;
 
     const preset = STATE_PRESETS[selectedState as keyof typeof STATE_PRESETS];
     if (preset) {

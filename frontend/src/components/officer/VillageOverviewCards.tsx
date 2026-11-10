@@ -1,30 +1,42 @@
 "use client";
 
 import React from "react";
+import { AlertTriangle, Bell, Houses, LucideIcon, Users } from "lucide-react";
 import { VillageOverviewMetrics } from "@/types/village";
 import PortalMetricGrid from "@/components/portal/PortalMetricGrid";
-import PortalMetricCard from "@/components/portal/PortalMetricCard";
+import OfficerKpiCard from "@/components/officer/OfficerKpiCard";
 
 interface VillageOverviewCardsProps {
   metrics: VillageOverviewMetrics;
   isLoading?: boolean;
 }
 
+interface SummaryCardConfig {
+  id: string;
+  title: string;
+  value: string | number;
+  unit: string;
+  badge: string;
+  badgeTone: "red" | "amber" | "green" | "blue" | "neutral";
+  accent?: "red" | "amber" | "green" | "blue";
+  detail: string;
+  icon: LucideIcon;
+}
+
 export default function VillageOverviewCards({
   metrics,
   isLoading = false,
 }: VillageOverviewCardsProps) {
-  const cards = [
+  const cards: SummaryCardConfig[] = [
     {
       id: "total-villages",
       title: "Total Monitored",
       value: metrics.totalMonitored,
       unit: "Settlements",
       badge: "Active Grid",
-      badgeColor: "bg-[#173D32]/10 text-[#173D32] border-[#173D32]/20",
+      badgeTone: "neutral",
       detail: "Monitored across Northeast mountain corridors",
-      icon: "🏘️",
-      pulse: false,
+      icon: Houses,
     },
     {
       id: "high-risk-villages",
@@ -32,30 +44,24 @@ export default function VillageOverviewCards({
       value: metrics.highRiskCount,
       unit: "Critical / High",
       badge: metrics.highRiskCount > 0 ? "Vulnerable" : "Nominal",
-      badgeColor:
-        metrics.highRiskCount > 0
-          ? "bg-red-100 text-red-800 border-red-200"
-          : "bg-emerald-100 text-emerald-800 border-emerald-200",
+      badgeTone: metrics.highRiskCount > 0 ? "red" : "green",
+      accent: metrics.highRiskCount > 0 ? "red" : "green",
       detail:
         metrics.highRiskCount > 0
           ? "Settlements located in critical runoff zones"
           : "No settlements currently in critical threat band",
-      icon: "⚠️",
-      pulse: metrics.highRiskCount > 0,
+      icon: AlertTriangle,
     },
     {
       id: "population-at-risk",
       title: "Population at Risk",
-      value: metrics.populationAtRisk,
+      value: metrics.populationAtRisk.toLocaleString("en-IN"),
       unit: "Residents",
       badge: metrics.populationAtRisk > 0 ? "Priority Target" : "Protected",
-      badgeColor:
-        metrics.populationAtRisk > 0
-          ? "bg-amber-100 text-amber-900 border-amber-300"
-          : "bg-emerald-100 text-emerald-800 border-emerald-200",
+      badgeTone: metrics.populationAtRisk > 0 ? "amber" : "green",
+      accent: metrics.populationAtRisk > 0 ? "amber" : "green",
       detail: "Estimated population within elevated hazard slopes",
-      icon: "👥",
-      pulse: metrics.populationAtRisk > 0,
+      icon: Users,
     },
     {
       id: "villages-active-alerts",
@@ -64,30 +70,28 @@ export default function VillageOverviewCards({
       unit: "Villages impacted",
       badge:
         metrics.villagesWithActiveAlerts > 0 ? "Advisories Active" : "No Alerts",
-      badgeColor:
-        metrics.villagesWithActiveAlerts > 0
-          ? "bg-red-100 text-red-800 border-red-200"
-          : "bg-[#173D32]/10 text-[#173D32] border-[#173D32]/20",
+      badgeTone: metrics.villagesWithActiveAlerts > 0 ? "red" : "green",
+      accent: metrics.villagesWithActiveAlerts > 0 ? "red" : "green",
       detail: "Live public alerts broadcasting to local residents",
-      icon: "📢",
-      pulse: metrics.villagesWithActiveAlerts > 0,
+      icon: Bell,
     },
   ];
 
   return (
     <PortalMetricGrid columns={4} ariaLabel="Village Overview Metrics">
       {cards.map((card) => (
-        <PortalMetricCard
+        <OfficerKpiCard
           key={card.id}
           id={card.id}
+          variant="summary"
           title={card.title}
           value={card.value}
           unit={card.unit}
           icon={card.icon}
+          accent={card.accent}
           badge={card.badge}
-          badgeColor={card.badgeColor}
+          badgeTone={card.badgeTone}
           detail={card.detail}
-          pulse={card.pulse}
           isLoading={isLoading}
         />
       ))}

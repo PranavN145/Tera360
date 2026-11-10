@@ -1,82 +1,321 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import type mapboxgl from "mapbox-gl";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  ChevronDown,
+  MapPin,
+  Minus,
+  Navigation,
+  Plus,
+  RefreshCw,
+} from "lucide-react";
 import PortalLayout from "@/components/portal/PortalLayout";
-import PortalMetricGrid from "@/components/portal/PortalMetricGrid";
-import PortalMetricCard from "@/components/portal/PortalMetricCard";
 import PortalFilterBar from "@/components/portal/PortalFilterBar";
 import PortalSplitLayout from "@/components/portal/PortalSplitLayout";
-import StatusBadge from "@/components/ui/StatusBadge";
-import RiskMap from "@/components/RiskMap";
+import RiskMap, {
+  isMapboxTokenConfigured,
+  RiskMapHotspot,
+  RiskMapLayerVisibility,
+} from "@/components/RiskMap";
+import OfficerLiveCorridorHud, {
+  OfficerMapLayersState,
+} from "@/components/officer/map/OfficerLiveCorridorHud";
+import OfficerCorridorDossier from "@/components/officer/map/OfficerCorridorDossier";
+import OfficerCorridorAlertModal from "@/components/officer/map/OfficerCorridorAlertModal";
+import {
+  corridorToHotspot,
+  matchAlertForCorridor,
+  NORTHEAST_STATES,
+  resolveCorridorCoordinates,
+} from "@/components/officer/map/corridorTelemetry";
+import { STATE_PRESETS } from "@/data/mockLandslideData";
 import { publicApi } from "@/lib/api";
-import { PublicRiskMapItem } from "@/types/public";
+import { PublicAlertItem, PublicRiskMapItem } from "@/types/public";
 
-const STATES = [
-  "All States",
-  "Assam",
-  "Nagaland",
-  "Sikkim",
-  "Meghalaya",
-  "Arunachal Pradesh",
-  "Manipur",
-  "Mizoram",
-  "Tripura",
-];
+const NORTHEAST_MAP_CENTER: [number, number] = [90.8, 25.8];
+const NORTHEAST_MAP_ZOOM = 6.2;
+const NORTHEAST_MAP_PITCH = 42;
+const NORTHEAST_MAP_BEARING = -10;
+
+const SEVERITY_SORT_RANK: Record<string, number> = {
+  Critical: 0,
+  Warning: 1,
+  Normal: 2,
+};
 
 export default function OfficerMapPage() {
-  const [selectedState, setSelectedState] = useState("All States");
-  const [corridors, setCorridors] = useState<PublicRiskMapItem[]>([]);
-  const [selectedCorridor, setSelectedCorridor] = useState<PublicRiskMapItem | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const stateDropdownRef = useRef<HTMLDivElement | null>(null);
 
+  const [selectedState, setSelectedState] = useState<string>("All States");
+  const [isStateMenuOpen, setIsStateMenuOpen] = useState<boolean>(false);
+
+  const [corridors, setCorridors] = useState<PublicRiskMapItem[]>([]);
+  const [alerts, setAlerts] = useState<PublicAlertItem[]>([]);
+  const [selectedCorridor, setSelectedCorridor] = useState<PublicRiskMapItem | null>(null);
+
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [mapRuntimeError, setMapRuntimeError] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+
+  const [isAlertModalOpen, setIsAlertModalOpen] = useState<boolean>(false);
+
+  const [layers, setLayers] = useState<OfficerMapLayersState>({
+    hillshade: true,
+    hazardHeatmap: false,
+    rescueRoute: true,
+    fieldSensors: true,
+  });
+
+  // Close right-hand Filtering dropdown on outside click
+  useEffect(() => {
+    if (!isStateMenuOpen) return;
+    const handleOutside = (e: MouseEvent) => {
+      if (stateDropdownRef.current && !stateDropdownRef.current.contains(e.target as Node)) {
+        setIsStateMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [isStateMenuOpen]);
+
+  // Fetch real backend corridor & alert telemetry when selectedState or refreshTrigger changes
   useEffect(() => {
     let mounted = true;
-    async function loadData() {
+
+    async function loadTelemetry() {
+      const stateParam = selectedState === "All States" ? undefined : selectedState;
+
       try {
-        const data = await publicApi.getRiskMap({
-          state: selectedState === "All States" ? undefined : selectedState,
-        });
-        if (mounted) {
-          setCorridors(data);
-          if (data.length > 0) {
-            setSelectedCorridor(data[0]);
-          }
+        const [riskRes, alertsRes] = await Promise.allSettled([
+          publicApi.getRiskMap({ state: stateParam }),
+          publicApi.getAlerts({ state: stateParam, limit: 50 }),
+        ]);
+
+        if (!mounted) return;
+
+        if (riskRes.status === "rejected") {
+          const message =
+            riskRes.reason instanceof Error
+              ? riskRes.reason.message
+              : "Failed to synchronize live corridor telemetry from backend.";
+          setApiError(message);
+          setCorridors([]);
+          setSelectedCorridor(null);
+        } else {
+          const fetchedCorridors = riskRes.value || [];
+          setCorridors(fetchedCorridors);
+          setApiError(null);
+
+          setSelectedCorridor((prev) => {
+            if (prev) {
+              const retained = fetchedCorridors.find((c) => c.id === prev.id);
+              if (retained) return retained;
+            }
+            if (fetchedCorridors.length === 0) return null;
+            // Prefer highest severity corridor by default
+            return (
+              fetchedCorridors.find(
+                (c) => c.riskLevel === "Critical" || c.status === "blocked"
+              ) ||
+              fetchedCorridors.find(
+                (c) => c.riskLevel === "High" || c.status === "caution"
+              ) ||
+              fetchedCorridors[0]
+            );
+          });
         }
-      } catch {
-        // Non-blocking map telemetry failure
+
+        if (alertsRes.status === "fulfilled") {
+          setAlerts(alertsRes.value.alerts || []);
+        } else {
+          setAlerts([]);
+        }
+      } catch (err: unknown) {
+        if (!mounted) return;
+        setApiError(
+          err instanceof Error ? err.message : "Failed to load GIS corridor telemetry."
+        );
+        setCorridors([]);
+        setSelectedCorridor(null);
       } finally {
         if (mounted) {
           setIsLoading(false);
         }
       }
     }
-    void loadData();
+
+    void loadTelemetry();
     return () => {
       mounted = false;
     };
-  }, [selectedState]);
+  }, [selectedState, refreshTrigger]);
 
-  // Operational metrics for summary grid
-  const metrics = useMemo(() => {
-    const total = corridors.length;
-    const critical = corridors.filter(
-      (c) => c.riskLevel === "Critical" || c.status === "blocked"
-    ).length;
-    const blocked = corridors.filter((c) => c.status === "blocked").length;
-    const underCaution = corridors.filter(
-      (c) => c.status === "caution" || c.status === "partial"
-    ).length;
-    const uniqueStates = new Set(corridors.map((c) => c.state)).size;
+  // Build RiskMap hotspots directly from real backend corridors & matched alerts
+  const hotspots: RiskMapHotspot[] = useMemo(() => {
+    const mapped = corridors.map((corridor) => {
+      const alert = matchAlertForCorridor(corridor, alerts);
+      return corridorToHotspot(corridor, alert);
+    });
+    return [...mapped].sort(
+      (a, b) => (SEVERITY_SORT_RANK[a.severity] ?? 3) - (SEVERITY_SORT_RANK[b.severity] ?? 3)
+    );
+  }, [corridors, alerts]);
 
-    return {
-      total: total > 0 ? total : 3,
-      critical: critical > 0 ? critical : 2,
-      blocked: blocked > 0 ? blocked : 1,
-      underCaution: underCaution > 0 ? underCaution : 1,
-      statesCount: uniqueStates > 0 ? uniqueStates : 8,
-    };
-  }, [corridors]);
+  const matchedAlertForSelected = useMemo(
+    () => matchAlertForCorridor(selectedCorridor, alerts),
+    [selectedCorridor, alerts]
+  );
+
+  // Map HUD toggles to RiskMap controlled layerVisibility
+  const mapLayerVisibility: Partial<RiskMapLayerVisibility> = useMemo(
+    () => ({
+      hotspots: true,
+      corridors: true,
+      susceptibility: false,
+      rainfall: false,
+      slopeElevation: false,
+      hillshade: layers.hillshade,
+      hazardHeatmap: layers.hazardHeatmap,
+      rescueRoute: layers.rescueRoute,
+      fieldSensors: layers.fieldSensors,
+    }),
+    [layers]
+  );
+
+  const handleToggleLayer = useCallback(
+    (key: keyof OfficerMapLayersState, next: boolean) => {
+      setLayers((prev) => ({ ...prev, [key]: next }));
+    },
+    []
+  );
+
+  const flyToCorridor = useCallback((corridor: PublicRiskMapItem) => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const alert = matchAlertForCorridor(corridor, alerts);
+    const coords = resolveCorridorCoordinates(corridor, alert);
+    const width = map.getContainer()?.clientWidth || 0;
+    const leftPad = width >= 720 ? 320 : 24;
+
+    map.flyTo({
+      center: coords,
+      zoom: 12.2,
+      pitch: 56,
+      bearing: -16,
+      padding: { top: 24, right: 48, bottom: 24, left: leftPad },
+      duration: 1400,
+      essential: true,
+    });
+  }, [alerts]);
+
+  const handleFocusCorridor = useCallback(
+    (corridor: PublicRiskMapItem) => {
+      setSelectedCorridor(corridor);
+      flyToCorridor(corridor);
+    },
+    [flyToCorridor]
+  );
+
+  const handleSelectHotspot = useCallback(
+    (hotspot: RiskMapHotspot) => {
+      const matched =
+        corridors.find((c) => c.id === hotspot.id) ||
+        corridors.find((c) => c.code.toUpperCase() === hotspot.code.toUpperCase());
+      if (matched) {
+        handleFocusCorridor(matched);
+      }
+    },
+    [corridors, handleFocusCorridor]
+  );
+
+  const handleSelectCorridorByCode = useCallback(
+    (corridorIdOrCode: string) => {
+      const needle = corridorIdOrCode.trim().toLowerCase();
+      const matched = corridors.find(
+        (c) =>
+          c.id.toLowerCase() === needle ||
+          c.code.toLowerCase() === needle ||
+          needle.includes(c.code.toLowerCase()) ||
+          c.code.toLowerCase().includes(needle)
+      );
+      if (matched) {
+        setSelectedCorridor(matched);
+      }
+    },
+    [corridors]
+  );
+
+  const handleMapLoaded = useCallback((map: mapboxgl.Map) => {
+    mapRef.current = map;
+  }, []);
+
+  const handleMapError = useCallback((msg: string) => {
+    setMapRuntimeError(msg);
+  }, []);
+
+  const handleZoomIn = () => {
+    mapRef.current?.zoomIn({ duration: 280 });
+  };
+
+  const handleZoomOut = () => {
+    mapRef.current?.zoomOut({ duration: 280 });
+  };
+
+  const handleRecenterMap = () => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (selectedCorridor) {
+      flyToCorridor(selectedCorridor);
+      return;
+    }
+
+    const preset = STATE_PRESETS[selectedState as keyof typeof STATE_PRESETS];
+    if (preset) {
+      map.flyTo({
+        center: preset.center as [number, number],
+        zoom: preset.zoom,
+        pitch: preset.pitch,
+        bearing: preset.bearing,
+        padding: { top: 0, right: 0, bottom: 0, left: 0 },
+        duration: 1200,
+        essential: true,
+      });
+    } else {
+      map.flyTo({
+        center: NORTHEAST_MAP_CENTER,
+        zoom: NORTHEAST_MAP_ZOOM,
+        pitch: NORTHEAST_MAP_PITCH,
+        bearing: NORTHEAST_MAP_BEARING,
+        padding: { top: 0, right: 0, bottom: 0, left: 0 },
+        duration: 1200,
+        essential: true,
+      });
+    }
+  };
+
+  const handleStateSelect = (state: string) => {
+    if (state !== selectedState) {
+      setIsLoading(true);
+      setSelectedState(state);
+    }
+    setIsStateMenuOpen(false);
+  };
+
+  const handleRetrySync = () => {
+    setIsLoading(true);
+    setRefreshTrigger((prev) => prev + 1);
+  };
+
+  const showFloatingControls = isMapboxTokenConfigured && !mapRuntimeError;
 
   return (
     <PortalLayout
@@ -87,207 +326,259 @@ export default function OfficerMapPage() {
         <div className="flex items-center gap-2">
           <Link
             href="/officer/roads"
-            className="px-3.5 py-1.5 rounded-full bg-[#173D32]/10 hover:bg-[#173D32]/15 text-[#173D32] text-xs font-bold transition-all"
+            className="px-3.5 py-1.5 rounded-full bg-[#173D32]/10 hover:bg-[#173D32]/15 text-[#173D32] text-xs font-bold transition-all inline-flex items-center gap-1.5"
           >
-            Road Clearances →
+            <span>Road Clearances</span>
+            <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
           </Link>
           <Link
             href="/officer/dashboard"
-            className="px-3.5 py-1.5 rounded-full bg-[#173D32] text-[#F6F4EC] text-xs font-bold hover:bg-[#1a4437] transition-all"
+            className="px-3.5 py-1.5 rounded-full bg-[#173D32] text-[#F6F4EC] text-xs font-bold hover:bg-[#1a4437] transition-all inline-flex items-center gap-1.5"
           >
-            ← Dashboard
+            <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Dashboard</span>
           </Link>
         </div>
       }
     >
-      <div className="space-y-6 sm:space-y-8 w-full">
-        {/* ── 1. Summary Metrics Grid (4 columns) ── */}
-        <PortalMetricGrid columns={4} ariaLabel="GIS Map Telemetry Summary">
-          <PortalMetricCard
-            id="gis-total-corridors"
-            title="Monitored Corridors"
-            value={metrics.total}
-            unit="Corridors"
-            icon="🛰️"
-            badge="Active Radar"
-            badgeColor="bg-[#173D32]/10 text-[#173D32] border-[#173D32]/20"
-            detail="Live spatial tracking across national and state highways"
-            isLoading={isLoading}
-          />
-          <PortalMetricCard
-            id="gis-critical-zones"
-            title="Critical Hazards"
-            value={metrics.critical}
-            unit="High Threat"
-            icon="⛰️"
-            badge={metrics.critical > 0 ? "High Saturation" : "Nominal"}
-            badgeColor={
-              metrics.critical > 0
-                ? "bg-red-100 text-red-800 border-red-200"
-                : "bg-emerald-100 text-emerald-800 border-emerald-200"
-            }
-            detail="Active slope displacement & deep soil saturation"
-            pulse={metrics.critical > 0}
-            isLoading={isLoading}
-          />
-          <PortalMetricCard
-            id="gis-blocked-roads"
-            title="Blocked Corridors"
-            value={metrics.blocked}
-            unit="Severe"
-            icon="🚫"
-            badge={metrics.blocked > 0 ? "Blocked" : "Clear"}
-            badgeVariant={metrics.blocked > 0 ? "blocked" : "open"}
-            detail={`${metrics.underCaution} additional stretches under restricted caution`}
-            pulse={metrics.blocked > 0}
-            isLoading={isLoading}
-          />
-          <PortalMetricCard
-            id="gis-states-covered"
-            title="Regional Coverage"
-            value={metrics.statesCount}
-            unit="NE States"
-            icon="🗺️"
-            badge="Eastern Sector"
-            badgeColor="bg-[#173D32]/10 text-[#173D32] border-[#173D32]/20"
-            detail="Multi-sensor integration with IMD & Sentinel-1 SAR"
-            isLoading={isLoading}
-          />
-        </PortalMetricGrid>
-
-        {/* ── 2. State Filter Bar ── */}
+      <div className="space-y-4 sm:space-y-5 w-full">
+        {/* ── 1. Top State Navigation ── */}
         <PortalFilterBar
-          left={STATES.map((state) => (
-            <button
-              key={state}
-              type="button"
-              onClick={() => setSelectedState(state)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                selectedState === state
-                  ? "bg-[#173D32] text-[#F6F4EC] shadow-xs"
-                  : "text-[#173D32]/75 hover:bg-[#173D32]/5"
-              }`}
+          className="px-3 py-2.5 sm:px-4 sm:py-3"
+          left={
+            <nav
+              aria-label="Filter corridors by Northeast state"
+              className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto max-w-full pb-0.5 sm:pb-0"
             >
-              {state}
-            </button>
-          ))}
+              {NORTHEAST_STATES.map((state) => {
+                const isActive = selectedState === state;
+                return (
+                  <button
+                    key={state}
+                    type="button"
+                    onClick={() => handleStateSelect(state)}
+                    aria-pressed={isActive}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap inline-flex items-center gap-1.5 shrink-0 ${
+                      isActive
+                        ? "bg-[#173D32] text-[#F6F4EC] shadow-xs"
+                        : "text-[#173D32]/80 hover:text-[#173D32] hover:bg-[#173D32]/6"
+                    }`}
+                  >
+                    {isActive && (
+                      <MapPin className="w-3.5 h-3.5 shrink-0" strokeWidth={2.3} aria-hidden="true" />
+                    )}
+                    <span>{state}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          }
           right={
-            <span className="text-xs font-semibold text-[#173D32]/60">
-              Filtering: <span className="font-extrabold text-[#173D32]">{selectedState}</span>
-            </span>
+            <div ref={stateDropdownRef} className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsStateMenuOpen((prev) => !prev)}
+                aria-haspopup="listbox"
+                aria-expanded={isStateMenuOpen}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full hover:bg-[#173D32]/5 text-xs font-medium text-[#173D32]/70 transition-colors cursor-pointer"
+              >
+                <span>Filtering:</span>
+                <span className="font-extrabold text-[#173D32]">{selectedState}</span>
+                <ChevronDown
+                  className={`w-3.5 h-3.5 text-[#173D32]/70 transition-transform ${
+                    isStateMenuOpen ? "rotate-180" : ""
+                  }`}
+                  aria-hidden="true"
+                />
+              </button>
+
+              {isStateMenuOpen && (
+                <div
+                  role="listbox"
+                  aria-label="Select state filter"
+                  className="absolute right-0 mt-1.5 w-48 rounded-2xl bg-[#FAF8F2] border border-[#173D32]/15 shadow-xl p-1.5 z-30"
+                >
+                  {NORTHEAST_STATES.map((state) => {
+                    const isSelected = selectedState === state;
+                    return (
+                      <button
+                        key={state}
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
+                        onClick={() => handleStateSelect(state)}
+                        className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center justify-between ${
+                          isSelected
+                            ? "bg-[#173D32] text-[#F6F4EC]"
+                            : "text-[#173D32] hover:bg-[#173D32]/8"
+                        }`}
+                      >
+                        <span>{state}</span>
+                        {isSelected && <MapPin className="w-3 h-3" aria-hidden="true" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           }
         />
 
-        {/* ── 3. Main Workspace: Map (7 cols) + Selected Corridor Dossier (5 cols) ── */}
+        {/* Graceful API Error Banner (non-blocking) */}
+        {apiError && (
+          <div
+            role="alert"
+            className="p-3.5 sm:p-4 rounded-2xl bg-red-50 border border-red-200 text-red-900 flex flex-wrap items-center justify-between gap-3 text-xs font-semibold"
+          >
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" aria-hidden="true" />
+              <span>{apiError}</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleRetrySync}
+              className="px-3.5 py-1.5 rounded-full bg-red-700 hover:bg-red-800 text-white font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Retry Telemetry</span>
+            </button>
+          </div>
+        )}
+
+        {/* ── 2 & 3. Split Workspace: Interactive Map (7 cols) + Corridor Telemetry Dossier (5 cols) ── */}
         <PortalSplitLayout
           leftSpan={7}
           stickyRight={true}
           left={
-            <div className="rounded-2xl sm:rounded-3xl overflow-hidden shadow-xs border border-[#173D32]/20 min-h-[540px] lg:min-h-[620px] relative bg-[#EEF4EB]">
+            <div className="officer-live-map relative rounded-2xl sm:rounded-3xl overflow-hidden shadow-[0_10px_30px_rgba(23,61,50,0.08)] border border-[#173D32]/15 h-[500px] sm:h-[560px] lg:h-[620px] bg-[#0F3124]">
               <RiskMap
                 variant="dashboard"
+                center={NORTHEAST_MAP_CENTER}
+                zoom={NORTHEAST_MAP_ZOOM}
+                pitch={NORTHEAST_MAP_PITCH}
+                bearing={NORTHEAST_MAP_BEARING}
                 selectedState={selectedState}
-                className="w-full h-full min-h-[540px] lg:min-h-[620px]"
-                onSelectCorridor={(corridorId) => {
-                  const matched = corridors.find(
-                    (c) =>
-                      c.code.toLowerCase().includes(corridorId.toLowerCase()) ||
-                      corridorId.toLowerCase().includes(c.code.toLowerCase())
-                  );
-                  if (matched) {
-                    setSelectedCorridor(matched);
-                  }
-                }}
+                terrainMode="satellite"
+                showHud={false}
+                showPlayback={false}
+                showControls={false}
+                showScaleControl={true}
+                scalePosition="bottom-left"
+                hotspots={hotspots}
+                activeHotspotId={selectedCorridor?.id ?? null}
+                onSelectHotspot={handleSelectHotspot}
+                onSelectCorridor={handleSelectCorridorByCode}
+                layerVisibility={mapLayerVisibility}
+                onMapLoaded={handleMapLoaded}
+                onMapError={handleMapError}
+                className="w-full h-full"
               />
+
+              {/* Runtime WebGL / Mapbox Tile Error Fallback */}
+              {mapRuntimeError && (
+                <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#173D32]/90 p-6 text-center">
+                  <div className="max-w-md rounded-3xl bg-[#FAF8F2] border border-[#173D32]/15 p-6 shadow-xl text-[#173D32]">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto mb-3">
+                      <AlertTriangle className="w-6 h-6" aria-hidden="true" />
+                    </div>
+                    <h3 className="text-base font-extrabold text-[#173D32]">
+                      Interactive Terrain Map Unavailable
+                    </h3>
+                    <p className="text-xs text-[#173D32]/75 mt-1.5 leading-relaxed">
+                      {mapRuntimeError} You can still inspect live corridor telemetry and issue alerts from the dossier panel.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Floating Top-Left Live Corridor HUD */}
+              {showFloatingControls && (
+                <OfficerLiveCorridorHud
+                  corridors={corridors}
+                  selectedCorridor={selectedCorridor}
+                  matchedAlert={matchedAlertForSelected}
+                  selectedState={selectedState}
+                  layers={layers}
+                  onToggleLayer={handleToggleLayer}
+                  onSelectCorridor={handleFocusCorridor}
+                />
+              )}
+
+              {/* Floating Bottom-Right Zoom & Map Navigation Controls */}
+              {showFloatingControls && (
+                <div className="absolute bottom-8 right-3.5 sm:right-4 z-20 flex flex-col items-end gap-2">
+                  <div className="bg-[#FAF8F2]/95 backdrop-blur-md border border-[#173D32]/15 rounded-xl shadow-md overflow-hidden flex flex-col">
+                    <button
+                      type="button"
+                      onClick={handleZoomIn}
+                      aria-label="Zoom in"
+                      title="Zoom in"
+                      className="w-9 h-9 flex items-center justify-center text-[#173D32] hover:bg-[#173D32]/8 transition-colors cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" strokeWidth={2.2} aria-hidden="true" />
+                    </button>
+                    <div className="border-t border-[#173D32]/12" />
+                    <button
+                      type="button"
+                      onClick={handleZoomOut}
+                      aria-label="Zoom out"
+                      title="Zoom out"
+                      className="w-9 h-9 flex items-center justify-center text-[#173D32] hover:bg-[#173D32]/8 transition-colors cursor-pointer"
+                    >
+                      <Minus className="w-4 h-4" strokeWidth={2.2} aria-hidden="true" />
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleRecenterMap}
+                    aria-label={
+                      selectedCorridor
+                        ? `Recenter map on ${selectedCorridor.code}`
+                        : "Recenter map overview"
+                    }
+                    title={
+                      selectedCorridor
+                        ? `Recenter on ${selectedCorridor.code}`
+                        : "Recenter map overview"
+                    }
+                    className="w-9 h-9 rounded-xl bg-[#FAF8F2]/95 backdrop-blur-md border border-[#173D32]/15 shadow-md flex items-center justify-center text-[#173D32] hover:bg-[#173D32]/8 transition-colors cursor-pointer"
+                  >
+                    <Navigation className="w-4 h-4" strokeWidth={2.1} aria-hidden="true" />
+                  </button>
+                </div>
+              )}
             </div>
           }
           right={
-            <div className="bg-[#FAF8F2] border border-[#173D32]/12 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col justify-between min-h-[540px] lg:min-h-[620px]">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#173D32]/60 block mb-1">
-                  Corridor Telemetry Dossier
-                </span>
-                <h3 className="text-xl font-extrabold text-[#173D32]">
-                  {selectedCorridor?.name || "Select a Corridor"}
-                </h3>
-                {selectedCorridor && (
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <span className="inline-block px-2.5 py-0.5 rounded-md bg-[#173D32] text-[#F6F4EC] text-xs font-black">
-                      {selectedCorridor.code}
-                    </span>
-                    <span className="text-xs font-bold text-[#173D32]/70">
-                      {selectedCorridor.state}
-                    </span>
-                  </div>
-                )}
-
-                {selectedCorridor ? (
-                  <div className="mt-5 space-y-3.5 text-xs">
-                    <div className="p-3.5 rounded-xl bg-[#F6F4EC] border border-[#173D32]/10">
-                      <span className="text-[#173D32]/60 block font-medium">Stretch & Mile Marker</span>
-                      <span className="font-bold text-[#173D32] text-sm mt-0.5 block">
-                        {selectedCorridor.stretch}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="p-3.5 rounded-xl bg-[#F6F4EC] border border-[#173D32]/10">
-                        <span className="text-[#173D32]/60 block font-medium">Clearance State</span>
-                        <div className="mt-1">
-                          <StatusBadge status={selectedCorridor.status} size="sm" />
-                        </div>
-                      </div>
-
-                      <div className="p-3.5 rounded-xl bg-[#F6F4EC] border border-[#173D32]/10">
-                        <span className="text-[#173D32]/60 block font-medium">Risk Assessment</span>
-                        <div className="mt-1">
-                          <StatusBadge status={selectedCorridor.riskLevel} size="sm" />
-                        </div>
-                      </div>
-                    </div>
-
-                    {selectedCorridor.coordinatesText && (
-                      <div className="p-3.5 rounded-xl bg-[#F6F4EC] border border-[#173D32]/10">
-                        <span className="text-[#173D32]/60 block font-medium">GIS Coordinates</span>
-                        <span className="font-mono font-bold text-[#173D32] mt-0.5 block">
-                          {selectedCorridor.coordinatesText}
-                        </span>
-                      </div>
-                    )}
-
-                    {selectedCorridor.statusReason && (
-                      <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-950">
-                        <span className="font-bold block mb-1">Operational Observation</span>
-                        <p className="leading-relaxed">{selectedCorridor.statusReason}</p>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="py-16 text-center text-xs text-[#173D32]/60">
-                    Click on any corridor pin from the radar to inspect live geotechnical status.
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-6 pt-4 border-t border-[#173D32]/10 flex items-center justify-between text-xs">
-                <span className="text-[#173D32]/60">
-                  Last synced:{" "}
-                  {selectedCorridor
-                    ? new Date(selectedCorridor.lastUpdated).toLocaleDateString()
-                    : "Live"}
-                </span>
-                <Link
-                  href="/officer/alerts"
-                  className="font-bold text-[#173D32] hover:underline inline-flex items-center gap-1"
-                >
-                  <span>Issue Alert for Corridor</span>
-                  <span>→</span>
-                </Link>
-              </div>
-            </div>
+            <OfficerCorridorDossier
+              corridors={corridors}
+              selectedCorridor={selectedCorridor}
+              matchedAlert={matchedAlertForSelected}
+              selectedState={selectedState}
+              isLoading={isLoading}
+              onSelectCorridor={handleFocusCorridor}
+              onResetState={() => handleStateSelect("All States")}
+              onIssueAlert={() => {
+                if (selectedCorridor) {
+                  setIsAlertModalOpen(true);
+                }
+              }}
+            />
           }
         />
       </div>
+
+      {/* Functional Issue Alert Modal for Selected Corridor */}
+      {isAlertModalOpen && selectedCorridor && (
+        <OfficerCorridorAlertModal
+          key={selectedCorridor.id}
+          isOpen={isAlertModalOpen}
+          corridor={selectedCorridor}
+          matchedAlert={matchedAlertForSelected}
+          onClose={() => setIsAlertModalOpen(false)}
+        />
+      )}
     </PortalLayout>
   );
 }
