@@ -29,24 +29,35 @@ export interface FieldOfficerProfile {
 
 export interface FieldOfficerTask {
   id: string;
+  title?: string;
   sector?: string;
   location: {
-    coordinates: [number, number]; // [lng, lat]
-    chainageName: string;
+    coordinates: [number, number]; // [lng, lat] or [lat, lng]
+    chainageName?: string;
+    name?: string;
     landmark?: string;
   };
   riskLevel: TaskRiskLevel;
+  priority?: 'Critical' | 'High' | 'Moderate' | 'Low' | string;
   reason: string;
   deadline: string;
   status: TaskStatus;
   assignedBy?: string;
+  assignedOfficerId?: string;
   assignedAt?: string;
   startedAt?: string | null;
   completedAt?: string | null;
   completionNotes?: string | null;
+  notes?: string | null;
   escalatedAt?: string | null;
   escalationReason?: string | null;
   escalationPriority?: string | null;
+  escalation?: {
+    reason: string;
+    priority: string;
+    escalatedAt: string;
+    escalatedBy: string;
+  } | null;
 }
 
 export interface VillagerReportItem {
@@ -133,12 +144,18 @@ export interface FieldOfficerMapData {
   sector: string;
   sectorCenter: [number, number];
   zoomLevel: number;
-  boundaries: {
+  boundaries?: {
     type: 'FeatureCollection';
     features: any[];
   };
-  dangerZones: DangerZoneItem[];
-  hazardReports: {
+  villages?: {
+    type: 'FeatureCollection';
+    features: any[];
+  };
+  roadStretches?: any[];
+  highRiskHazardZones?: any[];
+  dangerZones?: DangerZoneItem[];
+  hazardReports?: {
     reportId: string;
     villagerName: string;
     coordinates: [number, number];
@@ -148,6 +165,7 @@ export interface FieldOfficerMapData {
     timestamp: string;
     photoUrl: string;
   }[];
-  navigationRoutes: NavigationRouteItem[];
+  activeReports?: any[];
+  navigationRoutes?: NavigationRouteItem[];
 }
 

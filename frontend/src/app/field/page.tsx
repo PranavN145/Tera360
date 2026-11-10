@@ -28,6 +28,17 @@ const DEFAULT_PROFILE: FieldOfficerProfile = {
   activeDutyStatus: true,
 };
 
+interface RoadUpdateHistoryItem {
+  id: string;
+  roadSegmentId: string;
+  stretchName: string;
+  condition: RoadCondition;
+  reason: string;
+  photoUrl?: string | null;
+  timestamp: string;
+  updatedBy: string;
+}
+
 export default function FieldOfficerPortalPage() {
   const { user } = useApp();
   const [activeTab, setActiveTab] = useState<TabType>("tasks");
@@ -51,6 +62,7 @@ export default function FieldOfficerPortalPage() {
   const [tasks, setTasks] = useState<FieldOfficerTask[]>([]);
   const [reports, setReports] = useState<VillagerReportItem[]>([]);
   const [roads, setRoads] = useState<RoadStatusSegment[]>([]);
+  const [roadHistory, setRoadHistory] = useState<RoadUpdateHistoryItem[]>([]);
   const [alerts, setAlerts] = useState<SectorAlertItem[]>([]);
   const [mapData, setMapData] = useState<FieldOfficerMapData | null>(null);
 
@@ -65,13 +77,38 @@ export default function FieldOfficerPortalPage() {
   const [taskFilterRisk, setTaskFilterRisk] = useState<string>("All");
   const [reportFilterStatus, setReportFilterStatus] = useState<string>("All");
 
+  // Map Interactive States
+  const [mapLayer, setMapLayer] = useState<"topo" | "hazard" | "rainfall">("topo");
+  const [selectedLocation, setSelectedLocation] = useState<{
+    name: string;
+    coordinates: [number, number];
+    type: "village" | "hazard" | "road";
+    detail?: string;
+  }>({
+    name: "KM 42+200 Upper Ridge Cutting",
+    coordinates: [30.1425, 78.3182],
+    type: "hazard",
+    detail: "Active tension crack zone along NH-58 retaining structure",
+  });
+
   // Modal States
   const [modalType, setModalType] = useState<
-    "completeTask" | "escalateTask" | "rejectReport" | "escalateReport" | "updateRoad" | null
+    | "completeTask"
+    | "escalateTask"
+    | "verifyReport"
+    | "rejectReport"
+    | "escalateReport"
+    | "updateRoad"
+    | "viewTask"
+    | "viewReport"
+    | "viewAlert"
+    | null
   >(null);
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [modalInput, setModalInput] = useState("");
   const [modalInputSecondary, setModalInputSecondary] = useState("");
+  const [photoAttachment, setPhotoAttachment] = useState<string | null>(null);
   const [roadCondition, setRoadCondition] = useState<RoadCondition>("Partially Blocked");
   const [notificationBanner, setNotificationBanner] = useState<string | null>(null);
 
@@ -117,6 +154,22 @@ export default function FieldOfficerPortalPage() {
 
       if (roadsRes.status === "fulfilled" && Array.isArray(roadsRes.value)) {
         setRoads(roadsRes.value);
+        // Initialize road update history if not populated
+        setRoadHistory((prev) => {
+          if (prev.length === 0) {
+            return roadsRes.value.map((r, idx) => ({
+              id: `HIST-${idx + 1}`,
+              roadSegmentId: r.roadSegmentId,
+              stretchName: r.stretchName,
+              condition: r.condition,
+              reason: r.reason,
+              photoUrl: r.photoUrl,
+              timestamp: r.timestamp || new Date().toISOString(),
+              updatedBy: r.updatedBy || "Officer K. Patil",
+            }));
+          }
+          return prev;
+        });
       }
 
       if (alertsRes.status === "fulfilled" && Array.isArray(alertsRes.value)) {
@@ -131,7 +184,7 @@ export default function FieldOfficerPortalPage() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Network error";
       console.warn("Field officer API sync error:", msg);
-      showBanner("Running in cached local mode. Backend will re-sync automatically.");
+      showBanner("Running in local session mode. Telemetry will re-sync automatically.");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -152,6 +205,19 @@ export default function FieldOfficerPortalPage() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to update language";
       showBanner(msg);
+    }
+  };
+
+  // ── File Photo Attachment Helper ──────────────────────────────────────────
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoAttachment(reader.result as string);
+        showBanner("Inspection photo attached successfully.");
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -176,7 +242,7 @@ export default function FieldOfficerPortalPage() {
     if (!selectedId) return;
     try {
       setIsSubmitting(true);
-      const notes = modalInput.trim() || "Inspection concluded successfully.";
+      const notes = modalInput.trim() || "Inspection concluded successfully. Slope integrity verified.";
       const updated = await fieldOfficerApi.completeTask(selectedId, notes);
       setTasks((prev) =>
         prev.map((t) =>
@@ -187,6 +253,7 @@ export default function FieldOfficerPortalPage() {
                 status: "Completed",
                 completedAt: updated.completedAt || new Date().toISOString(),
                 completionNotes: notes,
+                notes: notes,
               }
             : t
         )
@@ -225,7 +292,7 @@ export default function FieldOfficerPortalPage() {
       setModalType(null);
       setModalInput("");
       setModalInputSecondary("");
-      showBanner(`🚨 Task ${selectedId} escalated directly to Central Disaster Officer Dashboard!`);
+      showBanner(`🚨 Task ${selectedId} escalated directly to Central Disaster Desk!`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : `Failed to escalate task ${selectedId}`;
       showBanner(msg);
@@ -235,17 +302,32 @@ export default function FieldOfficerPortalPage() {
   };
 
   // ── Report Actions ────────────────────────────────────────────────────────
-  const handleVerifyReport = async (id: string) => {
+  const handleVerifyReport = async () => {
+    if (!selectedId) return;
     try {
       setIsSubmitting(true);
-      const notes = "Ground truth confirmed on site by Field Officer.";
-      const updated = await fieldOfficerApi.verifyReport(id, notes);
+      const notes = modalInput.trim() || "Ground truth confirmed on site by Field Officer.";
+      const photo = photoAttachment || undefined;
+      const updated = await fieldOfficerApi.verifyReport(selectedId, notes, photo);
       setReports((prev) =>
-        prev.map((r) => (r.id === id ? { ...r, ...updated, status: "Verified", fieldNotes: notes } : r))
+        prev.map((r) =>
+          r.id === selectedId
+            ? {
+                ...r,
+                ...updated,
+                status: "Verified",
+                fieldNotes: notes,
+                inspectorPhotoUrl: photo || r.inspectorPhotoUrl,
+              }
+            : r
+        )
       );
-      showBanner(`Report ${id} verified. Ground truth recorded.`);
+      setModalType(null);
+      setModalInput("");
+      setPhotoAttachment(null);
+      showBanner(`Report ${selectedId} verified. Ground truth and field notes recorded.`);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : `Failed to verify report ${id}`;
+      const msg = err instanceof Error ? err.message : `Failed to verify report ${selectedId}`;
       showBanner(msg);
     } finally {
       setIsSubmitting(false);
@@ -313,8 +395,11 @@ export default function FieldOfficerPortalPage() {
         stretchName: existing?.stretchName,
         condition: roadCondition,
         reason: modalInput,
+        photoUrl: photoAttachment || existing?.photoUrl,
       });
       const updatedSegment = (res && (res.roadStatus || res.data || res.payload)) || res;
+      const updatedTime = new Date().toISOString();
+
       setRoads((prev) =>
         prev.map((r) =>
           r.roadSegmentId === selectedId
@@ -323,13 +408,31 @@ export default function FieldOfficerPortalPage() {
                 ...updatedSegment,
                 condition: roadCondition,
                 reason: modalInput,
-                timestamp: new Date().toISOString(),
+                photoUrl: photoAttachment || r.photoUrl,
+                timestamp: updatedTime,
               }
             : r
         )
       );
+
+      // Add to previously submitted updates audit log
+      setRoadHistory((prev) => [
+        {
+          id: `HIST-${Date.now()}`,
+          roadSegmentId: selectedId,
+          stretchName: existing?.stretchName || selectedId,
+          condition: roadCondition,
+          reason: modalInput,
+          photoUrl: photoAttachment || existing?.photoUrl,
+          timestamp: updatedTime,
+          updatedBy: profile.name,
+        },
+        ...prev,
+      ]);
+
       setModalType(null);
       setModalInput("");
+      setPhotoAttachment(null);
       showBanner(`📡 Road condition updated to '${roadCondition}' & synchronized with Central Dashboard!`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to update road condition";
@@ -352,11 +455,12 @@ export default function FieldOfficerPortalPage() {
                 ...updated,
                 acknowledged: true,
                 acknowledgedAt: updated.acknowledgedAt || new Date().toISOString(),
+                acknowledgedBy: profile.id,
               }
             : a
         )
       );
-      showBanner(`Alert ${id} acknowledged.`);
+      showBanner(`Emergency Alert ${id} acknowledged.`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : `Failed to acknowledge alert ${id}`;
       showBanner(msg);
@@ -365,25 +469,25 @@ export default function FieldOfficerPortalPage() {
     }
   };
 
-  // ── Helper Extractors for UI compatibility across schema versions ─────────
+  // ── Safe Helpers ──────────────────────────────────────────────────────────
   const getTaskLocation = (task: FieldOfficerTask): string => {
-    const loc = task.location as unknown as { chainageName?: string; name?: string } | undefined;
-    if (loc?.chainageName) return loc.chainageName;
-    if (loc?.name) return loc.name;
-    if ((task as unknown as { chainageName?: string }).chainageName) {
-      return (task as unknown as { chainageName: string }).chainageName;
+    if (typeof task.location === "string") return task.location;
+    return task.location?.chainageName || task.location?.name || "Assigned Sector Chainage";
+  };
+
+  const getTaskCoordinates = (task: FieldOfficerTask): string => {
+    if (task.location?.coordinates && Array.isArray(task.location.coordinates)) {
+      return `${task.location.coordinates[0].toFixed(4)}° N, ${task.location.coordinates[1].toFixed(4)}° E`;
     }
-    return "Assigned Route Stretch";
+    return "30.1425° N, 78.3182° E";
   };
 
   const getTaskNotes = (task: FieldOfficerTask): string | null => {
-    return task.completionNotes || (task as unknown as { notes?: string }).notes || null;
+    return task.completionNotes || task.notes || null;
   };
 
   const getTaskEscalationReason = (task: FieldOfficerTask): string | null => {
-    if (task.escalationReason) return task.escalationReason;
-    const escObj = (task as unknown as { escalation?: { reason?: string } }).escalation;
-    return escObj?.reason || null;
+    return task.escalationReason || task.escalation?.reason || null;
   };
 
   const getRoadUpdater = (road: RoadStatusSegment): string => {
@@ -392,7 +496,10 @@ export default function FieldOfficerPortalPage() {
 
   // ── Filtered Lists ────────────────────────────────────────────────────────
   const filteredTasks = tasks.filter((t) => {
-    const statusMatch = taskFilterStatus === "All" || t.status.toLowerCase() === taskFilterStatus.toLowerCase();
+    const statusMatch =
+      taskFilterStatus === "All" ||
+      t.status.toLowerCase() === taskFilterStatus.toLowerCase() ||
+      (taskFilterStatus === "Assigned" && (t.status === "Assigned" || (t.status as string) === "Pending"));
     const riskMatch = taskFilterRisk === "All" || t.riskLevel.toLowerCase() === taskFilterRisk.toLowerCase();
     return statusMatch && riskMatch;
   });
@@ -401,7 +508,11 @@ export default function FieldOfficerPortalPage() {
     return reportFilterStatus === "All" || r.status.toLowerCase() === reportFilterStatus.toLowerCase();
   });
 
-  const officerInitials = (profile.name || "FO")
+  const selectedTaskObj = tasks.find((t) => t.id === selectedId);
+  const selectedReportObj = reports.find((r) => r.id === selectedId);
+  const selectedAlertObj = alerts.find((a) => a.id === selectedId);
+
+  const officerInitials = (profile.name || "KP")
     .split(" ")
     .map((part) => part[0])
     .join("")
@@ -409,8 +520,8 @@ export default function FieldOfficerPortalPage() {
     .toUpperCase();
 
   return (
-    <div className="min-h-screen bg-[#F8F4EC] text-[#173D32] flex flex-col font-sans">
-      {/* ── TOP HEADER (Brand & Officer Profile) ────────────────── */}
+    <div className="min-h-screen bg-[#F6F4EC] text-[#173D32] flex flex-col font-sans">
+      {/* ── 1. PORTAL HEADER (Shared Brand & Officer Profile) ───── */}
       <header className="bg-[#173D32] text-[#F8F4EC] border-b border-[#DCE8D4]/20 shadow-md sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -453,17 +564,17 @@ export default function FieldOfficerPortalPage() {
 
             {/* Language Switcher */}
             <div className="flex items-center gap-1 bg-[#122e26] border border-[#DCE8D4]/20 rounded-full px-2 py-1 text-xs">
-              <span className="text-xs text-[#DCE8D4]/60">Lang:</span>
+              <span className="text-xs text-[#DCE8D4]/60">🌐</span>
               <select
                 aria-label="Language selector"
                 value={preferredLang}
                 onChange={(e) => handleLanguageChange(e.target.value)}
                 className="bg-transparent text-[#DCE8D4] font-semibold text-xs outline-none cursor-pointer"
               >
-                <option value="en" className="bg-[#173D32] text-[#F8F4EC]">EN</option>
-                <option value="hi" className="bg-[#173D32] text-[#F8F4EC]">HI</option>
-                <option value="mr" className="bg-[#173D32] text-[#F8F4EC]">MR</option>
-                <option value="ao" className="bg-[#173D32] text-[#F8F4EC]">AO</option>
+                <option value="en" className="bg-[#173D32] text-[#F8F4EC]">EN (English)</option>
+                <option value="hi" className="bg-[#173D32] text-[#F8F4EC]">HI (हिंदी)</option>
+                <option value="mr" className="bg-[#173D32] text-[#F8F4EC]">MR (मराठी)</option>
+                <option value="ao" className="bg-[#173D32] text-[#F8F4EC]">AO (Ao Naga)</option>
               </select>
             </div>
 
@@ -482,7 +593,7 @@ export default function FieldOfficerPortalPage() {
               )}
             </button>
 
-            {/* Profile Menu Toggle */}
+            {/* Profile Dropdown Toggle */}
             <div className="relative">
               <button
                 type="button"
@@ -496,11 +607,11 @@ export default function FieldOfficerPortalPage() {
                 <span className="text-xs opacity-60">▼</span>
               </button>
 
-              {/* Profile Card Popover */}
+              {/* Profile Dropdown Card */}
               {profileOpen && (
                 <div className="absolute right-0 mt-2 w-80 bg-[#FAF8F2] text-[#173D32] rounded-2xl shadow-2xl border border-[#173D32]/20 p-5 z-50 animate-in fade-in slide-in-from-top-2">
                   <div className="flex items-center gap-3 pb-3 border-b border-[#173D32]/10 mb-3">
-                    <div className="w-11 h-11 rounded-full bg-[#173D32] text-[#D6A65D] font-extrabold flex items-center justify-center text-sm">
+                    <div className="w-11 h-11 rounded-full bg-[#173D32] text-[#D6A65D] font-extrabold flex items-center justify-center text-sm shadow-xs">
                       {officerInitials}
                     </div>
                     <div>
@@ -514,12 +625,16 @@ export default function FieldOfficerPortalPage() {
                       <span className="font-semibold">{profile.department}</span>
                     </div>
                     <div>
-                      <span className="text-[#173D32]/60 font-medium block">Assigned Sector:</span>
+                      <span className="text-[#173D32]/60 font-medium block">Assigned Area:</span>
                       <span className="font-semibold text-[#173D32]">{profile.assignedArea}</span>
                     </div>
                     <div>
-                      <span className="text-[#173D32]/60 font-medium block">Contact Phone:</span>
+                      <span className="text-[#173D32]/60 font-medium block">Phone Number:</span>
                       <span className="font-mono font-semibold">{profile.phone}</span>
+                    </div>
+                    <div>
+                      <span className="text-[#173D32]/60 font-medium block">Preferred Language:</span>
+                      <span className="font-semibold uppercase">{profile.language}</span>
                     </div>
                     <div>
                       <span className="text-[#173D32]/60 font-medium block">Active Duty Status:</span>
@@ -529,13 +644,21 @@ export default function FieldOfficerPortalPage() {
                       </span>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setProfileOpen(false)}
-                    className="w-full mt-4 py-1.5 rounded-xl bg-[#173D32] text-[#F8F4EC] text-xs font-bold hover:bg-[#1f4e40] transition-colors cursor-pointer"
-                  >
-                    Close Profile Details
-                  </button>
+                  <div className="mt-4 pt-3 border-t border-[#173D32]/10 flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setProfileOpen(false)}
+                      className="w-full py-1.5 rounded-xl bg-[#173D32] text-[#F8F4EC] text-xs font-bold hover:bg-[#1f4e40] transition-colors cursor-pointer"
+                    >
+                      Close Profile
+                    </button>
+                    <Link
+                      href="/"
+                      className="w-full py-1.5 rounded-xl border border-[#173D32]/20 text-[#173D32] text-xs font-semibold text-center hover:bg-black/5 transition-colors"
+                    >
+                      Return to Homepage
+                    </Link>
+                  </div>
                 </div>
               )}
             </div>
@@ -543,7 +666,7 @@ export default function FieldOfficerPortalPage() {
         </div>
       </header>
 
-      {/* ── TOAST NOTIFICATION BANNER ──────────────────────────── */}
+      {/* ── 2. LIVE ACTION TOAST NOTIFICATION ──────────────────── */}
       {notificationBanner && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-[#D6A65D] text-[#173D32] px-6 py-2.5 rounded-full font-bold text-xs shadow-xl border border-[#173D32]/20 flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
           <span>⚡</span>
@@ -551,11 +674,12 @@ export default function FieldOfficerPortalPage() {
         </div>
       )}
 
-      {/* ── MAIN PORTAL LAYOUT (Sidebar Navbar + Content Canvas) ── */}
+      {/* ── 3. MAIN PORTAL BODY (Sidebar + Tab Content Canvas) ──── */}
       <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col md:flex-row gap-8">
-        {/* Left Side Navigation */}
-        <nav className="w-full md:w-64 shrink-0 space-y-2" aria-label="Portal Navigation Tabs">
+        {/* Left Side Navigation Tabs */}
+        <nav className="w-full md:w-64 shrink-0 space-y-3" aria-label="Portal Navigation Tabs">
           <div className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-3xl p-3 shadow-xs space-y-1">
+            {/* 1. My Tasks */}
             <button
               type="button"
               onClick={() => setActiveTab("tasks")}
@@ -578,6 +702,7 @@ export default function FieldOfficerPortalPage() {
               </span>
             </button>
 
+            {/* 2. Assigned Area Map */}
             <button
               type="button"
               onClick={() => setActiveTab("map")}
@@ -596,6 +721,7 @@ export default function FieldOfficerPortalPage() {
               </span>
             </button>
 
+            {/* 3. Reports */}
             <button
               type="button"
               onClick={() => setActiveTab("reports")}
@@ -607,7 +733,7 @@ export default function FieldOfficerPortalPage() {
             >
               <div className="flex items-center gap-3">
                 <span className="text-base">📢</span>
-                <span>Villager Reports</span>
+                <span>Reports</span>
               </div>
               <span
                 className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold ${
@@ -618,6 +744,7 @@ export default function FieldOfficerPortalPage() {
               </span>
             </button>
 
+            {/* 4. Road Status */}
             <button
               type="button"
               onClick={() => setActiveTab("roads")}
@@ -632,10 +759,11 @@ export default function FieldOfficerPortalPage() {
                 <span>Road Status</span>
               </div>
               <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold">
-                {roads.length} Segments
+                {roads.length} Roads
               </span>
             </button>
 
+            {/* 5. Alerts */}
             <button
               type="button"
               onClick={() => setActiveTab("alerts")}
@@ -647,13 +775,17 @@ export default function FieldOfficerPortalPage() {
             >
               <div className="flex items-center gap-3">
                 <span className="text-base">🚨</span>
-                <span>Sector Alerts</span>
+                <span>Alerts</span>
               </div>
-              {alerts.some((a) => !a.acknowledged) && (
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-rose-500 text-white font-extrabold animate-pulse">
-                  {alerts.filter((a) => !a.acknowledged).length} New
-                </span>
-              )}
+              <span
+                className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold ${
+                  alerts.some((a) => !a.acknowledged)
+                    ? "bg-rose-500 text-white animate-pulse"
+                    : "bg-[#173D32]/10 text-[#173D32]"
+                }`}
+              >
+                {alerts.filter((a) => !a.acknowledged).length} New
+              </span>
             </button>
           </div>
 
@@ -704,7 +836,7 @@ export default function FieldOfficerPortalPage() {
               </div>
               <div className="flex items-center gap-2 mt-2 pt-2 border-t border-[#173D32]/10 text-[11px] font-bold">
                 <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900">
-                  {tasks.filter((t) => t.status === "Assigned").length} Pending
+                  {tasks.filter((t) => t.status === "Assigned" || (t.status as string) === "Pending").length} Pending
                 </span>
                 <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-900">
                   {tasks.filter((t) => t.status === "In_Progress").length} In Progress
@@ -724,7 +856,7 @@ export default function FieldOfficerPortalPage() {
             >
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-[#173D32]/70">
-                  Road Blockages
+                  Road Conditions
                 </span>
                 <span className="text-sm">🚧</span>
               </div>
@@ -732,14 +864,14 @@ export default function FieldOfficerPortalPage() {
                 <span className="text-2xl font-black text-rose-700">
                   {roads.filter((r) => r.condition !== "Open").length}
                 </span>
-                <span className="text-xs text-[#173D32]/70 font-semibold">Active Blockages</span>
+                <span className="text-xs text-[#173D32]/70 font-semibold">Active Hazards</span>
               </div>
               <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#173D32]/10 text-[11px]">
                 <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-900 font-bold">
-                  {roads.filter((r) => r.condition === "Blocked" || r.condition === "Partially Blocked").length} Critical Hazards
+                  {roads.filter((r) => r.condition === "Blocked" || r.condition === "Partially Blocked").length} Blocked/Partial
                 </span>
                 <span className="font-mono text-[#173D32]/60 text-[10px]">
-                  {roads.length} Monitored
+                  {roads.length} Segments
                 </span>
               </div>
             </button>
@@ -764,7 +896,7 @@ export default function FieldOfficerPortalPage() {
                 <span className="text-2xl font-black text-amber-700">
                   {reports.filter((r) => r.status === "Pending").length}
                 </span>
-                <span className="text-xs text-[#173D32]/70 font-semibold">Awaiting Field Check</span>
+                <span className="text-xs text-[#173D32]/70 font-semibold">Awaiting Verification</span>
               </div>
               <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#173D32]/10 text-[11px]">
                 <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold">
@@ -777,13 +909,17 @@ export default function FieldOfficerPortalPage() {
             </button>
           </section>
 
+          {/* ══════════════════════════════════════════════════════════ */}
           {/* ── TAB 1: MY TASKS ─────────────────────────────────── */}
+          {/* ══════════════════════════════════════════════════════════ */}
           {activeTab === "tasks" && (
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-extrabold text-[#173D32]">Assigned Inspection Tasks</h2>
-                  <p className="text-xs text-[#173D32]/70 mt-0.5">Dispatched by Central Disaster Officer for on-ground verification.</p>
+                  <p className="text-xs text-[#173D32]/70 mt-0.5">
+                    Tasks assigned to {profile.name} ({profile.id}) across {profile.assignedArea}.
+                  </p>
                 </div>
 
                 {/* Filters */}
@@ -795,7 +931,7 @@ export default function FieldOfficerPortalPage() {
                     className="bg-[#FAF8F2] border border-[#173D32]/20 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-[#173D32] outline-none"
                   >
                     <option value="All">All Statuses</option>
-                    <option value="Assigned">Assigned</option>
+                    <option value="Assigned">Pending / Assigned</option>
                     <option value="In_Progress">In Progress</option>
                     <option value="Completed">Completed</option>
                     <option value="Escalated">Escalated</option>
@@ -843,6 +979,9 @@ export default function FieldOfficerPortalPage() {
                           >
                             {task.riskLevel} Risk
                           </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#173D32]/10 text-[#173D32]">
+                            Priority: {task.priority || task.riskLevel}
+                          </span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span
@@ -863,8 +1002,10 @@ export default function FieldOfficerPortalPage() {
 
                       <div className="space-y-2 text-xs">
                         <div>
-                          <span className="text-[#173D32]/60 font-semibold">Location Chainage:</span>
-                          <p className="font-bold text-sm text-[#173D32] mt-0.5">{getTaskLocation(task)}</p>
+                          <span className="text-[#173D32]/60 font-semibold">Location / Chainage:</span>
+                          <p className="font-bold text-sm text-[#173D32] mt-0.5 flex items-center gap-1.5">
+                            <span>📍</span> {getTaskLocation(task)}
+                          </p>
                         </div>
                         <div>
                           <span className="text-[#173D32]/60 font-semibold">Inspection Reason:</span>
@@ -888,7 +1029,7 @@ export default function FieldOfficerPortalPage() {
 
                         {getTaskNotes(task) && (
                           <div className="bg-[#DCE8D4]/40 p-2.5 rounded-xl border border-[#173D32]/10 mt-2">
-                            <span className="font-bold text-[#173D32]">Officer Notes:</span> {getTaskNotes(task)}
+                            <span className="font-bold text-[#173D32]">Officer Completion Notes:</span> {getTaskNotes(task)}
                           </div>
                         )}
 
@@ -938,6 +1079,18 @@ export default function FieldOfficerPortalPage() {
                             ⚠️ Escalate to Command
                           </button>
                         )}
+
+                        {/* Detailed View Modal Trigger */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedId(task.id);
+                            setModalType("viewTask");
+                          }}
+                          className="px-3.5 py-2 rounded-xl border border-[#173D32]/25 text-[#173D32] text-xs font-bold hover:bg-[#173D32]/10 transition-colors cursor-pointer ml-auto"
+                        >
+                          🔍 View Details
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -946,119 +1099,242 @@ export default function FieldOfficerPortalPage() {
             </div>
           )}
 
+          {/* ══════════════════════════════════════════════════════════ */}
           {/* ── TAB 2: ASSIGNED AREA MAP ───────────────────────── */}
+          {/* ══════════════════════════════════════════════════════════ */}
           {activeTab === "map" && (
             <div className="space-y-4">
-              <div>
-                <h2 className="text-xl font-extrabold text-[#173D32]">Assigned Area Map & Danger Zones</h2>
-                <p className="text-xs text-[#173D32]/70 mt-0.5">
-                  Topography, spatial landslide risk corridors, and turn-by-turn routes in {profile.assignedArea}.
-                </p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-xl font-extrabold text-[#173D32]">Assigned Area Map & Danger Zones</h2>
+                  <p className="text-xs text-[#173D32]/70 mt-0.5">
+                    Spatial corridors, village jurisdictions, and active navigation routes for {profile.assignedArea}.
+                  </p>
+                </div>
+
+                {/* Layer Toggle */}
+                <div className="flex items-center gap-1 bg-[#FAF8F2] border border-[#173D32]/20 p-1 rounded-2xl text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setMapLayer("topo")}
+                    className={`px-3 py-1 rounded-xl transition-all cursor-pointer ${
+                      mapLayer === "topo" ? "bg-[#173D32] text-[#F8F4EC]" : "text-[#173D32]/70 hover:text-[#173D32]"
+                    }`}
+                  >
+                    Topography
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMapLayer("hazard")}
+                    className={`px-3 py-1 rounded-xl transition-all cursor-pointer ${
+                      mapLayer === "hazard" ? "bg-[#173D32] text-[#F8F4EC]" : "text-[#173D32]/70 hover:text-[#173D32]"
+                    }`}
+                  >
+                    Susceptibility
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMapLayer("rainfall")}
+                    className={`px-3 py-1 rounded-xl transition-all cursor-pointer ${
+                      mapLayer === "rainfall" ? "bg-[#173D32] text-[#F8F4EC]" : "text-[#173D32]/70 hover:text-[#173D32]"
+                    }`}
+                  >
+                    24h Rainfall
+                  </button>
+                </div>
               </div>
 
-              {/* Map Canvas Card */}
-              <div className="bg-[#173D32] text-[#F8F4EC] rounded-3xl p-6 border border-[#DCE8D4]/20 relative overflow-hidden shadow-lg min-h-[440px] flex flex-col justify-between">
+              {/* Interactive Sector Canvas Card */}
+              <div className="bg-[#173D32] text-[#F8F4EC] rounded-3xl p-6 border border-[#DCE8D4]/20 relative overflow-hidden shadow-xl space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#DCE8D4]/20 pb-3">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
                     <span className="text-xs font-extrabold uppercase tracking-wider text-[#DCE8D4]">
-                      {mapData?.sector || profile.assignedArea} Satellite Topography
+                      {mapData?.sector || profile.assignedArea} Spatial Grid
                     </span>
                   </div>
                   <span className="text-[11px] font-mono text-[#D6A65D]">
-                    Center: [{mapData?.sectorCenter ? mapData.sectorCenter.join(", ") : "94.028° E, 25.675° N"}]
+                    Center: [{mapData?.sectorCenter ? mapData.sectorCenter.join(", ") : "30.1550° N, 78.3220° E"}]
                   </span>
                 </div>
 
-                {/* Spatial Elements Overlay */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
-                  {mapData?.dangerZones && mapData.dangerZones.length > 0 ? (
-                    mapData.dangerZones.map((zone) => (
+                {/* Assigned Villages & Monitored Road Stretches */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="bg-[#122e26] border border-[#DCE8D4]/20 rounded-2xl p-3.5 space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#D6A65D] block">
+                      Assigned Villages
+                    </span>
+                    <div className="space-y-1 text-xs text-[#DCE8D4]">
                       <div
-                        key={zone.zoneId}
-                        className={`rounded-2xl p-4 space-y-2 border ${
-                          zone.landslideSusceptibility === "Critical"
-                            ? "bg-[#122e26]/80 border-rose-500/40"
-                            : "bg-[#122e26]/80 border-amber-500/40"
-                        }`}
+                        onClick={() =>
+                          setSelectedLocation({
+                            name: "Rampur Upper",
+                            coordinates: [30.160, 78.315],
+                            type: "village",
+                            detail: "Population 2,400 • Primary Evacuation Zone: School Grounds",
+                          })
+                        }
+                        className="p-1.5 rounded-lg hover:bg-white/10 cursor-pointer flex items-center justify-between"
                       >
-                        <div className="flex items-center justify-between">
-                          <span
-                            className={`text-xs font-extrabold ${
-                              zone.landslideSusceptibility === "Critical" ? "text-rose-300" : "text-amber-300"
-                            }`}
-                          >
-                            🚨 {zone.name}
-                          </span>
-                          <span
-                            className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                              zone.landslideSusceptibility === "Critical"
-                                ? "bg-rose-500/20 text-rose-300"
-                                : "bg-amber-500/20 text-amber-300"
-                            }`}
-                          >
-                            Weight: {zone.riskWeight} ({zone.landslideSusceptibility})
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-[#DCE8D4]/80">
-                          Slope: {zone.slopeAngleDeg}° | Soil Saturation: {zone.soilMoisturePercent}% | 24h Rain: {zone.recentRainfall24hMm}mm
-                        </p>
-                        <div className="text-[11px] text-amber-200">
-                          Status: {zone.status} | Radius: {zone.radiusMeters}m
-                        </div>
+                        <span className="font-bold">🏡 Rampur Upper</span>
+                        <span className="text-[10px] opacity-70">Evac: School Grounds</span>
                       </div>
-                    ))
-                  ) : (
-                    <>
-                      <div className="bg-[#122e26]/80 border border-rose-500/40 rounded-2xl p-4 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-extrabold text-rose-300">🚨 Dzüdza Active Slip Zone</span>
-                          <span className="text-[10px] bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full font-bold">Weight: 0.94 (Critical)</span>
-                        </div>
-                        <p className="text-[11px] text-[#DCE8D4]/80">Slope: 46° | Soil Moisture: 89% | 24h Rain: 118mm</p>
-                        <div className="text-[11px] text-amber-200">
-                          Action: Enforce single-lane regulated convoy, maintain 24/7 spotter at KM 42+300.
-                        </div>
+                      <div
+                        onClick={() =>
+                          setSelectedLocation({
+                            name: "Devipura",
+                            coordinates: [30.153, 78.332],
+                            type: "village",
+                            detail: "Population 1,800 • Primary Evacuation Zone: Community Hall",
+                          })
+                        }
+                        className="p-1.5 rounded-lg hover:bg-white/10 cursor-pointer flex items-center justify-between"
+                      >
+                        <span className="font-bold">🏡 Devipura</span>
+                        <span className="text-[10px] opacity-70">Evac: Community Hall</span>
                       </div>
+                      <div
+                        onClick={() =>
+                          setSelectedLocation({
+                            name: "Shivalik Ridge Hamlet",
+                            coordinates: [30.142, 78.322],
+                            type: "village",
+                            detail: "Population 950 • High downslope exposure to debris flow",
+                          })
+                        }
+                        className="p-1.5 rounded-lg hover:bg-white/10 cursor-pointer flex items-center justify-between"
+                      >
+                        <span className="font-bold">🏡 Shivalik Ridge</span>
+                        <span className="text-[10px] opacity-70">Evac: South Ground</span>
+                      </div>
+                    </div>
+                  </div>
 
-                      <div className="bg-[#122e26]/80 border border-amber-500/40 rounded-2xl p-4 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-extrabold text-amber-300">⚠️ Phesama Upper Escarpment</span>
-                          <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-bold">Weight: 0.78 (High)</span>
+                  <div className="bg-[#122e26] border border-[#DCE8D4]/20 rounded-2xl p-3.5 space-y-1 md:col-span-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#D6A65D] block">
+                      Monitored Highway Corridors
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      {roads.map((r) => (
+                        <div
+                          key={r.roadSegmentId}
+                          onClick={() =>
+                            setSelectedLocation({
+                              name: r.stretchName,
+                              coordinates: [30.145, 78.32],
+                              type: "road",
+                              detail: `Condition: ${r.condition} — ${r.reason}`,
+                            })
+                          }
+                          className="p-2 rounded-xl bg-white/5 border border-white/10 hover:border-[#D6A65D] cursor-pointer space-y-1 transition-all"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-[11px] text-white truncate">{r.stretchName}</span>
+                            <span
+                              className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase ${
+                                r.condition === "Blocked"
+                                  ? "bg-rose-500 text-white"
+                                  : r.condition === "Partially Blocked"
+                                  ? "bg-amber-500 text-white"
+                                  : r.condition === "Caution"
+                                  ? "bg-yellow-400 text-black"
+                                  : "bg-emerald-600 text-white"
+                              }`}
+                            >
+                              {r.condition}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-[#DCE8D4]/70 truncate">{r.reason}</p>
                         </div>
-                        <p className="text-[11px] text-[#DCE8D4]/80">Slope: 38° | Soil Moisture: 76% | 24h Rain: 92mm</p>
-                        <div className="text-[11px] text-amber-200">
-                          Action: Pre-position JCB loader at KM 47 staging post; monitor weep holes.
-                        </div>
-                      </div>
-                    </>
-                  )}
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
-                {/* Navigation Route Display */}
-                <div className="bg-[#122e26] border border-[#DCE8D4]/20 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-                  <div className="space-y-1">
-                    <span className="text-[11px] font-bold text-[#D6A65D] uppercase tracking-wider block">
-                      Active Field Dispatch Navigation
-                    </span>
-                    <p className="font-semibold text-white">
-                      {mapData?.navigationRoutes && mapData.navigationRoutes.length > 0
-                        ? `${mapData.navigationRoutes[0].origin.name} ➔ ${mapData.navigationRoutes[0].destination.name}`
-                        : "Kohima South Emergency Post ➔ KM 42+300 Dzüdza Bridge Approach"}
-                    </p>
+                {/* Highlighted High-Risk Hazard Zones */}
+                <div className="space-y-2">
+                  <span className="text-xs font-black uppercase tracking-wider text-[#D6A65D] block">
+                    High-Risk Landslide Hazard Zones
+                  </span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    <div
+                      onClick={() =>
+                        setSelectedLocation({
+                          name: "KM 42+200 Upper Ridge Cutting (Zone HZ-01)",
+                          coordinates: [30.1425, 78.3182],
+                          type: "hazard",
+                          detail: "Slope 48° • Soil Saturation 89% • 24h Rain 118mm. Urgent retaining inspection.",
+                        })
+                      }
+                      className="bg-[#122e26] border border-rose-500/50 rounded-2xl p-4 space-y-2 hover:border-rose-400 cursor-pointer transition-all"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-extrabold text-rose-300">🚨 KM 42+200 Upper Ridge Cutting</span>
+                        <span className="text-[10px] bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full font-bold">
+                          Weight: 0.94 (Critical)
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#DCE8D4]/80">
+                        Slope: 48° | Soil Saturation: 89% | 24h Rain: 118mm
+                      </p>
+                      <div className="text-[11px] text-amber-200">
+                        Protocol: Enforce single-lane regulated convoy, maintain spotter at KM 42+300.
+                      </div>
+                    </div>
+
+                    <div
+                      onClick={() =>
+                        setSelectedLocation({
+                          name: "Village Approach B-12 Colluvium (Zone HZ-02)",
+                          coordinates: [30.1588, 78.3341],
+                          type: "hazard",
+                          detail: "Slope 39° • Soil Saturation 78% • 24h Rain 94mm. Culvert foundation erosion risk.",
+                        })
+                      }
+                      className="bg-[#122e26] border border-amber-500/50 rounded-2xl p-4 space-y-2 hover:border-amber-400 cursor-pointer transition-all"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-extrabold text-amber-300">⚠️ B-12 Colluvium Slide Zone</span>
+                        <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-bold">
+                          Weight: 0.78 (High)
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#DCE8D4]/80">
+                        Slope: 39° | Soil Saturation: 78% | 24h Rain: 94mm
+                      </p>
+                      <div className="text-[11px] text-amber-200">
+                        Protocol: Pre-position backhoe at chainage 3+400; monitor slope tension cracks.
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="px-3 py-1 bg-[#DCE8D4]/15 rounded-full font-mono text-[11px] text-[#DCE8D4]">
-                      {mapData?.navigationRoutes && mapData.navigationRoutes.length > 0
-                        ? `${mapData.navigationRoutes[0].distanceKm} KM (${mapData.navigationRoutes[0].estimatedTravelTimeMin} mins)`
-                        : "6.8 KM (14 mins)"}
+                </div>
+
+                {/* Interactive Turn-by-Turn Navigation Routing Card */}
+                <div className="bg-[#122e26] border border-[#DCE8D4]/30 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-[#D6A65D] uppercase tracking-wider block">
+                      Active Navigation Route To Selected Target
                     </span>
+                    <p className="font-bold text-white text-sm flex items-center gap-2">
+                      <span>🎯</span> {selectedLocation.name}
+                    </p>
+                    <p className="text-[11px] text-[#DCE8D4]/80">{selectedLocation.detail}</p>
+                    <span className="text-[10px] font-mono text-[#D6A65D]">
+                      GPS Coordinates: [{selectedLocation.coordinates.join(", ")}]
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 shrink-0 w-full md:w-auto">
                     <button
                       type="button"
-                      onClick={() => showBanner("GPS Coordinates copied to field dispatch terminal.")}
-                      className="px-3.5 py-1.5 rounded-xl bg-[#D6A65D] text-[#173D32] font-black hover:bg-[#e0b268] transition-colors cursor-pointer text-xs"
+                      onClick={() =>
+                        showBanner(
+                          `Navigation coordinates [${selectedLocation.coordinates.join(", ")}] transmitted to field terminal!`
+                        )
+                      }
+                      className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-[#D6A65D] text-[#173D32] font-black hover:bg-[#e0b268] transition-colors cursor-pointer text-xs"
                     >
-                      🧭 Open Turn-by-Turn GPS
+                      🧭 Transmit GPS & Route
                     </button>
                   </div>
                 </div>
@@ -1066,13 +1342,17 @@ export default function FieldOfficerPortalPage() {
             </div>
           )}
 
+          {/* ══════════════════════════════════════════════════════════ */}
           {/* ── TAB 3: VILLAGER REPORTS ────────────────────────── */}
+          {/* ══════════════════════════════════════════════════════════ */}
           {activeTab === "reports" && (
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-extrabold text-[#173D32]">Citizen & Villager Hazard Reports</h2>
-                  <p className="text-xs text-[#173D32]/70 mt-0.5">Crowdsourced reports within your sector. Verify on ground, reject, or escalate.</p>
+                  <p className="text-xs text-[#173D32]/70 mt-0.5">
+                    Reports submitted by villagers in {profile.assignedArea}. Verify on-ground, reject with reasons, or escalate.
+                  </p>
                 </div>
 
                 {/* Status Filter */}
@@ -1083,10 +1363,10 @@ export default function FieldOfficerPortalPage() {
                   className="bg-[#FAF8F2] border border-[#173D32]/20 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-[#173D32] outline-none"
                 >
                   <option value="All">All Reports</option>
-                  <option value="Pending">Pending</option>
-                  <option value="Verified">Verified</option>
+                  <option value="Pending">Pending Verification</option>
+                  <option value="Verified">Verified Ground Truth</option>
                   <option value="Rejected">Rejected</option>
-                  <option value="Escalated">Escalated</option>
+                  <option value="Escalated">Escalated to Command</option>
                 </select>
               </div>
 
@@ -1099,7 +1379,7 @@ export default function FieldOfficerPortalPage() {
                   {filteredReports.map((rep) => (
                     <div
                       key={rep.id}
-                      className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-3xl p-5 shadow-xs space-y-3"
+                      className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-3xl p-5 shadow-xs space-y-3 hover:border-[#173D32]/30 transition-all"
                     >
                       <div className="flex items-center justify-between border-b border-[#173D32]/10 pb-3">
                         <div className="flex items-center gap-2">
@@ -1119,32 +1399,31 @@ export default function FieldOfficerPortalPage() {
                               : "bg-amber-100 text-amber-800"
                           }`}
                         >
-                          {rep.status}
+                          ● {rep.status}
                         </span>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
                         <div className="sm:col-span-2 space-y-1.5">
-                          <p className="text-[#173D32] font-medium leading-relaxed">{rep.locationDescription}</p>
+                          <p className="text-[#173D32] font-semibold leading-relaxed">{rep.locationDescription}</p>
                           <div className="text-[11px] text-[#173D32]/70 flex flex-wrap items-center gap-3">
                             <span>
                               Reported by: <strong>{rep.villagerName}</strong> ({rep.contact})
                             </span>
                             <span>
-                              Time:{" "}
-                              {new Date(rep.timestamp).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}
+                              Time: {new Date(rep.timestamp).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}
                             </span>
                           </div>
 
                           {rep.fieldNotes && (
-                            <div className="bg-[#DCE8D4]/40 p-2 rounded-xl text-[11px] border border-[#173D32]/10">
-                              <strong>Field Verification:</strong> {rep.fieldNotes}
+                            <div className="bg-[#DCE8D4]/40 p-2.5 rounded-xl text-[11px] border border-[#173D32]/10 mt-1">
+                              <strong>Officer Field Notes:</strong> {rep.fieldNotes}
                             </div>
                           )}
 
                           {rep.rejectionReason && (
-                            <div className="bg-rose-50 text-rose-900 p-2 rounded-xl text-[11px] border border-rose-200">
-                              <strong>Rejection Reason:</strong> {rep.rejectionReason}
+                            <div className="bg-rose-50 text-rose-900 p-2.5 rounded-xl text-[11px] border border-rose-200 mt-1">
+                              <strong>Rejection Justification:</strong> {rep.rejectionReason}
                             </div>
                           )}
                         </div>
@@ -1164,41 +1443,58 @@ export default function FieldOfficerPortalPage() {
                       </div>
 
                       {/* Actions */}
-                      {rep.status === "Pending" && (
-                        <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-[#173D32]/10">
-                          <button
-                            type="button"
-                            onClick={() => handleVerifyReport(rep.id)}
-                            disabled={isSubmitting}
-                            className="px-3.5 py-1.5 rounded-xl bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 transition-colors cursor-pointer disabled:opacity-50"
-                          >
-                            ✓ Verify Ground Truth
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedId(rep.id);
-                              setModalInput("");
-                              setModalType("rejectReport");
-                            }}
-                            className="px-3.5 py-1.5 rounded-xl border border-rose-400 text-rose-700 text-xs font-bold hover:bg-rose-50 transition-colors cursor-pointer"
-                          >
-                            ✕ Reject Report
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedId(rep.id);
-                              setModalInput("");
-                              setModalInputSecondary("");
-                              setModalType("escalateReport");
-                            }}
-                            className="px-3.5 py-1.5 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 transition-colors cursor-pointer"
-                          >
-                            ⚠️ Escalate to Command
-                          </button>
-                        </div>
-                      )}
+                      <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-[#173D32]/10">
+                        {rep.status === "Pending" && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedId(rep.id);
+                                setModalInput("");
+                                setPhotoAttachment(null);
+                                setModalType("verifyReport");
+                              }}
+                              className="px-3.5 py-1.5 rounded-xl bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 transition-colors cursor-pointer"
+                            >
+                              ✓ Verify with Notes & Photo
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedId(rep.id);
+                                setModalInput("");
+                                setModalType("rejectReport");
+                              }}
+                              className="px-3.5 py-1.5 rounded-xl border border-rose-400 text-rose-700 text-xs font-bold hover:bg-rose-50 transition-colors cursor-pointer"
+                            >
+                              ✕ Reject Report
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedId(rep.id);
+                                setModalInput("");
+                                setModalInputSecondary("");
+                                setModalType("escalateReport");
+                              }}
+                              className="px-3.5 py-1.5 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 transition-colors cursor-pointer"
+                            >
+                              ⚠️ Escalate to Command
+                            </button>
+                          </>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedId(rep.id);
+                            setModalType("viewReport");
+                          }}
+                          className="px-3.5 py-1.5 rounded-xl border border-[#173D32]/25 text-[#173D32] text-xs font-bold hover:bg-[#173D32]/10 transition-colors cursor-pointer ml-auto"
+                        >
+                          🔍 View Full Report
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1206,13 +1502,15 @@ export default function FieldOfficerPortalPage() {
             </div>
           )}
 
+          {/* ══════════════════════════════════════════════════════════ */}
           {/* ── TAB 4: ROAD STATUS ─────────────────────────────── */}
+          {/* ══════════════════════════════════════════════════════════ */}
           {activeTab === "roads" && (
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div>
                 <h2 className="text-xl font-extrabold text-[#173D32]">Real-Time Road Corridor Conditions</h2>
                 <p className="text-xs text-[#173D32]/70 mt-0.5">
-                  Update segment conditions (Open, Caution, Partially Blocked, Blocked) synced to Central Dashboard & Route Advisories.
+                  Update segment conditions (Open, Caution, Partially Blocked, Blocked) with photograph attachments and reasons.
                 </p>
               </div>
 
@@ -1253,6 +1551,16 @@ export default function FieldOfficerPortalPage() {
                         <p className="text-[#173D32]/90 leading-relaxed">
                           <strong>Current Status Reason:</strong> {road.reason}
                         </p>
+                        {road.photoUrl && (
+                          <div className="my-2">
+                            <span className="text-[10px] text-[#173D32]/60 font-semibold block mb-1">Attached Photo:</span>
+                            <img
+                              src={road.photoUrl}
+                              alt="Road condition"
+                              className="h-24 rounded-xl object-cover border border-[#173D32]/20"
+                            />
+                          </div>
+                        )}
                         <p className="text-[11px] text-[#173D32]/60 pt-1">
                           Last Updated:{" "}
                           {new Date(road.timestamp).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}{" "}
@@ -1260,28 +1568,76 @@ export default function FieldOfficerPortalPage() {
                         </p>
                       </div>
 
-                      <div className="pt-3 border-t border-[#173D32]/10 flex items-center gap-3">
+                      <div className="pt-3 border-t border-[#173D32]/10 flex items-center justify-between">
                         <button
                           type="button"
                           onClick={() => {
                             setSelectedId(road.roadSegmentId);
                             setRoadCondition(road.condition);
                             setModalInput(road.reason);
+                            setPhotoAttachment(road.photoUrl || null);
                             setModalType("updateRoad");
                           }}
                           className="px-4 py-2 rounded-xl bg-[#173D32] text-[#F8F4EC] text-xs font-bold hover:bg-[#1f4e40] transition-colors cursor-pointer"
                         >
-                          ⚡ Update Condition & Sync
+                          ⚡ Update Condition & Photo
                         </button>
+                        <span className="text-[10px] text-[#173D32]/60 font-mono">
+                          Broadcasts to Administrator & Route Planners
+                        </span>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
+
+              {/* Previously Submitted Updates Feed */}
+              {roadHistory.length > 0 && (
+                <div className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-3xl p-5 shadow-xs space-y-3">
+                  <div className="flex items-center justify-between border-b border-[#173D32]/10 pb-2">
+                    <h3 className="font-extrabold text-sm text-[#173D32]">Previously Submitted Updates (Audit Log)</h3>
+                    <span className="text-[11px] text-[#173D32]/60">{roadHistory.length} recorded entries</span>
+                  </div>
+                  <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+                    {roadHistory.map((item) => (
+                      <div
+                        key={item.id}
+                        className="p-3 bg-white/60 rounded-xl border border-[#173D32]/10 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+                      >
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-[#173D32]">{item.stretchName}</span>
+                            <span
+                              className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase ${
+                                item.condition === "Blocked"
+                                  ? "bg-rose-100 text-rose-800"
+                                  : item.condition === "Partially Blocked"
+                                  ? "bg-amber-100 text-amber-800"
+                                  : item.condition === "Caution"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-emerald-100 text-emerald-800"
+                              }`}
+                            >
+                              {item.condition}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-[#173D32]/80">{item.reason}</p>
+                        </div>
+                        <div className="text-[10px] text-[#173D32]/60 font-mono sm:text-right shrink-0">
+                          <div>{new Date(item.timestamp).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}</div>
+                          <div>By {item.updatedBy}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
+          {/* ══════════════════════════════════════════════════════════ */}
           {/* ── TAB 5: SECTOR ALERTS ───────────────────────────── */}
+          {/* ══════════════════════════════════════════════════════════ */}
           {activeTab === "alerts" && (
             <div className="space-y-4">
               <div>
@@ -1333,7 +1689,7 @@ export default function FieldOfficerPortalPage() {
                         </pre>
                       </div>
 
-                      <div className="pt-3 border-t border-[#173D32]/10 flex items-center justify-between">
+                      <div className="pt-3 border-t border-[#173D32]/10 flex flex-wrap items-center justify-between gap-2">
                         {alert.acknowledged ? (
                           <span className="text-emerald-800 font-bold text-xs flex items-center gap-1.5">
                             ✓ Acknowledged by Officer{" "}
@@ -1350,6 +1706,17 @@ export default function FieldOfficerPortalPage() {
                             ✓ Acknowledge Receipt
                           </button>
                         )}
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedId(alert.id);
+                            setModalType("viewAlert");
+                          }}
+                          className="px-3.5 py-1.5 rounded-xl border border-[#173D32]/25 text-[#173D32] text-xs font-bold hover:bg-[#173D32]/10 transition-colors cursor-pointer"
+                        >
+                          📋 Protocol Details
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -1360,18 +1727,25 @@ export default function FieldOfficerPortalPage() {
         </main>
       </div>
 
-      {/* ── MODALS (Complete, Escalate, Reject, Update Road) ────── */}
+      {/* ══════════════════════════════════════════════════════════ */}
+      {/* ── ACTION & DETAIL MODALS ──────────────────────────────── */}
+      {/* ══════════════════════════════════════════════════════════ */}
       {modalType && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
-          <div className="bg-[#FAF8F2] border border-[#173D32]/20 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4">
+          <div className="bg-[#FAF8F2] border border-[#173D32]/20 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <h3 className="font-extrabold text-lg text-[#173D32]">
-              {modalType === "completeTask" && `Complete Inspection Task: ${selectedId}`}
+              {modalType === "completeTask" && `Complete Inspection: ${selectedId}`}
               {modalType === "escalateTask" && `🚨 Escalate Task: ${selectedId} to Command`}
+              {modalType === "verifyReport" && `Verify Villager Report: ${selectedId}`}
               {modalType === "rejectReport" && `Reject Citizen Report: ${selectedId}`}
-              {modalType === "escalateReport" && `🚨 Escalate Citizen Report: ${selectedId}`}
-              {modalType === "updateRoad" && `Update Real-Time Road Condition: ${selectedId}`}
+              {modalType === "escalateReport" && `🚨 Escalate Report: ${selectedId}`}
+              {modalType === "updateRoad" && `Update Road Condition: ${selectedId}`}
+              {modalType === "viewTask" && `Inspection Task Details: ${selectedId}`}
+              {modalType === "viewReport" && `Citizen Report Details: ${selectedId}`}
+              {modalType === "viewAlert" && `Emergency Protocol Details: ${selectedId}`}
             </h3>
 
+            {/* Complete Task Modal */}
             {modalType === "completeTask" && (
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-[#173D32]">
@@ -1381,12 +1755,13 @@ export default function FieldOfficerPortalPage() {
                   rows={4}
                   value={modalInput}
                   onChange={(e) => setModalInput(e.target.value)}
-                  placeholder="Describe ground stability, mitigations conducted, culvert status..."
+                  placeholder="Describe ground stability, mitigations conducted, culvert clearance..."
                   className="w-full bg-white border border-[#173D32]/20 rounded-2xl p-3 text-xs outline-none focus:border-[#173D32]"
                 />
               </div>
             )}
 
+            {/* Escalate Task Modal */}
             {modalType === "escalateTask" && (
               <div className="space-y-3">
                 <div>
@@ -1416,6 +1791,42 @@ export default function FieldOfficerPortalPage() {
               </div>
             )}
 
+            {/* Verify Report Modal */}
+            {modalType === "verifyReport" && (
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-semibold text-[#173D32] block mb-1">
+                    Field Verification Notes:
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={modalInput}
+                    onChange={(e) => setModalInput(e.target.value)}
+                    placeholder="Document ground truth, verified crack dimensions, hazard confirmation..."
+                    className="w-full bg-white border border-[#173D32]/20 rounded-2xl p-3 text-xs outline-none focus:border-[#173D32]"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-[#173D32] block mb-1">
+                    Attach Inspector Photograph:
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    className="w-full text-xs text-[#173D32] file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-[#173D32] file:text-[#F8F4EC] cursor-pointer"
+                  />
+                  {photoAttachment && (
+                    <div className="mt-2">
+                      <span className="text-[10px] text-emerald-800 font-bold block mb-1">Image Preview:</span>
+                      <img src={photoAttachment} alt="Inspector observation" className="h-20 rounded-xl object-cover border" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Reject Report Modal */}
             {modalType === "rejectReport" && (
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-rose-800">
@@ -1431,6 +1842,7 @@ export default function FieldOfficerPortalPage() {
               </div>
             )}
 
+            {/* Escalate Report Modal */}
             {modalType === "escalateReport" && (
               <div className="space-y-3">
                 <div>
@@ -1460,6 +1872,7 @@ export default function FieldOfficerPortalPage() {
               </div>
             )}
 
+            {/* Update Road Modal */}
             {modalType === "updateRoad" && (
               <div className="space-y-3">
                 <div>
@@ -1485,55 +1898,161 @@ export default function FieldOfficerPortalPage() {
                     className="w-full bg-white border border-[#173D32]/20 rounded-2xl p-3 text-xs outline-none focus:border-[#173D32]"
                   />
                 </div>
+                <div>
+                  <label className="text-xs font-semibold text-[#173D32] block mb-1">Attach Condition Photo:</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    className="w-full text-xs text-[#173D32] file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-[#173D32] file:text-[#F8F4EC] cursor-pointer"
+                  />
+                  {photoAttachment && (
+                    <div className="mt-2">
+                      <span className="text-[10px] text-emerald-800 font-bold block mb-1">Image Preview:</span>
+                      <img src={photoAttachment} alt="Road condition" className="h-20 rounded-xl object-cover border" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Detailed View Modal: Task */}
+            {modalType === "viewTask" && selectedTaskObj && (
+              <div className="space-y-3 text-xs">
+                <div className="p-3 bg-white/70 rounded-2xl border border-[#173D32]/10 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-[#173D32]">Status:</span>
+                    <span className="font-bold px-2 py-0.5 rounded-full bg-[#173D32]/10">{selectedTaskObj.status}</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-[#173D32] block">Location:</span>
+                    <span>{getTaskLocation(selectedTaskObj)}</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-[#173D32] block">GPS Coordinates:</span>
+                    <span className="font-mono">{getTaskCoordinates(selectedTaskObj)}</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-[#173D32] block">Risk & Priority:</span>
+                    <span>{selectedTaskObj.riskLevel} Risk • Priority: {selectedTaskObj.priority || selectedTaskObj.riskLevel}</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-[#173D32] block">Inspection Reason:</span>
+                    <p className="leading-relaxed">{selectedTaskObj.reason}</p>
+                  </div>
+                  <div>
+                    <span className="font-bold text-[#173D32] block">Deadline:</span>
+                    <span>{new Date(selectedTaskObj.deadline).toLocaleString()}</span>
+                  </div>
+                  {getTaskNotes(selectedTaskObj) && (
+                    <div>
+                      <span className="font-bold text-[#173D32] block">Officer Notes:</span>
+                      <span>{getTaskNotes(selectedTaskObj)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Detailed View Modal: Report */}
+            {modalType === "viewReport" && selectedReportObj && (
+              <div className="space-y-3 text-xs">
+                <div className="p-3 bg-white/70 rounded-2xl border border-[#173D32]/10 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-[#173D32]">Status:</span>
+                    <span className="font-bold px-2 py-0.5 rounded-full bg-[#173D32]/10">{selectedReportObj.status}</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-[#173D32] block">Hazard Type:</span>
+                    <span>{selectedReportObj.hazardType}</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-[#173D32] block">Description:</span>
+                    <p className="leading-relaxed">{selectedReportObj.locationDescription}</p>
+                  </div>
+                  <div>
+                    <span className="font-bold text-[#173D32] block">Reported By:</span>
+                    <span>{selectedReportObj.villagerName} ({selectedReportObj.contact})</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-[#173D32] block">Timestamp:</span>
+                    <span>{new Date(selectedReportObj.timestamp).toLocaleString()}</span>
+                  </div>
+                  {selectedReportObj.photoUrl && (
+                    <div>
+                      <span className="font-bold text-[#173D32] block mb-1">Citizen Photo:</span>
+                      <img src={selectedReportObj.photoUrl} alt="Hazard evidence" className="w-full h-44 object-cover rounded-xl border" />
+                    </div>
+                  )}
+                  {selectedReportObj.fieldNotes && (
+                    <div>
+                      <span className="font-bold text-[#173D32] block">Verification Field Notes:</span>
+                      <span>{selectedReportObj.fieldNotes}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Detailed View Modal: Alert */}
+            {modalType === "viewAlert" && selectedAlertObj && (
+              <div className="space-y-3 text-xs">
+                <div className="p-3 bg-white/70 rounded-2xl border border-[#173D32]/10 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-[#173D32]">Severity:</span>
+                    <span className="font-black px-2 py-0.5 rounded-full bg-rose-600 text-white uppercase">{selectedAlertObj.severity}</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-[#173D32] block">Bulletin Title:</span>
+                    <span className="font-semibold text-sm">{selectedAlertObj.title}</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-[#173D32] block">Dispatched:</span>
+                    <span>{new Date(selectedAlertObj.createdAt).toLocaleString()}</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-[#173D32] block mb-1">Standard Action Protocol:</span>
+                    <pre className="whitespace-pre-wrap font-sans bg-white p-3 rounded-xl border text-[11px] leading-relaxed">
+                      {selectedAlertObj.instructions}
+                    </pre>
+                  </div>
+                </div>
               </div>
             )}
 
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#173D32]/10">
               <button
                 type="button"
-                onClick={() => setModalType(null)}
+                onClick={() => {
+                  setModalType(null);
+                  setPhotoAttachment(null);
+                }}
                 className="px-4 py-2 rounded-xl border border-[#173D32]/20 text-xs font-bold hover:bg-[#173D32]/5 cursor-pointer"
               >
-                Cancel
+                {modalType.startsWith("view") ? "Close" : "Cancel"}
               </button>
-              <button
-                type="button"
-                disabled={isSubmitting}
-                onClick={() => {
-                  if (modalType === "completeTask") handleCompleteTask();
-                  if (modalType === "escalateTask") handleEscalateTask();
-                  if (modalType === "rejectReport") handleRejectReport();
-                  if (modalType === "escalateReport") handleEscalateReport();
-                  if (modalType === "updateRoad") handleRoadUpdate();
-                }}
-                className="px-4 py-2 rounded-xl bg-[#173D32] text-[#F8F4EC] text-xs font-bold hover:bg-[#1f4e40] cursor-pointer disabled:opacity-50"
-              >
-                {isSubmitting ? "Submitting..." : "Confirm & Submit"}
-              </button>
+
+              {!modalType.startsWith("view") && (
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => {
+                    if (modalType === "completeTask") handleCompleteTask();
+                    if (modalType === "escalateTask") handleEscalateTask();
+                    if (modalType === "verifyReport") handleVerifyReport();
+                    if (modalType === "rejectReport") handleRejectReport();
+                    if (modalType === "escalateReport") handleEscalateReport();
+                    if (modalType === "updateRoad") handleRoadUpdate();
+                  }}
+                  className="px-4 py-2 rounded-xl bg-[#173D32] text-[#F8F4EC] text-xs font-bold hover:bg-[#1f4e40] cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? "Submitting..." : "Confirm & Submit"}
+                </button>
+              )}
             </div>
           </div>
         </div>
       )}
-
-      {/* ── FOOTER ────────────────────────────────────────────── */}
-      <footer className="bg-[#173D32] text-[#F8F4EC] border-t border-[#DCE8D4]/20 py-8 mt-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#DCE8D4]/70">
-          <div>
-            <span className="font-extrabold text-[#DCE8D4]">TERRA360</span> &copy; 2026 Landslide Early Warning System. All rights reserved.
-          </div>
-          <div className="flex items-center gap-6">
-            <Link href="/contact" className="hover:text-[#D6A65D] transition-colors">
-              Contact Us & Support
-            </Link>
-            <Link href="/privacy" className="hover:text-[#D6A65D] transition-colors">
-              Privacy Policy
-            </Link>
-            <Link href="/terms" className="hover:text-[#D6A65D] transition-colors">
-              Terms of Use
-            </Link>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
