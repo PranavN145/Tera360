@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import Image from "next/image";
 import { useApp } from "@/context/AppContext";
 import { publicApi, ApiClientError } from "@/lib/api";
 import { HazardReportOutput } from "@/types/public";
@@ -56,6 +57,24 @@ export default function ReportModal() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const handleRemovePhoto = useCallback(() => {
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }, []);
+
+  const handleReset = useCallback(() => {
+    setSubmittedReport(null);
+    setErrorMessage(null);
+    setFieldErrors({});
+    setLocation("");
+    setDescription("");
+    handleRemovePhoto();
+    closeReportModal();
+  }, [closeReportModal, handleRemovePhoto]);
+
   // Sync reporter name if user logs in
   useEffect(() => {
     if (user && !reporterName) {
@@ -72,7 +91,7 @@ export default function ReportModal() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isReportModalOpen]);
+  }, [isReportModalOpen, handleReset]);
 
   // Prevent background scroll when modal is open
   useEffect(() => {
@@ -112,14 +131,6 @@ export default function ReportModal() {
       setPhotoPreview(reader.result as string);
     };
     reader.readAsDataURL(file);
-  };
-
-  const handleRemovePhoto = () => {
-    setPhotoFile(null);
-    setPhotoPreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -212,16 +223,6 @@ export default function ReportModal() {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleReset = () => {
-    setSubmittedReport(null);
-    setErrorMessage(null);
-    setFieldErrors({});
-    setLocation("");
-    setDescription("");
-    handleRemovePhoto();
-    closeReportModal();
   };
 
   return (
@@ -456,10 +457,12 @@ export default function ReportModal() {
                   /* Attached Photo Preview */
                   <div className="relative rounded-xl p-2.5 bg-[#F6F4EC] border border-[#173D32]/20 flex items-center gap-3">
                     <div className="relative w-14 h-14 rounded-lg overflow-hidden shrink-0 border border-[#173D32]/15 bg-black/5">
-                      <img
+                      <Image
                         src={photoPreview}
                         alt="Hazard observation preview"
-                        className="w-full h-full object-cover"
+                        fill
+                        unoptimized
+                        className="object-cover"
                       />
                     </div>
                     <div className="flex-1 min-w-0">

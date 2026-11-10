@@ -1073,6 +1073,24 @@ export default function RiskMap({
     }
   }, [selectedCorridor, activeTelemetry]);
 
+  // Canvas resize listener using ResizeObserver to ensure Mapbox GL canvas resizes cleanly
+  useEffect(() => {
+    const container = mapContainerRef.current;
+    if (!container || typeof ResizeObserver === "undefined") return;
+
+    const ro = new ResizeObserver(() => {
+      const map = mapInstanceRef.current;
+      if (map) {
+        map.resize();
+      }
+    });
+
+    ro.observe(container);
+    return () => {
+      ro.disconnect();
+    };
+  }, []);
+
   return (
     <div
       className={`relative w-full h-full min-h-[400px] overflow-hidden ${className}`}
@@ -1108,7 +1126,7 @@ export default function RiskMap({
 
       {/* Floating Top-Left Dashboard Overlay Card */}
       {effectiveShowHud && (
-        <div className="absolute top-3.5 left-3.5 sm:top-4 sm:left-4 z-20 max-w-[315px] sm:max-w-[340px] w-full bg-[#FAF8F2]/95 backdrop-blur-md rounded-2xl border border-[#173D32]/15 shadow-[0_12px_32px_rgba(23,61,50,0.14)] p-3.5 sm:p-4 text-[#173D32] select-none transition-all">
+        <div className="absolute top-3.5 left-3.5 sm:top-4 sm:left-4 z-20 max-w-[calc(100%-1.75rem)] sm:max-w-[340px] max-h-[calc(100%-1.75rem)] overflow-y-auto w-full bg-[#FAF8F2]/95 backdrop-blur-md rounded-2xl border border-[#173D32]/15 shadow-[0_12px_32px_rgba(23,61,50,0.14)] p-3.5 sm:p-4 text-[#173D32] select-none transition-all">
         {/* Card Header with Status Beacon & Collapse Toggle */}
         <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-[#173D32]/10">
           <div className="flex items-center gap-2">

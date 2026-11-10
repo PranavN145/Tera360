@@ -31,8 +31,9 @@ function AccountDashboard() {
   // Profile Form States
   const [name, setName] = useState(user?.name || "");
   const [phone, setPhone] = useState(user?.phone || "");
-  const [language, setLanguage] = useState<"en" | "as" | "bn" | "hi" | "mni" | "lus">(
-    (user?.language as any) || "en"
+  type SupportedLanguage = "en" | "as" | "bn" | "hi" | "mni" | "lus";
+  const [language, setLanguage] = useState<SupportedLanguage>(
+    (user?.language as SupportedLanguage) || "en"
   );
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileSuccessMsg, setProfileSuccessMsg] = useState<string | null>(null);
@@ -44,7 +45,7 @@ function AccountDashboard() {
     if (user) {
       setName(user.name);
       setPhone(user.phone || "");
-      if (user.language) setLanguage(user.language as any);
+      if (user.language) setLanguage(user.language as SupportedLanguage);
     }
   }, [user]);
 
@@ -466,7 +467,7 @@ function AccountDashboard() {
                 <select
                   id="acc-language"
                   value={language}
-                  onChange={(e) => setLanguage(e.target.value as any)}
+                  onChange={(e) => setLanguage(e.target.value as SupportedLanguage)}
                   disabled={isSavingProfile}
                   className="w-full h-11 px-4 rounded-xl bg-[#FAF8F2] border border-[#173D32]/20 text-sm font-semibold text-[#173D32] focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60 cursor-pointer"
                 >

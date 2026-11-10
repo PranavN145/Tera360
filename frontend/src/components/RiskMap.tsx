@@ -2285,6 +2285,24 @@ export default function RiskMap({
     }
   }, [selectedCorridor, activeTelemetry]);
 
+  // Canvas resize listener using ResizeObserver to ensure Mapbox GL canvas resizes cleanly
+  useEffect(() => {
+    const container = mapContainerRef.current;
+    if (!container || typeof ResizeObserver === "undefined") return;
+
+    const ro = new ResizeObserver(() => {
+      const map = mapInstanceRef.current;
+      if (map) {
+        map.resize();
+      }
+    });
+
+    ro.observe(container);
+    return () => {
+      ro.disconnect();
+    };
+  }, []);
+
   return (
     <div
       className={`relative w-full h-full min-h-[400px] overflow-hidden ${className}`}
@@ -2323,7 +2341,7 @@ export default function RiskMap({
         <div className={`absolute top-3.5 left-3.5 sm:top-4 sm:left-4 z-20 ${
           variant === "mini"
             ? "max-w-[200px] p-2 rounded-xl"
-            : "max-w-[315px] sm:max-w-[340px] p-3.5 sm:p-4 rounded-2xl"
+            : "max-w-[calc(100%-1.75rem)] sm:max-w-[340px] max-h-[calc(100%-1.75rem)] overflow-y-auto p-3.5 sm:p-4 rounded-2xl"
         } w-full bg-[#FAF8F2]/95 backdrop-blur-md border border-[#173D32]/15 shadow-[0_12px_32px_rgba(23,61,50,0.14)] text-[#173D32] select-none transition-all`}>
           {variant === "mini" ? (
             <div className="flex items-center gap-2">

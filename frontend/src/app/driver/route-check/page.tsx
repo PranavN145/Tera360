@@ -154,7 +154,6 @@ export default function DriverRouteCheckPage() {
   const [vehicleType, setVehicleType] = useState<"lmv" | "hcv" | "emergency">("lmv");
   const [originInput, setOriginInput] = useState<string>("");
   const [destinationInput, setDestinationInput] = useState<string>("");
-  const [isSavedRoute, setIsSavedRoute] = useState<boolean>(false);
   const [isSubscribed, setIsSubscribed] = useState<boolean>(false);
 
   const activeRoute =
@@ -164,7 +163,6 @@ export default function DriverRouteCheckPage() {
     setSelectedRouteId(preset.id);
     setOriginInput(preset.origin);
     setDestinationInput(preset.destination);
-    setIsSavedRoute(false);
   };
 
   const handleSwapLocations = () => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
+import Image from "next/image";
 import Header from "@/components/layout/Header";
 import { useApp } from "@/context/AppContext";
 import { publicApi, ApiClientError } from "@/lib/api";
@@ -414,10 +415,12 @@ export default function ReportPage() {
                 {photoPreview ? (
                   <div className="relative rounded-2xl p-3 sm:p-4 bg-[#F6F4EC] border border-[#173D32]/20 flex items-center gap-4">
                     <div className="relative w-20 h-20 rounded-xl overflow-hidden shrink-0 border border-[#173D32]/15 bg-black/5">
-                      <img
+                      <Image
                         src={photoPreview}
                         alt="Hazard observation"
-                        className="w-full h-full object-cover"
+                        fill
+                        unoptimized
+                        className="object-cover"
                       />
                     </div>
                     <div className="flex-1 min-w-0">

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import Header from "@/components/layout/Header";
-import RiskMap from "@/components/RiskMap";
+import RiskMap, { RiskMapHotspot } from "@/components/RiskMap";
 import { useApp } from "@/context/AppContext";
 import { publicApi } from "@/lib/api";
 import {
@@ -11,7 +11,6 @@ import {
   PublicRiskMapItem,
   PublicStats,
   roadStatusItemToAlertDetail,
-  riskMapItemToAlertDetail,
 } from "@/types/public";
 import {
   FALLBACK_ROADS,
@@ -79,18 +78,48 @@ function resolveMapCoordinates(
 }
 
 export default function RiskMapPage() {
-  const { openAlertModal, openReportModal, addToast } = useApp();
+  const { openAlertModal, openReportModal } = useApp();
   const [selectedState, setSelectedState] = useState("All States");
   const [selectedCorridor, setSelectedCorridor] = useState<string | null>(null);
   const [selectedSeverity, setSelectedSeverity] = useState("All");
   const [search, setSearch] = useState("");
-  const [activeLayer, setActiveLayer] = useState<"topo" | "rainfall">("topo");
-  const [zoomLevel, setZoomLevel] = useState<number>(1.0);
 
   // Initialize with fallback demo data so corridor cards are immediately visible
   const [roads, setRoads] = useState<PublicRiskMapItem[]>(FALLBACK_ROADS);
   const [corridors, setCorridors] = useState<PublicRoadStatusItem[]>(FALLBACK_ROAD_STATUS);
   const [stats, setStats] = useState<PublicStats | null>(FALLBACK_STATS);
+
+  // Transform roads into interactive regional map hotspots
+  const hotspots: RiskMapHotspot[] = useMemo(() => {
+    return roads.map((r, i) => {
+      let coords: [number, number] = [94.025, 25.685];
+      if (r.geometry && Array.isArray(r.geometry.coordinates) && r.geometry.coordinates.length >= 2) {
+        coords = [r.geometry.coordinates[0], r.geometry.coordinates[1]];
+      } else {
+        const mc = resolveMapCoordinates(r, i);
+        coords = [88.5 + (mc.x / 100) * 8.5, 23.0 + (mc.y / 100) * 5.5];
+      }
+      const sev: "Critical" | "Warning" | "Normal" =
+        r.riskLevel === "Critical" || r.status === "blocked"
+          ? "Critical"
+          : r.riskLevel === "High" || r.status === "caution"
+          ? "Warning"
+          : "Normal";
+
+      return {
+        id: r.id,
+        code: r.code,
+        title: r.name,
+        region: r.stretch,
+        state: r.state,
+        severity: sev,
+        riskLevel: r.riskLevel,
+        status: r.status,
+        coordinates: coords,
+        statusReason: r.statusReason,
+      };
+    });
+  }, [roads]);
 
   useEffect(() => {
     let isMounted = true;
@@ -149,8 +178,11 @@ export default function RiskMapPage() {
     setSelectedState(s);
     setSelectedCorridor(null);
     // Directly invoke map camera navigation for responsive feedback
-    if (typeof window !== "undefined" && typeof (window as any).__riskMapFlyToState === "function") {
-      (window as any).__riskMapFlyToState(s);
+    if (typeof window !== "undefined") {
+      const win = window as Window & { __riskMapFlyToState?: (state: string) => void };
+      if (typeof win.__riskMapFlyToState === "function") {
+        win.__riskMapFlyToState(s);
+      }
     }
   };
 
@@ -177,13 +209,6 @@ export default function RiskMapPage() {
       isMounted = false;
     };
   }, []);
-
-  const handleZoom = (delta: number) => {
-    setZoomLevel((prev) => {
-      const next = Math.round((prev + delta) * 10) / 10;
-      return Math.min(Math.max(next, 0.8), 1.6);
-    });
-  };
 
   const filteredCorridors = corridors.filter((c) => {
     const matchesSeverity =
@@ -379,6 +404,8 @@ export default function RiskMapPage() {
             variant="full"
             selectedState={selectedState}
             selectedCorridor={selectedCorridor}
+            hotspots={hotspots}
+            onSelectHotspot={(h) => setSelectedCorridor(h.code || h.title)}
             className="w-full h-full"
             onSelectCorridor={(corridorId) => {
               setSelectedCorridor(corridorId);
@@ -392,13 +419,6 @@ export default function RiskMapPage() {
               }
             }}
           />
-
-          {/* Doppler Rainfall Radar Sweep Overlay */}
-          {activeLayer === "rainfall" && (
-            <div className="absolute inset-0 bg-gradient-to-tr from-cyan-900/15 via-blue-800/10 to-teal-900/20 pointer-events-none animate-pulse z-10">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(6,182,212,0.15),transparent_70%)] animate-radar-pulse" />
-            </div>
-          )}
         </div>
 
         {/* Filter Controls Bar */}
