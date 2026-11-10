@@ -123,3 +123,35 @@ npm run dev
 | `GET` | `/api/v1/users/me/sessions` | Bearer | Any authenticated | Lists user's active session devices |
 | `DELETE`| `/api/v1/users/me/sessions/:id` | Bearer | Any authenticated | Revokes a specific session |
 
+---
+
+## Field Officer Portal API (`/api/field-officer` & `/api/v1/field-officer`)
+
+The Field Officer Portal powers on-ground inspection teams, hazard ground-truthing, real-time road status syncing, and localized emergency alerts.
+
+### Endpoints Catalog
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/field-officer/profile` | Returns authenticated officer metadata (Name, Department, Assigned Area, Phone, Language, duty status) |
+| `PATCH` | `/api/field-officer/profile/language` | Updates officer's preferred language code (e.g., `en`, `hi`, `ao`) |
+| `GET` | `/api/field-officer/tasks` | Fetches inspection tasks assigned specifically to this officer in their sector |
+| `PATCH` | `/api/field-officer/tasks/:id/start` | Updates task status to `In_Progress` and logs timestamp |
+| `PATCH` | `/api/field-officer/tasks/:id/complete` | Marks task as `Completed` with completion notes |
+| `POST` | `/api/field-officer/tasks/:id/escalate` | Escalates task to `Escalated` with reason, priority, and immediate central dashboard notification |
+| `GET` | `/api/field-officer/map/data` | Returns GeoJSON sector boundaries, high-risk danger zones, active villager reports, and task routes |
+| `GET` | `/api/field-officer/reports` | Retrieves citizen hazard reports logged in the officer's assigned sector boundary |
+| `PATCH` | `/api/field-officer/reports/:id/verify` | Marks report as `Verified` with optional field notes and inspector photo |
+| `PATCH` | `/api/field-officer/reports/:id/reject` | Marks report as `Rejected` with mandatory rejection reason |
+| `POST` | `/api/field-officer/reports/:id/escalate` | Escalates report straight to central disaster high command with urgency metadata |
+| `GET` | `/api/field-officer/road-status/current` | Returns latest real-time status of all road segments in the officer's area |
+| `POST` | `/api/field-officer/road-status/update` | Updates road condition (`Open`, `Caution`, `Partially Blocked`, `Blocked`) and syncs to central dashboard |
+| `GET` | `/api/field-officer/alerts` | Returns active emergency alerts and disaster protocols relevant to the assigned area |
+| `PATCH` | `/api/field-officer/alerts/:id/acknowledge` | Acknowledges alert (`acknowledged: true`) with officer ID and UTC timestamp |
+
+### Running the Field Officer Test Suite
+```bash
+node backend/tests/unit-test-field-officer.js
+```
+
+

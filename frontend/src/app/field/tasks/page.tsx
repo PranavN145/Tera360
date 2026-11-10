@@ -125,7 +125,14 @@ export default function FieldTasksPage() {
       title="Field Operations & Tasks"
       subtitle="Sensor telemetry checks, incident verification, and ground team dispatches across Northeast corridors."
       headerActions={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/field"
+            className="px-3.5 py-1.5 rounded-full bg-[#173D32] text-[#F6F4EC] text-xs font-bold hover:bg-[#1a4437] transition-all inline-flex items-center gap-1.5"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
+            <span>Field Workbench</span>
+          </Link>
           <Link
             href="/report"
             className="px-3.5 py-1.5 rounded-full bg-[#D6A65D] hover:bg-[#c9984e] text-[#173D32] text-xs font-bold shadow-xs transition-all inline-flex items-center gap-1.5"
@@ -135,7 +142,7 @@ export default function FieldTasksPage() {
           </Link>
           <Link
             href="/field/map"
-            className="px-3.5 py-1.5 rounded-full bg-[#173D32] text-[#F6F4EC] text-xs font-bold hover:bg-[#1a4437] transition-all inline-flex items-center gap-1.5"
+            className="px-3.5 py-1.5 rounded-full bg-white border border-[#173D32]/20 text-[#173D32] text-xs font-bold hover:bg-[#FAF8F2] transition-all inline-flex items-center gap-1.5"
           >
             <Compass className="w-3.5 h-3.5" aria-hidden="true" />
             <span>Area Map</span>

@@ -24,6 +24,15 @@ import {
   CreateContactPayload,
   ContactOutput,
 } from '@/types/public';
+import type {
+  FieldOfficerProfile,
+  FieldOfficerTask,
+  VillagerReportItem,
+  RoadStatusSegment,
+  SectorAlertItem,
+  FieldOfficerMapData,
+  RoadCondition,
+} from '@/types/fieldOfficer';
 import { demoDataManager } from '@/data/demoDataManager';
 
 const API_BASE_URL =
@@ -892,6 +901,7 @@ export function getRolePortalPath(role?: string): string {
     case 'driver':
       return '/driver/route-check';
     case 'field_officer':
+    case 'field-officer':
       return '/field/tasks';
     case 'officer':
       return '/officer/dashboard';
@@ -901,3 +911,137 @@ export function getRolePortalPath(role?: string): string {
       return '/';
   }
 }
+
+export const fieldOfficerApi = {
+  async getProfile(): Promise<FieldOfficerProfile> {
+    return apiClient('/api/field-officer/profile');
+  },
+
+  async updateLanguage(language: string): Promise<FieldOfficerProfile> {
+    return apiClient('/api/field-officer/profile/language', {
+      method: 'PATCH',
+      body: JSON.stringify({ language }),
+    });
+  },
+
+  async getTasks(params?: {
+    status?: string;
+    riskLevel?: string;
+  }): Promise<FieldOfficerTask[]> {
+    const query = new URLSearchParams();
+    if (params?.status) query.set('status', params.status);
+    if (params?.riskLevel) query.set('riskLevel', params.riskLevel);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return apiClient(`/api/field-officer/tasks${qs}`);
+  },
+
+  async startTask(id: string): Promise<FieldOfficerTask> {
+    return apiClient(`/api/field-officer/tasks/${id}/start`, {
+      method: 'PATCH',
+    });
+  },
+
+  async completeTask(
+    id: string,
+    completionNotes?: string
+  ): Promise<FieldOfficerTask> {
+    return apiClient(`/api/field-officer/tasks/${id}/complete`, {
+      method: 'PATCH',
+      body: JSON.stringify({ completionNotes }),
+    });
+  },
+
+  async escalateTask(
+    id: string,
+    reason: string,
+    priority = 'Critical'
+  ): Promise<{ task?: FieldOfficerTask } & Partial<FieldOfficerTask>> {
+    return apiClient(`/api/field-officer/tasks/${id}/escalate`, {
+      method: 'POST',
+      body: JSON.stringify({ reason, priority }),
+    });
+  },
+
+  async getMapData(): Promise<FieldOfficerMapData> {
+    return apiClient('/api/field-officer/map/data');
+  },
+
+  async getReports(params?: {
+    status?: string;
+    hazardType?: string;
+  }): Promise<VillagerReportItem[]> {
+    const query = new URLSearchParams();
+    if (params?.status) query.set('status', params.status);
+    if (params?.hazardType) query.set('hazardType', params.hazardType);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return apiClient(`/api/field-officer/reports${qs}`);
+  },
+
+  async verifyReport(
+    id: string,
+    fieldNotes?: string,
+    inspectorPhotoUrl?: string
+  ): Promise<VillagerReportItem> {
+    return apiClient(`/api/field-officer/reports/${id}/verify`, {
+      method: 'PATCH',
+      body: JSON.stringify({ fieldNotes, inspectorPhotoUrl }),
+    });
+  },
+
+  async rejectReport(
+    id: string,
+    rejectionReason: string
+  ): Promise<VillagerReportItem> {
+    return apiClient(`/api/field-officer/reports/${id}/reject`, {
+      method: 'PATCH',
+      body: JSON.stringify({ rejectionReason }),
+    });
+  },
+
+  async escalateReport(
+    id: string,
+    payload: {
+      escalationReason: string;
+      urgency?: string;
+      recommendedAction?: string;
+    }
+  ): Promise<{ report?: VillagerReportItem } & Partial<VillagerReportItem>> {
+    return apiClient(`/api/field-officer/reports/${id}/escalate`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getCurrentRoadStatus(): Promise<RoadStatusSegment[]> {
+    return apiClient('/api/field-officer/road-status/current');
+  },
+
+  async updateRoadStatus(payload: {
+    roadSegmentId?: string;
+    stretchName?: string;
+    condition: RoadCondition;
+    reason: string;
+    photoUrl?: string | null;
+  }): Promise<
+    {
+      roadStatus?: RoadStatusSegment;
+      data?: RoadStatusSegment;
+      payload?: RoadStatusSegment;
+    } & Partial<RoadStatusSegment>
+  > {
+    return apiClient('/api/field-officer/road-status/update', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getAlerts(): Promise<SectorAlertItem[]> {
+    return apiClient('/api/field-officer/alerts');
+  },
+
+  async acknowledgeAlert(id: string): Promise<SectorAlertItem> {
+    return apiClient(`/api/field-officer/alerts/${id}/acknowledge`, {
+      method: 'PATCH',
+    });
+  },
+};

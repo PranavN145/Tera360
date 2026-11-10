@@ -7,6 +7,10 @@ export interface AuthUser {
   name: string;
   emailVerified: boolean;
   isActive: boolean;
+  department?: string;
+  assignedArea?: string;
+  phone?: string;
+  language?: string;
 }
 
 declare global {
@@ -16,4 +20,5 @@ declare global {
     }
   }
 }
+
 

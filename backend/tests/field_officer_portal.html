@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terra360 - Field Officer Portal</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    :root {
+      --forest-canopy: #173D32;
+      --misty-hills: #DCE8D4;
+      --earth-ochre: #D6A65D;
+      --cloud-white: #F8F4EC;
+    }
+  </style>
+</head>
+<body class="bg-[#F8F4EC] text-[#173D32] antialiased min-h-screen flex flex-col font-sans selection:bg-[#D6A65D] selection:text-[#173D32]">
+
+  <!-- ── 1. HEADER (Brand & Officer Profile) ────────────────── -->
+  <header class="bg-[#173D32] text-[#F8F4EC] border-b border-[#DCE8D4]/20 shadow-md sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-18 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2">
+          <!-- Terra360 Mountain/Wave Logo Motif -->
+          <div class="w-8 h-8 rounded-lg bg-[#D6A65D] text-[#173D32] flex items-center justify-center font-black text-lg">
+            ▲
+          </div>
+          <span class="text-2xl font-black tracking-wider text-[#DCE8D4]">
+            TERRA<span class="text-[#D6A65D]">360</span>
+          </span>
+          <span class="bg-[#D6A65D]/20 text-[#D6A65D] border border-[#D6A65D]/30 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ml-1 hidden sm:inline-block">
+            Field Officer Portal
+          </span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3 sm:gap-4">
+        <!-- Sector Tag -->
+        <div class="hidden lg:flex items-center gap-2 bg-[#122e26] border border-[#DCE8D4]/20 px-3 py-1.5 rounded-full text-xs">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="font-semibold text-[#DCE8D4]">Sector 4 (Kohima-Phesama NH-29)</span>
+        </div>
+
+        <!-- Language Selector -->
+        <div class="flex items-center gap-1.5 bg-[#122e26] border border-[#DCE8D4]/20 rounded-full px-2.5 py-1 text-xs">
+          <span class="text-[#DCE8D4]/60">🌐</span>
+          <select id="langSelect" onchange="changeLanguage(this.value)" class="bg-transparent text-[#DCE8D4] font-semibold text-xs outline-none cursor-pointer">
+            <option value="en" class="bg-[#173D32]">EN (English)</option>
+            <option value="hi" class="bg-[#173D32]">HI (हिंदी)</option>
+            <option value="ao" class="bg-[#173D32]">AO (Ao Naga)</option>
+          </select>
+        </div>
+
+        <!-- Notification Bell -->
+        <button onclick="switchTab('alerts')" class="relative p-2 rounded-full bg-[#122e26] text-[#DCE8D4] hover:text-[#D6A65D] transition-colors cursor-pointer" title="Emergency Alerts">
+          🔔
+          <span id="alertCountBadge" class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white font-bold text-[10px] flex items-center justify-center animate-pulse">1</span>
+        </button>
+
+        <!-- Profile Toggle -->
+        <div class="relative">
+          <button onclick="toggleProfile()" class="flex items-center gap-2 bg-[#DCE8D4]/15 hover:bg-[#DCE8D4]/25 border border-[#DCE8D4]/30 px-3 py-1.5 rounded-full transition-all cursor-pointer">
+            <div class="w-7 h-7 rounded-full bg-[#D6A65D] text-[#173D32] font-black flex items-center justify-center text-xs">
+              TJ
+            </div>
+            <span class="font-semibold text-xs text-[#F8F4EC] hidden sm:inline">Temsu Jamir</span>
+            <span class="text-xs opacity-60">▼</span>
+          </button>
+
+          <!-- Profile Dropdown Card -->
+          <div id="profilePopover" class="hidden absolute right-0 mt-2 w-80 bg-[#FAF8F2] text-[#173D32] rounded-2xl shadow-2xl border border-[#173D32]/20 p-5 z-50">
+            <div class="flex items-center gap-3 pb-3 border-b border-[#173D32]/10 mb-3">
+              <div class="w-12 h-12 rounded-full bg-[#173D32] text-[#D6A65D] font-black flex items-center justify-center text-sm shadow-xs">
+                TJ
+              </div>
+              <div>
+                <h4 class="font-bold text-sm text-[#173D32]">Temsu Jamir</h4>
+                <p class="text-[11px] text-[#173D32]/70 font-mono">NSDMA-FO-2024-042</p>
+              </div>
+            </div>
+            <div class="space-y-2 text-xs">
+              <div>
+                <span class="text-[#173D32]/60 font-medium block">Department:</span>
+                <span class="font-semibold">Nagaland State Disaster Management Authority (NSDMA)</span>
+              </div>
+              <div>
+                <span class="text-[#173D32]/60 font-medium block">Assigned Area:</span>
+                <span class="font-semibold text-[#173D32]">Sector 4 - Kohima-Phesama NH-29 Corridor</span>
+              </div>
+              <div>
+                <span class="text-[#173D32]/60 font-medium block">Phone:</span>
+                <span class="font-mono font-semibold">+91 98765 00003</span>
+              </div>
+              <div>
+                <span class="text-[#173D32]/60 font-medium block">Duty Status:</span>
+                <span class="inline-flex items-center gap-1.5 text-emerald-800 font-bold bg-emerald-100 px-2 py-0.5 rounded-full mt-0.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span> Active On-Duty
+                </span>
+              </div>
+            </div>
+            <button onclick="toggleProfile()" class="w-full mt-4 py-1.5 rounded-xl bg-[#173D32] text-[#F8F4EC] text-xs font-bold hover:bg-[#1f4e40] transition-colors cursor-pointer">
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── 2. LIVE ACTION TOAST ───────────────────────────────── -->
+  <div id="toast" class="hidden fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-[#D6A65D] text-[#173D32] px-6 py-2.5 rounded-full font-bold text-xs shadow-xl border border-[#173D32]/20 flex items-center gap-2">
+    <span id="toastIcon">⚡</span>
+    <span id="toastText">Action completed successfully</span>
+  </div>
+
+  <!-- ── 3. PORTAL BODY & TABS ──────────────────────────────── -->
+  <div class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 flex flex-col md:flex-row gap-6">
+
+    <!-- Left Navbar Tabs (From Wireframe) -->
+    <nav class="w-full md:w-60 shrink-0 space-y-3">
+      <div class="bg-[#FAF8F2] border border-[#173D32]/15 rounded-3xl p-3 shadow-xs space-y-1">
+        <button id="tabBtn-tasks" onclick="switchTab('tasks')" class="w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all bg-[#173D32] text-[#F8F4EC] shadow-sm cursor-pointer">
+          <div class="flex items-center gap-3">
+            <span class="text-base">📋</span>
+            <span>My Tasks</span>
+          </div>
+          <span id="taskCountBadge" class="text-[11px] px-2 py-0.5 rounded-full font-extrabold bg-[#D6A65D] text-[#173D32]">2</span>
+        </button>
+
+        <button id="tabBtn-map" onclick="switchTab('map')" class="w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all text-[#173D32] hover:bg-[#DCE8D4]/40 cursor-pointer">
+          <div class="flex items-center gap-3">
+            <span class="text-base">🗺️</span>
+            <span>Assigned Area Map</span>
+          </div>
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-bold">Live</span>
+        </button>
+
+        <button id="tabBtn-reports" onclick="switchTab('reports')" class="w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all text-[#173D32] hover:bg-[#DCE8D4]/40 cursor-pointer">
+          <div class="flex items-center gap-3">
+            <span class="text-base">📢</span>
+            <span>Reports</span>
+          </div>
+          <span id="reportCountBadge" class="text-[11px] px-2 py-0.5 rounded-full font-extrabold bg-[#D6A65D] text-[#173D32]">2</span>
+        </button>
+
+        <button id="tabBtn-roads" onclick="switchTab('roads')" class="w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all text-[#173D32] hover:bg-[#DCE8D4]/40 cursor-pointer">
+          <div class="flex items-center gap-3">
+            <span class="text-base">🚧</span>
+            <span>Road Status</span>
+          </div>
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold">2 Roads</span>
+        </button>
+
+        <button id="tabBtn-alerts" onclick="switchTab('alerts')" class="w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all text-[#173D32] hover:bg-[#DCE8D4]/40 cursor-pointer">
+          <div class="flex items-center gap-3">
+            <span class="text-base">🚨</span>
+            <span>Alerts</span>
+          </div>
+          <span id="alertTabBadge" class="text-[10px] px-2 py-0.5 rounded-full bg-rose-500 text-white font-extrabold animate-pulse">1 New</span>
+        </button>
+      </div>
+
+      <!-- Live Sync Monitor Card -->
+      <div class="bg-[#DCE8D4]/50 border border-[#173D32]/15 rounded-3xl p-4 text-xs space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="font-black text-[#173D32] text-[11px] uppercase tracking-wider">Disaster Desk Sync</span>
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+        </div>
+        <p class="text-[#173D32]/80 leading-relaxed text-[11px]">
+          Direct telemetry uplink to State Emergency Operations Centre (SEOC).
+        </p>
+      </div>
+    </nav>
+
+    <!-- Main Content Canvas -->
+    <main class="flex-1 space-y-6">
+
+      <!-- ── SECTION 1: MY TASKS ─────────────────────────────── -->
+      <section id="view-tasks" class="space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-xl font-extrabold text-[#173D32]">Inspection Tasks Assigned by Disaster Officer</h2>
+            <p class="text-xs text-[#173D32]/70 mt-0.5">Assigned to: Sector 4 (Kohima-Phesama NH-29 Corridor)</p>
+          </div>
+        </div>
+
+        <div id="taskList" class="space-y-4">
+          <!-- Rendered dynamically via JS -->
+        </div>
+      </section>
+
+      <!-- ── SECTION 2: ASSIGNED AREA MAP ───────────────────── -->
+      <section id="view-map" class="hidden space-y-4">
+        <div>
+          <h2 class="text-xl font-extrabold text-[#173D32]">Assigned Area Map & Danger Zones</h2>
+          <p class="text-xs text-[#173D32]/70 mt-0.5">High-risk landslide zones, active villager reports, and task navigation routes.</p>
+        </div>
+
+        <div class="bg-[#173D32] text-[#F8F4EC] rounded-3xl p-6 border border-[#DCE8D4]/20 shadow-xl relative overflow-hidden space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#DCE8D4]/20 pb-3">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+              <span class="text-xs font-black uppercase tracking-wider text-[#DCE8D4]">
+                Kohima-Phesama Mountain Corridor (25.685° N, 94.025° E)
+              </span>
+            </div>
+            <span class="text-xs font-mono text-[#D6A65D]">NH-29 Monitored Stretch KM 38–52</span>
+          </div>
+
+          <!-- Danger Zones Cards -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-[#122e26] border border-rose-500/50 rounded-2xl p-4 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-black text-rose-300">🚨 Dzüdza Active Escarpment Slip</span>
+                <span class="text-[10px] bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full font-bold">Weight: 0.94 (Critical)</span>
+              </div>
+              <p class="text-[11px] text-[#DCE8D4]/80">Slope: 46° | Soil Saturation: 89% | 24h Rainfall: 118mm</p>
+              <div class="text-[11px] text-amber-200">
+                Action Protocol: Enforce single-lane regulated convoy, maintain 24/7 spotter at KM 42+300.
+              </div>
+            </div>
+
+            <div class="bg-[#122e26] border border-amber-500/50 rounded-2xl p-4 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-black text-amber-300">⚠️ Phesama Upper Colluvium Slide</span>
+                <span class="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-bold">Weight: 0.78 (High)</span>
+              </div>
+              <p class="text-[11px] text-[#DCE8D4]/80">Slope: 38° | Soil Saturation: 76% | 24h Rainfall: 92mm</p>
+              <div class="text-[11px] text-amber-200">
+                Action Protocol: Pre-position JCB loader at KM 47 staging post; monitor weep holes.
+              </div>
+            </div>
+          </div>
+
+          <!-- Navigation Coordinate Endpoints -->
+          <div class="bg-[#122e26] border border-[#DCE8D4]/20 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <div class="space-y-1">
+              <span class="text-[11px] font-bold text-[#D6A65D] uppercase tracking-wider block">Turn-by-Turn Navigation</span>
+              <p class="font-semibold text-white">Kohima South Emergency Post ➔ KM 42+300 Dzüdza Bridge Approach</p>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="px-3 py-1 bg-[#DCE8D4]/15 rounded-full font-mono text-[11px] text-[#DCE8D4]">6.8 KM (14 mins)</span>
+              <button onclick="triggerToast('GPS Coordinates transmitted to field terminal: [94.025, 25.685]')" class="px-3.5 py-1.5 rounded-xl bg-[#D6A65D] text-[#173D32] font-black hover:bg-[#e0b268] transition-colors cursor-pointer text-xs">
+                🧭 Open Navigation Route
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── SECTION 3: VILLAGER REPORTS ────────────────────── -->
+      <section id="view-reports" class="hidden space-y-4">
+        <div>
+          <h2 class="text-xl font-extrabold text-[#173D32]">Villager Hazard Reports in Sector</h2>
+          <p class="text-xs text-[#173D32]/70 mt-0.5">Verify ground truth, reject with reason, or escalate to disaster high command.</p>
+        </div>
+
+        <div id="reportList" class="space-y-4">
+          <!-- Rendered dynamically via JS -->
+        </div>
+      </section>
+
+      <!-- ── SECTION 4: ROAD STATUS ─────────────────────────── -->
+      <section id="view-roads" class="hidden space-y-4">
+        <div>
+          <h2 class="text-xl font-extrabold text-[#173D32]">Real-Time Road Corridor Status</h2>
+          <p class="text-xs text-[#173D32]/70 mt-0.5">Strict condition updates: Open / Caution / Partially Blocked / Blocked (Syncs to Central Dashboard).</p>
+        </div>
+
+        <div id="roadList" class="space-y-4">
+          <!-- Rendered dynamically via JS -->
+        </div>
+      </section>
+
+      <!-- ── SECTION 5: SECTOR ALERTS ───────────────────────── -->
+      <section id="view-alerts" class="hidden space-y-4">
+        <div>
+          <h2 class="text-xl font-extrabold text-[#173D32]">Sector Emergency Alerts & Protocols</h2>
+          <p class="text-xs text-[#173D32]/70 mt-0.5">Action instructions dispatched specifically for Sector 4. Acknowledge receipt upon review.</p>
+        </div>
+
+        <div id="alertList" class="space-y-4">
+          <!-- Rendered dynamically via JS -->
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ── 4. MODALS ──────────────────────────────────────────── -->
+  <div id="modalOverlay" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+    <div class="bg-[#FAF8F2] border border-[#173D32]/20 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4">
+      <h3 id="modalTitle" class="font-extrabold text-lg text-[#173D32]">Modal Action</h3>
+
+      <div id="modalBody" class="space-y-3">
+        <!-- Injected via JS -->
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-3 border-t border-[#173D32]/10">
+        <button onclick="closeModal()" class="px-4 py-2 rounded-xl border border-[#173D32]/20 text-xs font-bold hover:bg-[#173D32]/5 cursor-pointer">
+          Cancel
+        </button>
+        <button id="modalConfirmBtn" onclick="submitModal()" class="px-4 py-2 rounded-xl bg-[#173D32] text-[#F8F4EC] text-xs font-bold hover:bg-[#1f4e40] cursor-pointer">
+          Confirm & Submit
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 5. FOOTER (From Wireframe) ─────────────────────────── -->
+  <footer class="bg-[#173D32] text-[#F8F4EC] border-t border-[#DCE8D4]/20 py-8 mt-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#DCE8D4]/70">
+      <div>
+        <span class="font-extrabold text-[#DCE8D4]">TERRA360</span> &copy; 2026 Landslide Early Warning System.
+      </div>
+      <div class="flex items-center gap-6">
+        <a href="#" onclick="triggerToast('Emergency Operations Hotline: 1070 (Toll Free)')" class="hover:text-[#D6A65D] transition-colors">Emergency Desk Contact</a>
+        <a href="#" onclick="triggerToast('Disaster Management Protocol Doc: NSDMA-SOP-2026')" class="hover:text-[#D6A65D] transition-colors">SOP Guidelines</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ── 6. APPLICATION STATE & LOGIC ───────────────────────── -->
+  <script>
+    // State
+    const state = {
+      activeTab: 'tasks',
+      activeModal: null,
+      selectedId: null,
+      tasks: [
+        {
+          id: 'TSK-NH29-001',
+          chainageName: 'NH-29 KM 42+300 (Dzüdza Bridge Approach)',
+          riskLevel: 'Critical',
+          reason: 'Active slope deformation and tensile ground cracks extending across 35m of mountain slope after continuous monsoon precipitation.',
+          deadline: 'Tomorrow, 14:00 IST',
+          status: 'In_Progress',
+          startedAt: 'Today, 09:15 IST',
+          completedAt: null,
+          completionNotes: null,
+          escalationReason: null
+        },
+        {
+          id: 'TSK-NH29-002',
+          chainageName: 'NH-29 KM 48+800 (Phesama Hillside Cut)',
+          riskLevel: 'High',
+          reason: 'Rockfall trajectory assessment required; loose basalt boulders perched on upper berm above highway culvert C-14.',
+          deadline: '11 Nov, 17:00 IST',
+          status: 'Assigned',
+          startedAt: null,
+          completedAt: null,
+          completionNotes: null,
+          escalationReason: null
+        },
+        {
+          id: 'TSK-NH29-003',
+          chainageName: 'SH-6 KM 6+200 (Jotsoma Bypass)',
+          riskLevel: 'Moderate',
+          reason: 'Culvert inlet siltation causing minor water ponding on road shoulder; inspect drainage channel after flash flood warning.',
+          deadline: 'Yesterday, 12:00 IST',
+          status: 'Completed',
+          startedAt: '08 Nov, 13:00 IST',
+          completedAt: '08 Nov, 16:30 IST',
+          completionNotes: 'Debris cleared by local PWD road gang. Water flowing freely through 900mm culvert. No structural subsidence detected.',
+          escalationReason: null
+        }
+      ],
+      reports: [
+        {
+          id: 'VREP-2026-104',
+          villagerName: 'Keviletuo Angami',
+          contact: '+91 98160 54321',
+          timestamp: 'Today, 07:45 IST',
+          locationDescription: '150 meters downhill from Dzüdza primary school terrace, near power pylon 14',
+          hazardType: 'Mudflow & Silt Runoff',
+          status: 'Pending',
+          fieldNotes: null,
+          rejectionReason: null
+        },
+        {
+          id: 'VREP-2026-105',
+          villagerName: 'Vitsonuo Suokhrie',
+          contact: '+91 98765 88990',
+          timestamp: 'Today, 08:10 IST',
+          locationDescription: 'Phesama agricultural terrace border, noticeable 4-inch crack on retaining wall',
+          hazardType: 'Slope Fissure',
+          status: 'Pending',
+          fieldNotes: null,
+          rejectionReason: null
+        },
+        {
+          id: 'VREP-2026-098',
+          villagerName: 'Neisalhou Solo',
+          contact: '+91 98765 44332',
+          timestamp: 'Yesterday, 15:20 IST',
+          locationDescription: 'Jotsoma stream junction road culvert overflow',
+          hazardType: 'Blocked Culvert',
+          status: 'Verified',
+          fieldNotes: 'Inspected and verified. Culvert throat choked with branches and shale gravel. Assigned to maintenance team.',
+          rejectionReason: null
+        }
+      ],
+      roads: [
+        {
+          roadSegmentId: 'ROAD-NH29-S4',
+          stretchName: 'NH-29 KM 38 to KM 52 (Phesama – Dzüdza)',
+          condition: 'Partially Blocked',
+          reason: 'Single lane operation due to minor landslide mud deposit at KM 42+300. Earthmovers working on outer lane.',
+          timestamp: 'Today, 09:30 IST',
+          updatedBy: 'Temsu Jamir (Field Officer)'
+        },
+        {
+          roadSegmentId: 'ROAD-SH6-S4',
+          stretchName: 'SH-6 KM 0 to KM 15 (Kohima to Khonoma Heritage Route)',
+          condition: 'Open',
+          reason: 'Normal mountain transit operational; road surface clear with standard wet pavement precautions.',
+          timestamp: 'Today, 07:00 IST',
+          updatedBy: 'Temsu Jamir (Field Officer)'
+        }
+      ],
+      alerts: [
+        {
+          id: 'ALT-SEC4-2026-01',
+          severity: 'Critical',
+          title: 'Red Alert: Imminent Mass Movement Warning - Dzüdza Escarpment',
+          instructions: '1. Immediately erect diversion barriers at KM 39 check-post.\n2. Reroute heavy freight via SH-6 bypass.\n3. Verify all villager dwellings within 300m downslope radius.\n4. Maintain radio contact with Central Disaster Desk on Channel 4.',
+          createdAt: 'Today, 08:00 IST',
+          acknowledged: false,
+          acknowledgedAt: null
+        },
+        {
+          id: 'ALT-SEC4-2026-02',
+          severity: 'Warning',
+          title: 'High Rainfall Threshold Exceeded: Phesama Catchment (>120mm/24h)',
+          instructions: 'Conduct foot reconnaissance of weep holes along highway retaining walls between KM 47 and KM 50. Report any hydrostatic pressure bulging.',
+          createdAt: 'Today, 06:30 IST',
+          acknowledged: true,
+          acknowledgedAt: 'Today, 06:45 IST'
+        }
+      ]
+    };
+
+    // UI Toast
+    function triggerToast(msg, icon = '⚡') {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastIcon').textContent = icon;
+      document.getElementById('toastText').textContent = msg;
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 3500);
+    }
+
+    // Tab Navigation
+    function switchTab(tabId) {
+      state.activeTab = tabId;
+      const tabs = ['tasks', 'map', 'reports', 'roads', 'alerts'];
+      tabs.forEach(t => {
+        const view = document.getElementById(`view-${t}`);
+        const btn = document.getElementById(`tabBtn-${t}`);
+        if (t === tabId) {
+          view.classList.remove('hidden');
+          btn.className = 'w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all bg-[#173D32] text-[#F8F4EC] shadow-sm cursor-pointer';
+        } else {
+          view.classList.add('hidden');
+          btn.className = 'w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all text-[#173D32] hover:bg-[#DCE8D4]/40 cursor-pointer';
+        }
+      });
+    }
+
+    // Profile Popover
+    function toggleProfile() {
+      const p = document.getElementById('profilePopover');
+      p.classList.toggle('hidden');
+    }
+
+    function changeLanguage(lang) {
+      triggerToast(`Language preference set to ${lang.toUpperCase()}`, '🌐');
+    }
+
+    // Render Tasks
+    function renderTasks() {
+      const container = document.getElementById('taskList');
+      container.innerHTML = state.tasks.map(task => `
+        <div class="bg-[#FAF8F2] border border-[#173D32]/15 rounded-3xl p-5 shadow-xs hover:border-[#173D32]/30 transition-all">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[#173D32]/10 mb-3">
+            <div class="flex items-center gap-2">
+              <span class="font-mono text-xs font-black text-[#173D32] bg-[#DCE8D4] px-2.5 py-1 rounded-lg">${task.id}</span>
+              <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
+                task.riskLevel === 'Critical' ? 'bg-rose-100 text-rose-800' :
+                task.riskLevel === 'High' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
+              }">${task.riskLevel} Risk</span>
+            </div>
+            <span class="text-xs font-bold px-3 py-1 rounded-full ${
+              task.status === 'In_Progress' ? 'bg-sky-100 text-sky-800 animate-pulse' :
+              task.status === 'Completed' ? 'bg-emerald-100 text-emerald-800' :
+              task.status === 'Escalated' ? 'bg-red-100 text-red-800' : 'bg-slate-200 text-slate-800'
+            }">● ${task.status.replace('_', ' ')}</span>
+          </div>
+
+          <div class="space-y-2 text-xs">
+            <div>
+              <span class="text-[#173D32]/60 font-semibold">Location Chainage:</span>
+              <p class="font-bold text-sm text-[#173D32] mt-0.5">${task.chainageName}</p>
+            </div>
+            <div>
+              <span class="text-[#173D32]/60 font-semibold">Reason:</span>
+              <p class="text-[#173D32]/90 leading-relaxed mt-0.5">${task.reason}</p>
+            </div>
+            <div class="flex items-center gap-4 text-[11px] text-[#173D32]/70 pt-1">
+              <span>Deadline: <strong>${task.deadline}</strong></span>
+              ${task.startedAt ? `<span>Started: <strong>${task.startedAt}</strong></span>` : ''}
+              ${task.completedAt ? `<span>Completed: <strong>${task.completedAt}</strong></span>` : ''}
+            </div>
+            ${task.completionNotes ? `
+              <div class="bg-[#DCE8D4]/40 p-2.5 rounded-xl border border-[#173D32]/10 mt-2">
+                <span class="font-bold text-[#173D32]">Completion Notes:</span> ${task.completionNotes}
+              </div>` : ''}
+            ${task.escalationReason ? `
+              <div class="bg-rose-50 text-rose-900 p-2.5 rounded-xl border border-rose-200 mt-2">
+                <span class="font-bold">🚨 Escalation Reason:</span> ${task.escalationReason}
+              </div>` : ''}
+          </div>
+
+          <!-- Buttons from sketch -->
+          <div class="flex flex-wrap items-center gap-2 pt-4 mt-3 border-t border-[#173D32]/10">
+            ${task.status === 'Assigned' ? `
+              <button onclick="startTask('${task.id}')" class="px-4 py-2 rounded-xl bg-[#173D32] text-[#F8F4EC] text-xs font-bold hover:bg-[#1f4e40] transition-colors cursor-pointer">
+                ▶ Start Inspection
+              </button>` : ''}
+            ${task.status === 'In_Progress' ? `
+              <button onclick="openModal('completeTask', '${task.id}')" class="px-4 py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 transition-colors cursor-pointer">
+                ✓ Mark Completed
+              </button>` : ''}
+            ${task.status !== 'Completed' && task.status !== 'Escalated' ? `
+              <button onclick="openModal('escalateTask', '${task.id}')" class="px-4 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 transition-colors cursor-pointer">
+                ⚠️ Escalate to Command
+              </button>` : ''}
+          </div>
+        </div>
+      `).join('');
+
+      document.getElementById('taskCountBadge').textContent = state.tasks.filter(t => t.status !== 'Completed').length;
+    }
+
+    // Render Reports
+    function renderReports() {
+      const container = document.getElementById('reportList');
+      container.innerHTML = state.reports.map(rep => `
+        <div class="bg-[#FAF8F2] border border-[#173D32]/15 rounded-3xl p-5 shadow-xs space-y-3">
+          <div class="flex items-center justify-between border-b border-[#173D32]/10 pb-3">
+            <div class="flex items-center gap-2">
+              <span class="font-mono text-xs font-bold text-[#173D32] bg-[#DCE8D4] px-2 py-0.5 rounded">${rep.id}</span>
+              <span class="text-xs font-extrabold text-[#173D32]">${rep.hazardType}</span>
+            </div>
+            <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
+              rep.status === 'Verified' ? 'bg-emerald-100 text-emerald-800' :
+              rep.status === 'Rejected' ? 'bg-slate-200 text-slate-700' :
+              rep.status === 'Escalated' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
+            }">${rep.status}</span>
+          </div>
+
+          <div class="text-xs space-y-1.5">
+            <p class="text-[#173D32] font-medium leading-relaxed">${rep.locationDescription}</p>
+            <div class="text-[11px] text-[#173D32]/70 flex items-center gap-3">
+              <span>Reported by: <strong>${rep.villagerName}</strong> (${rep.contact})</span>
+              <span>Time: ${rep.timestamp}</span>
+            </div>
+            ${rep.fieldNotes ? `
+              <div class="bg-[#DCE8D4]/40 p-2 rounded-xl text-[11px] border border-[#173D32]/10">
+                <strong>Field Verification:</strong> ${rep.fieldNotes}
+              </div>` : ''}
+            ${rep.rejectionReason ? `
+              <div class="bg-rose-50 text-rose-900 p-2 rounded-xl text-[11px] border border-rose-200">
+                <strong>Rejection Reason:</strong> ${rep.rejectionReason}
+              </div>` : ''}
+          </div>
+
+          ${rep.status === 'Pending' ? `
+            <div class="flex flex-wrap items-center gap-2 pt-3 border-t border-[#173D32]/10">
+              <button onclick="verifyReport('${rep.id}')" class="px-3.5 py-1.5 rounded-xl bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 transition-colors cursor-pointer">
+                ✓ Verify Ground Truth
+              </button>
+              <button onclick="openModal('rejectReport', '${rep.id}')" class="px-3.5 py-1.5 rounded-xl border border-rose-400 text-rose-700 text-xs font-bold hover:bg-rose-50 transition-colors cursor-pointer">
+                ✕ Reject Report
+              </button>
+              <button onclick="openModal('escalateReport', '${rep.id}')" class="px-3.5 py-1.5 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 transition-colors cursor-pointer">
+                ⚠️ Escalate to Command
+              </button>
+            </div>` : ''}
+        </div>
+      `).join('');
+
+      document.getElementById('reportCountBadge').textContent = state.reports.filter(r => r.status === 'Pending').length;
+    }
+
+    // Render Roads
+    function renderRoads() {
+      const container = document.getElementById('roadList');
+      container.innerHTML = state.roads.map(road => `
+        <div class="bg-[#FAF8F2] border border-[#173D32]/15 rounded-3xl p-5 shadow-xs space-y-3">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#173D32]/10 pb-3">
+            <div>
+              <h4 class="font-extrabold text-sm text-[#173D32]">${road.stretchName}</h4>
+              <span class="text-[11px] font-mono text-[#173D32]/70">${road.roadSegmentId}</span>
+            </div>
+            <span class="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
+              road.condition === 'Blocked' ? 'bg-rose-600 text-white animate-pulse' :
+              road.condition === 'Partially Blocked' ? 'bg-amber-500 text-white' :
+              road.condition === 'Caution' ? 'bg-yellow-400 text-slate-900' : 'bg-emerald-600 text-white'
+            }">${road.condition}</span>
+          </div>
+
+          <div class="text-xs space-y-1">
+            <p class="text-[#173D32]/90 leading-relaxed">
+              <strong>Status Reason:</strong> ${road.reason}
+            </p>
+            <p class="text-[11px] text-[#173D32]/60 pt-1">
+              Last Updated: ${road.timestamp} by ${road.updatedBy}
+            </p>
+          </div>
+
+          <div class="pt-3 border-t border-[#173D32]/10">
+            <button onclick="openModal('updateRoad', '${road.roadSegmentId}')" class="px-4 py-2 rounded-xl bg-[#173D32] text-[#F8F4EC] text-xs font-bold hover:bg-[#1f4e40] transition-colors cursor-pointer">
+              ⚡ Update Condition & Sync
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Render Alerts
+    function renderAlerts() {
+      const container = document.getElementById('alertList');
+      container.innerHTML = state.alerts.map(alert => `
+        <div class="rounded-3xl p-5 border shadow-xs space-y-3 ${
+          alert.severity === 'Critical' ? 'bg-rose-50/80 border-rose-300' : 'bg-[#FAF8F2] border-[#173D32]/15'
+        }">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#173D32]/10 pb-3">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-black uppercase ${
+                alert.severity === 'Critical' ? 'bg-rose-600 text-white animate-pulse' : 'bg-amber-500 text-white'
+              }">${alert.severity}</span>
+              <h4 class="font-extrabold text-sm text-[#173D32]">${alert.title}</h4>
+            </div>
+            <span class="text-[11px] text-[#173D32]/60 font-mono">${alert.createdAt}</span>
+          </div>
+
+          <div class="text-xs space-y-2">
+            <span class="font-bold text-[#173D32] uppercase tracking-wider text-[11px] block">Standard Action Protocol:</span>
+            <pre class="font-sans whitespace-pre-wrap bg-white/70 p-3.5 rounded-2xl text-xs text-[#173D32] border border-[#173D32]/10 leading-relaxed">${alert.instructions}</pre>
+          </div>
+
+          <div class="pt-3 border-t border-[#173D32]/10 flex items-center justify-between">
+            ${alert.acknowledged ? `
+              <span class="text-emerald-800 font-bold text-xs flex items-center gap-1.5">
+                ✓ Acknowledged (${alert.acknowledgedAt})
+              </span>` : `
+              <button onclick="acknowledgeAlert('${alert.id}')" class="px-4 py-2 rounded-xl bg-[#173D32] text-[#F8F4EC] text-xs font-bold hover:bg-[#1f4e40] transition-colors cursor-pointer">
+                ✓ Acknowledge Receipt
+              </button>`}
+          </div>
+        </div>
+      `).join('');
+
+      const unack = state.alerts.filter(a => !a.acknowledged).length;
+      document.getElementById('alertCountBadge').textContent = unack;
+      const tabBadge = document.getElementById('alertTabBadge');
+      if (unack > 0) {
+        tabBadge.textContent = `${unack} New`;
+        tabBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-rose-500 text-white font-extrabold animate-pulse';
+      } else {
+        tabBadge.textContent = 'All Ack';
+        tabBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-bold';
+      }
+    }
+
+    // Actions
+    function startTask(id) {
+      const task = state.tasks.find(t => t.id === id);
+      if (task) {
+        task.status = 'In_Progress';
+        task.startedAt = 'Just now';
+        renderTasks();
+        triggerToast(`Inspection clock started for ${id}`, '⏱️');
+      }
+    }
+
+    function verifyReport(id) {
+      const rep = state.reports.find(r => r.id === id);
+      if (rep) {
+        rep.status = 'Verified';
+        rep.fieldNotes = 'Ground truth confirmed on site by Field Officer inspection.';
+        renderReports();
+        triggerToast(`Report ${id} successfully verified`, '✓');
+      }
+    }
+
+    function acknowledgeAlert(id) {
+      const alert = state.alerts.find(a => a.id === id);
+      if (alert) {
+        alert.acknowledged = true;
+        alert.acknowledgedAt = 'Just now';
+        renderAlerts();
+        triggerToast(`Alert ${id} acknowledged by Officer`, '✓');
+      }
+    }
+
+    // Modal Handling
+    function openModal(type, id) {
+      state.activeModal = type;
+      state.selectedId = id;
+      const overlay = document.getElementById('modalOverlay');
+      const title = document.getElementById('modalTitle');
+      const body = document.getElementById('modalBody');
+
+      if (type === 'completeTask') {
+        title.textContent = `Complete Inspection Task: ${id}`;
+        body.innerHTML = `
+          <label class="text-xs font-semibold text-[#173D32] block">Completion Notes / Mitigation Observations:</label>
+          <textarea id="modalTextArea" rows="3" class="w-full bg-white border border-[#173D32]/20 rounded-2xl p-3 text-xs outline-none focus:border-[#173D32]" placeholder="Describe slope condition, culvert clearance, anchor bolts..."></textarea>
+        `;
+      } else if (type === 'escalateTask') {
+        title.textContent = `🚨 Escalate Task: ${id} to High Command`;
+        body.innerHTML = `
+          <label class="text-xs font-semibold text-rose-800 block">Mandatory Escalation Reason:</label>
+          <textarea id="modalTextArea" rows="3" class="w-full bg-white border border-rose-300 rounded-2xl p-3 text-xs outline-none focus:border-rose-600" placeholder="Active tensile cracking expanding across road shoulder; immediate JCB excavator needed..."></textarea>
+        `;
+      } else if (type === 'rejectReport') {
+        title.textContent = `Reject Villager Report: ${id}`;
+        body.innerHTML = `
+          <label class="text-xs font-semibold text-rose-800 block">Mandatory Rejection Justification:</label>
+          <textarea id="modalTextArea" rows="3" class="w-full bg-white border border-rose-300 rounded-2xl p-3 text-xs outline-none focus:border-rose-600" placeholder="Explain why this observation is a false alarm or non-landslide hazard..."></textarea>
+        `;
+      } else if (type === 'escalateReport') {
+        title.textContent = `🚨 Escalate Report: ${id} to Disaster Command`;
+        body.innerHTML = `
+          <label class="text-xs font-semibold text-[#173D32] block">Escalation Reason & Recommended Action:</label>
+          <textarea id="modalTextArea" rows="3" class="w-full bg-white border border-[#173D32]/20 rounded-2xl p-3 text-xs outline-none focus:border-[#173D32]" placeholder="Debris damming stream above village; immediate evacuation recommended..."></textarea>
+        `;
+      } else if (type === 'updateRoad') {
+        const road = state.roads.find(r => r.roadSegmentId === id);
+        title.textContent = `Update Road Condition: ${road ? road.stretchName : id}`;
+        body.innerHTML = `
+          <div>
+            <label class="text-xs font-semibold text-[#173D32] block mb-1">Road Condition (Strict Enum):</label>
+            <select id="modalSelectCondition" class="w-full bg-white border border-[#173D32]/20 rounded-xl p-2.5 text-xs font-bold text-[#173D32] outline-none">
+              <option value="Open" ${road && road.condition === 'Open' ? 'selected' : ''}>Open</option>
+              <option value="Caution" ${road && road.condition === 'Caution' ? 'selected' : ''}>Caution</option>
+              <option value="Partially Blocked" ${road && road.condition === 'Partially Blocked' ? 'selected' : ''}>Partially Blocked</option>
+              <option value="Blocked" ${road && road.condition === 'Blocked' ? 'selected' : ''}>Blocked</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-[#173D32] block mb-1">Reason / Obstruction Description:</label>
+            <textarea id="modalTextArea" rows="2" class="w-full bg-white border border-[#173D32]/20 rounded-2xl p-3 text-xs outline-none focus:border-[#173D32]" placeholder="Mudslide at KM 42, alternating single-lane convoy...">${road ? road.reason : ''}</textarea>
+          </div>
+        `;
+      }
+
+      overlay.classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('modalOverlay').classList.add('hidden');
+      state.activeModal = null;
+      state.selectedId = null;
+    }
+
+    function submitModal() {
+      const text = document.getElementById('modalTextArea') ? document.getElementById('modalTextArea').value.trim() : '';
+
+      if (state.activeModal === 'completeTask') {
+        const task = state.tasks.find(t => t.id === state.selectedId);
+        if (task) {
+          task.status = 'Completed';
+          task.completedAt = 'Just now';
+          task.completionNotes = text || 'Inspection concluded successfully.';
+          renderTasks();
+          triggerToast(`Task ${state.selectedId} marked as Completed`, '✓');
+        }
+      } else if (state.activeModal === 'escalateTask') {
+        if (!text) {
+          alert('Escalation reason is required!');
+          return;
+        }
+        const task = state.tasks.find(t => t.id === state.selectedId);
+        if (task) {
+          task.status = 'Escalated';
+          task.escalationReason = text;
+          renderTasks();
+          triggerToast(`🚨 Task ${state.selectedId} escalated to Central Dashboard!`, '⚠️');
+        }
+      } else if (state.activeModal === 'rejectReport') {
+        if (!text) {
+          alert('Rejection reason is mandatory!');
+          return;
+        }
+        const rep = state.reports.find(r => r.id === state.selectedId);
+        if (rep) {
+          rep.status = 'Rejected';
+          rep.rejectionReason = text;
+          renderReports();
+          triggerToast(`Report ${state.selectedId} rejected with reason`, '✕');
+        }
+      } else if (state.activeModal === 'escalateReport') {
+        if (!text) {
+          alert('Escalation details are required!');
+          return;
+        }
+        const rep = state.reports.find(r => r.id === state.selectedId);
+        if (rep) {
+          rep.status = 'Escalated';
+          renderReports();
+          triggerToast(`🚨 Report ${state.selectedId} escalated to High Command!`, '⚠️');
+        }
+      } else if (state.activeModal === 'updateRoad') {
+        const cond = document.getElementById('modalSelectCondition').value;
+        const road = state.roads.find(r => r.roadSegmentId === state.selectedId);
+        if (road) {
+          road.condition = cond;
+          road.reason = text || road.reason;
+          road.timestamp = 'Just now';
+          renderRoads();
+          triggerToast(`📡 Road condition '${cond}' synced with Central Dashboard!`, '📡');
+        }
+      }
+
+      closeModal();
+    }
+
+    // Initialize UI on boot
+    window.addEventListener('DOMContentLoaded', () => {
+      renderTasks();
+      renderReports();
+      renderRoads();
+      renderAlerts();
+    });
+  </script>
+</body>
+</html>
