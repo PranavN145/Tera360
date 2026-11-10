@@ -23,75 +23,77 @@ export default function Footer() {
 
       {/* Footer Content Container */}
       {/* Positioned inside the dark green valley between the top wavy curve and the bottom tribal pattern */}
-      <div className="relative z-10 w-full max-w-[1340px] mx-auto px-4 sm:px-6 lg:px-10 xl:px-14 pt-20 sm:pt-24 lg:pt-28 pb-14 sm:pb-16 lg:pb-20">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6 md:gap-8">
+      <div className="relative z-10 w-full max-w-[1340px] mx-auto px-3 sm:px-6 lg:px-10 xl:px-14 pt-12 sm:pt-18 md:pt-24 lg:pt-28 pb-7 sm:pb-12 md:pb-16 lg:pb-20">
+        <div className="flex flex-row items-center justify-between gap-2 sm:gap-6 md:gap-8">
           
-          {/* Left: Footer Logo & Tagline */}
-          <div className="flex flex-col items-center md:items-start gap-2 shrink-0">
+          {/* Left: Footer Logo & Tagline (Desktop & Mobile consistent) */}
+          <div className="flex flex-col items-start gap-1 sm:gap-1.5 md:gap-2 shrink-0">
             <Link
               href="/"
               className="flex items-center rounded-lg focus-visible:outline-2 focus-visible:outline-white/60 transition-opacity hover:opacity-95"
               aria-label="Terra360 Home"
             >
-              <div className="relative w-[175px] sm:w-[200px] lg:w-[220px] h-[50px] sm:h-[58px] lg:h-[64px]">
+              <div className="relative w-[100px] sm:w-[165px] md:w-[200px] lg:w-[220px] h-[29px] sm:h-[48px] md:h-[58px] lg:h-[64px]">
                 <Image
                   src="/images/footer_logo.png"
                   alt="Terra360"
                   fill
-                  sizes="220px"
-                  className="object-contain object-center md:object-left"
+                  sizes="(max-width: 640px) 120px, 220px"
+                  className="object-contain object-left"
                 />
               </div>
             </Link>
-            <span className="text-[11px] sm:text-[12.5px] lg:text-[13.5px] font-semibold tracking-[0.25em] text-[#F6F4EC]/85 uppercase pl-0.5">
+            <span className="text-[7px] sm:text-[10px] md:text-[12px] lg:text-[13.5px] font-semibold tracking-[0.16em] sm:tracking-[0.22em] md:tracking-[0.25em] text-[#F6F4EC]/85 uppercase pl-0.5">
               MONITOR · ANALYZE · PROTECT
             </span>
           </div>
 
           {/* Center: Footer Navigation Links with Vertical Dividers */}
           <nav
-            className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-4 text-xs sm:text-[14px] text-[#F6F4EC]/85 font-medium"
+            className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-3 md:gap-4 text-[10px] sm:text-[12.5px] md:text-[14px] text-[#F6F4EC]/85 font-medium px-1"
             aria-label="Footer Navigation"
           >
             <Link
               href="/about"
-              className="hover:text-white transition-colors py-1 focus-visible:outline-2 focus-visible:outline-white/60 rounded-xs"
+              className="hover:text-white transition-colors py-0.5 focus-visible:outline-2 focus-visible:outline-white/60 rounded-xs"
             >
               About
             </Link>
             <span className="text-[#F6F4EC]/30" aria-hidden="true">|</span>
             <Link
               href="/privacy"
-              className="hover:text-white transition-colors py-1 focus-visible:outline-2 focus-visible:outline-white/60 rounded-xs"
+              className="hover:text-white transition-colors py-0.5 focus-visible:outline-2 focus-visible:outline-white/60 rounded-xs"
             >
-              Privacy Policy
+              <span className="hidden sm:inline">Privacy Policy</span>
+              <span className="sm:hidden">Privacy</span>
             </Link>
             <span className="text-[#F6F4EC]/30" aria-hidden="true">|</span>
             <Link
               href="/terms"
-              className="hover:text-white transition-colors py-1 focus-visible:outline-2 focus-visible:outline-white/60 rounded-xs"
+              className="hover:text-white transition-colors py-0.5 focus-visible:outline-2 focus-visible:outline-white/60 rounded-xs"
             >
-              Terms of Use
+              <span className="hidden sm:inline">Terms of Use</span>
+              <span className="sm:hidden">Terms</span>
             </Link>
             <span className="text-[#F6F4EC]/30" aria-hidden="true">|</span>
             <Link
               href="/contact"
-              className="hover:text-white transition-colors py-1 focus-visible:outline-2 focus-visible:outline-white/60 rounded-xs"
+              className="hover:text-white transition-colors py-0.5 focus-visible:outline-2 focus-visible:outline-white/60 rounded-xs"
             >
               Contact
             </Link>
           </nav>
 
           {/* Right: Social Media Icons & Copyright */}
-          <div className="flex flex-col items-center md:items-end gap-2.5 shrink-0">
+          <div className="flex flex-col items-end gap-1 sm:gap-1.5 md:gap-2.5 shrink-0">
             {/* Social Media Circular Icons */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-2.5 md:gap-3">
               {/* LinkedIn */}
               <a
                 href="https://linkedin.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-8 h-8 rounded-full border border-[#F6F4EC]/25 hover:border-[#F6F4EC]/60 bg-[#173D32]/30 hover:bg-[#F6F4EC]/10 flex items-center justify-center text-[#F6F4EC]/85 hover:text-white transition-all text-xs font-bold"
+                className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 rounded-full border border-[#F6F4EC]/25 hover:border-[#F6F4EC]/60 bg-[#173D32]/30 hover:bg-[#F6F4EC]/10 flex items-center justify-center text-[#F6F4EC]/85 hover:text-white transition-all text-[10px] sm:text-xs font-bold"
                 aria-label="LinkedIn"
               >
                 <span>in</span>
@@ -102,11 +104,11 @@ export default function Footer() {
                 href="https://instagram.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-8 h-8 rounded-full border border-[#F6F4EC]/25 hover:border-[#F6F4EC]/60 bg-[#173D32]/30 hover:bg-[#F6F4EC]/10 flex items-center justify-center text-[#F6F4EC]/85 hover:text-white transition-all"
+                className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 rounded-full border border-[#F6F4EC]/25 hover:border-[#F6F4EC]/60 bg-[#173D32]/30 hover:bg-[#F6F4EC]/10 flex items-center justify-center text-[#F6F4EC]/85 hover:text-white transition-all"
                 aria-label="Instagram"
               >
                 <svg
-                  className="w-4 h-4"
+                  className="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -124,11 +126,11 @@ export default function Footer() {
                 href="https://github.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-8 h-8 rounded-full border border-[#F6F4EC]/25 hover:border-[#F6F4EC]/60 bg-[#173D32]/30 hover:bg-[#F6F4EC]/10 flex items-center justify-center text-[#F6F4EC]/85 hover:text-white transition-all"
+                className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 rounded-full border border-[#F6F4EC]/25 hover:border-[#F6F4EC]/60 bg-[#173D32]/30 hover:bg-[#F6F4EC]/10 flex items-center justify-center text-[#F6F4EC]/85 hover:text-white transition-all"
                 aria-label="GitHub"
               >
                 <svg
-                  className="w-4 h-4 fill-current"
+                  className="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4 fill-current"
                   viewBox="0 0 24 24"
                   aria-hidden="true"
                 >
@@ -142,8 +144,9 @@ export default function Footer() {
             </div>
 
             {/* Copyright Note */}
-            <p className="text-xs text-[#F6F4EC]/70 font-normal">
-              © 2026 Terra360. All rights reserved.
+            <p className="text-[9px] sm:text-[10px] md:text-xs text-[#F6F4EC]/75 font-normal whitespace-nowrap">
+              <span className="hidden sm:inline">© 2026 Terra360. All rights reserved.</span>
+              <span className="sm:hidden">© 2026 Terra360</span>
             </p>
           </div>
 

@@ -135,13 +135,14 @@ export interface ContactOutput {
 export function formatRelativeTime(dateInput?: string | Date | null): string {
   if (!dateInput) return 'Recently';
 
+  // Avoid reading current system time during Next.js SSR prerendering
+  if (typeof window === 'undefined') {
+    return 'Recently';
+  }
+
   try {
     const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
     if (isNaN(date.getTime())) return 'Recently';
-
-    if (typeof window === 'undefined') {
-      return 'Recently';
-    }
 
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -206,7 +207,7 @@ export function riskMapItemToAlertDetail(road: PublicRiskMapItem): AlertDetail {
     severity = 'Warning';
   }
 
-  const trafficStatus =
+  const defaultStatusText =
     status === 'blocked'
       ? 'Blocked · Diversion in effect'
       : status === 'caution'
@@ -214,6 +215,10 @@ export function riskMapItemToAlertDetail(road: PublicRiskMapItem): AlertDetail {
       : status === 'partial'
       ? 'Partial clearance operational'
       : 'Open to vehicular traffic';
+
+  const trafficStatus = road.statusReason
+    ? `${defaultStatusText} — ${road.statusReason}`
+    : defaultStatusText;
 
   return {
     id: road.id,

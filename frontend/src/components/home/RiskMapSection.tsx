@@ -82,7 +82,7 @@ export default function RiskMapSection() {
 
             {/* Description */}
             <p className="mt-3.5 text-base sm:text-lg text-[#173D32]/85 leading-relaxed font-normal">
-              High-resolution slope vulnerability mapping, real-time Doppler radar overlays, and arterial highway clearance statuses across the 8 Northeast states.
+              Live map showing landslide danger zones, real-time rainfall updates, and open highway routes across the 8 Northeast states.
             </p>
           </div>
 
