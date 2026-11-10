@@ -1,19 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { usersService } from './users.service';
-import { env } from '../../config/env';
-
-const REFRESH_COOKIE_NAME = 'refreshToken';
-
-function clearRefreshTokenCookie(res: Response): void {
-  const isSecure = env.COOKIE_SAMESITE === 'none' || env.NODE_ENV === 'production';
-  res.clearCookie(REFRESH_COOKIE_NAME, {
-    httpOnly: true,
-    secure: isSecure,
-    sameSite: env.COOKIE_SAMESITE,
-    domain: env.COOKIE_DOMAIN !== 'localhost' ? env.COOKIE_DOMAIN : undefined,
-    path: '/api/v1/auth',
-  });
-}
+import {
+  clearRefreshTokenCookie,
+  getRefreshTokenFromRequest,
+} from '../../utils/cookie';
 
 export class UsersController {
   async getMe(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -46,7 +36,7 @@ export class UsersController {
 
   async changePassword(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const rawRefreshToken = req.cookies?.[REFRESH_COOKIE_NAME];
+      const rawRefreshToken = getRefreshTokenFromRequest(req);
       await usersService.changePassword(req.user!.id, req.body, rawRefreshToken);
       res.status(200).json({
         success: true,
@@ -61,7 +51,7 @@ export class UsersController {
 
   async getSessions(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const rawRefreshToken = req.cookies?.[REFRESH_COOKIE_NAME];
+      const rawRefreshToken = getRefreshTokenFromRequest(req);
       const sessions = await usersService.getSessions(req.user!.id, rawRefreshToken);
       res.status(200).json({
         success: true,

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Header from "@/components/layout/Header";
+import RiskMap from "@/components/RiskMap";
 import { useApp } from "@/context/AppContext";
 import { publicApi } from "@/lib/api";
 import {
@@ -589,6 +590,11 @@ export default function RiskMapPage() {
               </button>
             </div>
           </div>
+        </div>
+
+        {/* Full-Screen 3D Interactive Risk Map Container */}
+        <div className="relative w-full h-[500px] sm:h-[620px] lg:h-[720px] rounded-3xl overflow-hidden border border-[#173D32]/15 shadow-xl mb-8 bg-[#FAF8F2]">
+          <RiskMap className="w-full h-full" selectedState={selectedState} />
         </div>
 
         {/* Filter Controls Bar */}
