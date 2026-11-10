@@ -4,13 +4,15 @@ import React, { useEffect, useRef, useState, useMemo } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import {
-  corridorRoutes,
   rescueRoute,
-  STATE_PRESETS,
+  getStatePreset,
+  getCorridorTelemetry,
+  STATE_CORRIDOR_TELEMETRY,
   computeSimulatedCorridorRoutes,
-  nh29FieldSensors,
   computeSimulatedSensors,
 } from "../data/mockLandslideData.js";
+
+export type CorridorTelemetryData = typeof STATE_CORRIDOR_TELEMETRY[keyof typeof STATE_CORRIDOR_TELEMETRY];
 
 // Read token securely from environment variable (Next.js or Vite)
 const MAPBOX_ACCESS_TOKEN: string =
@@ -69,6 +71,7 @@ const REGIONAL_CORRIDOR_ARCS = [
     id: "reg-nh29",
     code: "NH-29",
     name: "Dimapur – Kohima – Mao Highway",
+    state: "Nagaland",
     defaultRisk: "critical",
     coordinates: [
       [93.72, 25.91],
@@ -82,6 +85,7 @@ const REGIONAL_CORRIDOR_ARCS = [
     id: "reg-nh10",
     code: "NH-10",
     name: "Sevoke – Teesta Gorge – Gangtok Highway",
+    state: "Sikkim",
     defaultRisk: "warning",
     coordinates: [
       [88.43, 26.86],
@@ -94,6 +98,7 @@ const REGIONAL_CORRIDOR_ARCS = [
     id: "reg-nh27",
     code: "NH-27",
     name: "Guwahati – Haflong – Jatinga – Silchar Highway",
+    state: "Assam",
     defaultRisk: "warning",
     coordinates: [
       [91.78, 26.14],
@@ -107,6 +112,7 @@ const REGIONAL_CORRIDOR_ARCS = [
     id: "reg-nh6",
     code: "NH-6",
     name: "Shillong – Jowai – Sonapur – Silchar Highway",
+    state: "Meghalaya",
     defaultRisk: "warning",
     coordinates: [
       [91.89, 25.57],
@@ -114,6 +120,59 @@ const REGIONAL_CORRIDOR_ARCS = [
       [92.36, 25.105],
       [92.62, 24.92],
       [92.80, 24.83],
+    ],
+  },
+  {
+    id: "reg-nh415",
+    code: "NH-415",
+    name: "Banderdewa – Itanagar – Gohpur Expressway",
+    state: "Arunachal Pradesh",
+    defaultRisk: "safe",
+    coordinates: [
+      [93.75, 27.08],
+      [93.81, 27.12],
+      [93.95, 27.24],
+      [94.22, 27.65],
+      [94.7278, 28.2180],
+    ],
+  },
+  {
+    id: "reg-nh37",
+    code: "NH-37",
+    name: "Imphal – Noney – Tupul – Jiribam Highway",
+    state: "Manipur",
+    defaultRisk: "warning",
+    coordinates: [
+      [93.55, 24.81],
+      [93.63, 24.84],
+      [93.75, 24.80],
+      [93.9063, 24.6637],
+    ],
+  },
+  {
+    id: "reg-nh54",
+    code: "NH-54",
+    name: "Silchar – Vairengte – Kolasib – Aizawl Highway",
+    state: "Mizoram",
+    defaultRisk: "safe",
+    coordinates: [
+      [92.68, 24.30],
+      [92.72, 23.95],
+      [92.75, 23.73],
+      [92.8378, 23.1645],
+    ],
+  },
+  {
+    id: "reg-nh8",
+    code: "NH-8",
+    name: "Agartala – Teliamura – Udaipur National Highway",
+    state: "Tripura",
+    defaultRisk: "safe",
+    coordinates: [
+      [91.32, 23.85],
+      [91.55, 23.83],
+      [91.78, 23.78],
+      [91.9882, 23.7451],
     ],
   },
 ];
@@ -170,6 +229,8 @@ export interface RiskMapProps {
   bearing?: number;
   /** Optional state filter to trigger camera fly-to */
   selectedState?: string;
+  /** Optional active corridor code or name to sync telemetry HUD */
+  selectedCorridor?: string | null;
   /** Override visibility of top-left Live Corridor HUD (defaults to true for 'full' and 'dashboard', false for 'mini') */
   showHud?: boolean;
   /** Optional legacy showPlayback flag (kept for backwards compatibility) */
@@ -181,7 +242,7 @@ export interface RiskMapProps {
   /** Position of Mapbox ScaleControl when enabled (defaults to 'bottom-right') */
   scalePosition?: "bottom-left" | "bottom-right";
   /** Optional corridor click callback */
-  onSelectCorridor?: (corridorId: string, properties: Record<string, any>) => void;
+  onSelectCorridor?: (corridorId: string, properties?: Record<string, any>) => void;
   /** Optional hotspots to display as interactive regional markers */
   hotspots?: RiskMapHotspot[];
   /** Currently focused hotspot id */
@@ -225,6 +286,7 @@ export default function RiskMap({
   pitch = 60,
   bearing = -20,
   selectedState,
+  selectedCorridor,
   showHud,
   showControls = true,
   showScaleControl = false,
@@ -247,7 +309,51 @@ export default function RiskMap({
   const activeStyleUrlRef = useRef<string>(
     terrainMode ? TERRAIN_STYLE_MAP[terrainMode] : "mapbox://styles/mapbox/light-v11"
   );
-  const prevSelectedStateRef = useRef<string | undefined>(selectedState);
+  const selectedStateRef = useRef<string | undefined>(selectedState);
+
+  // Unified active corridor telemetry state driving the Live Corridor HUD
+  const propTelemetryKey = selectedCorridor || selectedState || "All States";
+  const propTelemetryKeyRef = useRef(propTelemetryKey);
+  useEffect(() => {
+    propTelemetryKeyRef.current = propTelemetryKey;
+  }, [propTelemetryKey]);
+
+  const [manualTelemetrySelection, setManualTelemetrySelection] = useState<{
+    forPropKey: string;
+    key: string;
+  } | null>(null);
+
+  const activeTelemetry = useMemo<CorridorTelemetryData>(() => {
+    const effectiveKey =
+      manualTelemetrySelection && manualTelemetrySelection.forPropKey === propTelemetryKey
+        ? manualTelemetrySelection.key
+        : propTelemetryKey;
+    return getCorridorTelemetry(effectiveKey);
+  }, [manualTelemetrySelection, propTelemetryKey]);
+
+  // Camera navigation helper with smooth flyTo animation across Northeast states
+  const navigateToState = React.useCallback(
+    (stateName?: string, duration = 2000) => {
+      const map = mapInstanceRef.current;
+      if (!map) return;
+      const preset = getStatePreset(stateName || "All States");
+      if (!preset) return;
+
+      try {
+        map.flyTo({
+          center: preset.center as [number, number],
+          zoom: preset.zoom,
+          pitch: preset.pitch ?? 60,
+          bearing: preset.bearing ?? 0,
+          essential: true,
+          duration,
+        });
+      } catch (err) {
+        console.warn("Map camera navigation error:", err);
+      }
+    },
+    []
+  );
 
   const effectiveShowHud =
     showHud !== undefined
@@ -293,26 +399,32 @@ export default function RiskMap({
   const rescueRouteEnabledRef = useRef(rescueRouteEnabled);
   const fieldSensorsEnabledRef = useRef(fieldSensorsEnabled);
 
-  // Compute live simulated corridor routes GeoJSON along NH-29 Pherima slope (syncing live backend statuses when hotspots are supplied)
+  // Compute dynamic simulated corridor routes GeoJSON along Northeast mountain passes (syncing live hotspot statuses when supplied)
   const simulatedCorridorData = useMemo(() => {
     const base = computeSimulatedCorridorRoutes(14);
-    if (hotspots === undefined) {
-      return base;
-    }
 
     const activeStateLower = (selectedState || "").trim().toLowerCase();
-    const isStateFiltered = Boolean(activeStateLower && activeStateLower !== "all states");
+    const isStateFiltered = Boolean(
+      activeStateLower &&
+      activeStateLower !== "all states" &&
+      activeStateLower !== "all" &&
+      activeStateLower !== "default"
+    );
 
     const filteredFeatures = base.features
       .filter((feat: any) => {
         if (!isStateFiltered) return true;
-        const featState = String(feat.properties?.state || "").toLowerCase();
-        return featState === activeStateLower || activeStateLower.startsWith(featState);
+        const featState = String(feat.properties?.state || "").toLowerCase().trim();
+        return (
+          featState === activeStateLower ||
+          activeStateLower.includes(featState) ||
+          featState.includes(activeStateLower)
+        );
       })
       .map((feat: any) => {
         const props = feat.properties || {};
         const codeUpper = String(props.corridor || "").toUpperCase();
-        const matched = hotspots.find((h) => h.code.toUpperCase() === codeUpper);
+        const matched = hotspots?.find((h) => h.code.toUpperCase() === codeUpper);
         if (!matched) return feat;
 
         // Preserve NH-29's multi-segment hazard gradient when NH-29 is Critical
@@ -355,11 +467,25 @@ export default function RiskMap({
   const regionalCorridorsGeoJson = useMemo(() => {
     const list = hotspots || [];
     const activeStateLower = (selectedState || "").trim().toLowerCase();
-    const isStateFiltered = Boolean(activeStateLower && activeStateLower !== "all states");
+    const isStateFiltered = Boolean(
+      activeStateLower &&
+      activeStateLower !== "all states" &&
+      activeStateLower !== "all" &&
+      activeStateLower !== "default"
+    );
 
     // Include real LineString geometries from backend hotspots when present
     const customFeatures = list
-      .filter((h) => Array.isArray(h.routeCoordinates) && h.routeCoordinates.length >= 2)
+      .filter((h) => {
+        if (!Array.isArray(h.routeCoordinates) || h.routeCoordinates.length < 2) return false;
+        if (!isStateFiltered) return true;
+        const hState = String(h.state || "").toLowerCase().trim();
+        return (
+          hState === activeStateLower ||
+          activeStateLower.includes(hState) ||
+          hState.includes(activeStateLower)
+        );
+      })
       .map((h) => ({
         type: "Feature" as const,
         properties: {
@@ -372,6 +498,7 @@ export default function RiskMap({
               : h.severity === "Warning"
               ? "warning"
               : "safe",
+          state: h.state,
         },
         geometry: {
           type: "LineString" as const,
@@ -384,7 +511,12 @@ export default function RiskMap({
     const arcFeatures = REGIONAL_CORRIDOR_ARCS.filter((arc) => {
       if (customCodes.has(arc.code.toUpperCase())) return false;
       if (!isStateFiltered) return true;
-      return list.some((h) => h.code.toUpperCase() === arc.code.toUpperCase());
+      const arcState = String((arc as any).state || "").toLowerCase().trim();
+      const matchesState =
+        arcState === activeStateLower ||
+        activeStateLower.includes(arcState) ||
+        arcState.includes(activeStateLower);
+      return matchesState || list.some((h) => h.code.toUpperCase() === arc.code.toUpperCase());
     }).map((arc) => {
       const matched = list.find(
         (h) => h.code.toUpperCase() === arc.code.toUpperCase()
@@ -404,6 +536,7 @@ export default function RiskMap({
           code: arc.code,
           name: arc.name,
           riskLevel: risk,
+          state: (arc as any).state,
         },
         geometry: {
           type: "LineString" as const,
@@ -628,6 +761,10 @@ export default function RiskMap({
 
       el.addEventListener("click", (ev) => {
         ev.stopPropagation();
+        setManualTelemetrySelection({
+          forPropKey: propTelemetryKeyRef.current,
+          key: hotspot.code || hotspot.state || hotspot.title,
+        });
         if (onSelectHotspotRef.current) {
           onSelectHotspotRef.current(hotspot);
         }
@@ -642,12 +779,25 @@ export default function RiskMap({
     });
   }, []);
 
-  // Helper: sync obstacle marker visibility (hide at low regional zoom when regional hotspots are active)
+  // Helper: sync obstacle marker visibility (hide when non-Nagaland state is selected or at low regional zoom)
   const syncObstacleMarkerVisibility = React.useCallback((map: mapboxgl.Map) => {
     const obstacleMarker = obstacleMarkerRef.current;
     if (!obstacleMarker) return;
     const el = obstacleMarker.getElement();
     if (!el) return;
+
+    const currentSelected = (selectedStateRef.current || "").toLowerCase().trim();
+    const isNagalandOrAll =
+      !currentSelected ||
+      currentSelected === "all states" ||
+      currentSelected === "all" ||
+      currentSelected === "default" ||
+      currentSelected.includes("nagaland");
+
+    if (!isNagalandOrAll) {
+      el.style.display = "none";
+      return;
+    }
 
     const hasRegionalHotspots = hotspotsRef.current !== undefined;
     const hotspotsVisible = effectiveLayersRef.current.hotspots;
@@ -810,21 +960,17 @@ export default function RiskMap({
     [syncHotspotMarkers, syncObstacleMarkerVisibility]
   );
 
-  // Target segment (NH-29 Pherima Slide Cut) live telemetry values
-  const targetSegment = simulatedCorridorData.features.find(
-    (f: any) => f.properties?.id === "nh29-seg-3"
-  );
-  const targetProps = (targetSegment?.properties || {
-    status: "critical",
-    soil_moisture_pct: 84,
-    pore_water_pressure_kpa: 210,
-    tilt_rate_mm_h: 0.28,
-  }) as Record<string, any>;
-  const isPorePressureCritical = (targetProps.pore_water_pressure_kpa || 0) >= 200;
-  const rainfallIntensity = 84;
+  // Target segment & live telemetry values bound to unified activeTelemetry state
+  const isPorePressureCritical = activeTelemetry.isCritical;
 
-  const initialCenterLng = center[0];
-  const initialCenterLat = center[1];
+  // Resolve initial camera position based on selectedState preset or passed center/zoom props
+  const statePreset = selectedState ? getStatePreset(selectedState) : null;
+  const isDefaultNagalandCenter = center[0] === 94.02 && center[1] === 25.72;
+  const initialCenterLng = (!isDefaultNagalandCenter || !statePreset) ? center[0] : statePreset.center[0];
+  const initialCenterLat = (!isDefaultNagalandCenter || !statePreset) ? center[1] : statePreset.center[1];
+  const initialZoom = (!isDefaultNagalandCenter || !statePreset) ? zoom : statePreset.zoom;
+  const initialPitch = statePreset?.pitch ?? pitch;
+  const initialBearing = statePreset?.bearing ?? bearing;
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -851,9 +997,9 @@ export default function RiskMap({
         container: mapContainerRef.current,
         style: initialStyle,
         center: [initialCenterLng, initialCenterLat],
-        zoom,
-        pitch,
-        bearing,
+        zoom: initialZoom,
+        pitch: initialPitch,
+        bearing: initialBearing,
         antialias: true,
       });
     } catch (err) {
@@ -869,6 +1015,7 @@ export default function RiskMap({
     mapInstanceRef.current = map;
     if (typeof window !== "undefined") {
       (window as any).__riskMap = map;
+      (window as any).__riskMapFlyToState = (stateName: string) => navigateToState(stateName);
     }
 
     // Add navigation controls (top-right)
@@ -1498,6 +1645,14 @@ export default function RiskMap({
         if (!e.features || !e.features[0]) return;
         const feature = e.features[0] as any;
         const props = (feature.properties || {}) as Record<string, any>;
+        const corridorKey = props.corridor || props.code || props.state || props.segment_name;
+
+        if (corridorKey) {
+          setManualTelemetrySelection({
+            forPropKey: propTelemetryKeyRef.current,
+            key: String(corridorKey),
+          });
+        }
 
         if (onSelectCorridorRef.current) {
           onSelectCorridorRef.current(
@@ -1619,6 +1774,13 @@ export default function RiskMap({
       map.on("click", "regional-corridors-layer", (e) => {
         if (!e.features || !e.features[0]) return;
         const props = ((e.features[0] as any).properties || {}) as Record<string, any>;
+        const corridorKey = props.code || props.state || props.name || props.id;
+        if (corridorKey) {
+          setManualTelemetrySelection({
+            forPropKey: propTelemetryKeyRef.current,
+            key: String(corridorKey),
+          });
+        }
         if (onSelectCorridorRef.current) {
           onSelectCorridorRef.current(props.code || props.id || "corridor", props);
         }
@@ -1738,6 +1900,12 @@ export default function RiskMap({
 
       syncAllLayersAndFilters(map);
 
+      // Ensure camera navigates cleanly to target state upon initial style load
+      const targetState = selectedStateRef.current || selectedState;
+      if (targetState) {
+        navigateToState(targetState, 1500);
+      }
+
       if (onMapLoadedRef.current) {
         onMapLoadedRef.current(map);
       }
@@ -1759,11 +1927,25 @@ export default function RiskMap({
 
       if (typeof window !== "undefined" && (window as any).__riskMap === map) {
         delete (window as any).__riskMap;
+        delete (window as any).__riskMapFlyToState;
       }
       map.remove();
       mapInstanceRef.current = null;
     };
-  }, [initialCenterLng, initialCenterLat, zoom, pitch, bearing, showControls, showScaleControl, scalePosition, syncAllLayersAndFilters, syncObstacleMarkerVisibility]);
+  }, [
+    initialCenterLng,
+    initialCenterLat,
+    initialZoom,
+    initialPitch,
+    initialBearing,
+    showControls,
+    showScaleControl,
+    scalePosition,
+    syncAllLayersAndFilters,
+    syncObstacleMarkerVisibility,
+    navigateToState,
+    selectedState,
+  ]);
 
   // React to controlled terrainMode changes (switching Mapbox style & 2D/3D pitch cleanly)
   useEffect(() => {
@@ -2028,26 +2210,15 @@ export default function RiskMap({
     }
   }, [fieldSensorsEnabled, isControlledLayers]);
 
-  // React to selectedState fly-to triggers
+  // React to selectedState fly-to triggers with smooth 2000ms animation
   useEffect(() => {
+    selectedStateRef.current = selectedState;
     const map = mapInstanceRef.current;
-    const prevState = prevSelectedStateRef.current;
-    prevSelectedStateRef.current = selectedState;
-    if (!map || !selectedState) return;
-    if (prevState === selectedState && selectedState === "All States") return;
+    if (!map) return;
 
-    const preset = STATE_PRESETS[selectedState as keyof typeof STATE_PRESETS];
-    if (preset) {
-      map.flyTo({
-        center: preset.center as [number, number],
-        zoom: preset.zoom,
-        pitch: preset.pitch,
-        bearing: preset.bearing,
-        essential: true,
-        duration: 2200,
-      });
-    }
-  }, [selectedState]);
+    navigateToState(selectedState, 2000);
+    syncObstacleMarkerVisibility(map);
+  }, [selectedState, navigateToState, syncObstacleMarkerVisibility]);
 
   // Dynamically update Mapbox source & trigger visual alert transition
   useEffect(() => {
@@ -2097,6 +2268,61 @@ export default function RiskMap({
     }
   }, [simulatedCorridorData, simulatedSensorsData, isPorePressureCritical]);
 
+  // Dynamically highlight active corridor on regional corridors layer
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    try {
+      if (map.getLayer("regional-corridors-layer")) {
+        const badgeLower = (activeTelemetry.corridorBadge || "").toLowerCase();
+        map.setPaintProperty("regional-corridors-layer", "line-width", [
+          "case",
+          ["==", ["downcase", ["to-string", ["get", "code"]]], badgeLower],
+          8,
+          ["interpolate", ["linear"], ["zoom"], 6, 3, 12, 5],
+        ]);
+      }
+    } catch {
+      // non-blocking style synchronization
+    }
+  }, [activeTelemetry]);
+
+  // When an explicit corridor is selected, smoothly fly camera to its coordinates
+  useEffect(() => {
+    if (selectedCorridor && activeTelemetry?.coordinates) {
+      const map = mapInstanceRef.current;
+      if (map) {
+        map.flyTo({
+          center: activeTelemetry.coordinates as [number, number],
+          zoom: 10,
+          pitch: 55,
+          bearing: 0,
+          essential: true,
+          duration: 1800,
+        });
+      }
+    }
+  }, [selectedCorridor, activeTelemetry]);
+
+  // Canvas resize listener using ResizeObserver to ensure Mapbox GL canvas resizes cleanly
+  useEffect(() => {
+    const container = mapContainerRef.current;
+    if (!container || typeof ResizeObserver === "undefined") return;
+
+    const ro = new ResizeObserver(() => {
+      const map = mapInstanceRef.current;
+      if (map) {
+        map.resize();
+      }
+    });
+
+    ro.observe(container);
+    return () => {
+      ro.disconnect();
+    };
+  }, []);
+
   return (
     <div
       className={`relative w-full h-full min-h-[400px] overflow-hidden ${className}`}
@@ -2135,16 +2361,28 @@ export default function RiskMap({
         <div className={`absolute top-3.5 left-3.5 sm:top-4 sm:left-4 z-20 ${
           variant === "mini"
             ? "max-w-[200px] p-2 rounded-xl"
-            : "max-w-[315px] sm:max-w-[340px] p-3.5 sm:p-4 rounded-2xl"
+            : "max-w-[calc(100%-1.75rem)] sm:max-w-[340px] max-h-[calc(100%-1.75rem)] overflow-y-auto p-3.5 sm:p-4 rounded-2xl"
         } w-full bg-[#FAF8F2]/95 backdrop-blur-md border border-[#173D32]/15 shadow-[0_12px_32px_rgba(23,61,50,0.14)] text-[#173D32] select-none transition-all`}>
           {variant === "mini" ? (
             <div className="flex items-center gap-2">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-600" />
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                  activeTelemetry.statusSeverity === "critical"
+                    ? "bg-red-400"
+                    : activeTelemetry.statusSeverity === "warning"
+                      ? "bg-amber-400"
+                      : "bg-emerald-400"
+                }`} />
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${
+                  activeTelemetry.statusSeverity === "critical"
+                    ? "bg-red-600"
+                    : activeTelemetry.statusSeverity === "warning"
+                      ? "bg-amber-500"
+                      : "bg-emerald-600"
+                }`} />
               </span>
               <span className="text-[10px] font-black uppercase tracking-wider text-[#173D32]">
-                3D GIS · NH-29
+                3D GIS · {activeTelemetry.corridorBadge || "NER"}
               </span>
             </div>
           ) : (
@@ -2153,8 +2391,20 @@ export default function RiskMap({
               <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-[#173D32]/10">
                 <div className="flex items-center gap-2">
                   <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-600" />
+                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                      activeTelemetry.statusSeverity === "critical"
+                        ? "bg-red-400"
+                        : activeTelemetry.statusSeverity === "warning"
+                          ? "bg-amber-400"
+                          : "bg-emerald-400"
+                    }`} />
+                    <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
+                      activeTelemetry.statusSeverity === "critical"
+                        ? "bg-red-600"
+                        : activeTelemetry.statusSeverity === "warning"
+                          ? "bg-amber-500"
+                          : "bg-emerald-600"
+                    }`} />
                   </span>
                   <span className="text-[11px] font-black uppercase tracking-wider text-[#173D32]">
                     Live Corridor HUD
@@ -2163,7 +2413,7 @@ export default function RiskMap({
 
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#173D32]/10 text-[#173D32]">
-                    NH-29
+                    {activeTelemetry.corridorBadge || "NER"}
                   </span>
                   <button
                     type="button"
@@ -2183,56 +2433,57 @@ export default function RiskMap({
               {/* 1. Active Corridor Alert Badge */}
               <div
                 className={`p-2.5 rounded-xl border flex items-start gap-2 shadow-2xs transition-colors ${
-                  isPorePressureCritical
+                  activeTelemetry.statusSeverity === "critical"
                     ? "bg-red-50/95 border-red-300"
-                    : targetProps.status === "warning"
-                    ? "bg-amber-50/95 border-amber-200"
-                    : "bg-emerald-50/95 border-emerald-200"
+                    : activeTelemetry.statusSeverity === "warning"
+                      ? "bg-amber-50/95 border-amber-200"
+                      : "bg-emerald-50/95 border-emerald-200"
                 }`}
               >
                 <span className="text-sm mt-0.5 shrink-0" aria-hidden="true">
-                  {isPorePressureCritical ? "⛔" : targetProps.status === "warning" ? "⚠️" : "✅"}
+                  {activeTelemetry.statusSeverity === "critical" ? "⛔" : activeTelemetry.statusSeverity === "warning" ? "⚠️" : "✅"}
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-1">
                     <span
                       className={`text-[10px] font-bold uppercase tracking-wider ${
-                        isPorePressureCritical
+                        activeTelemetry.statusSeverity === "critical"
                           ? "text-red-800"
-                          : targetProps.status === "warning"
-                          ? "text-amber-800"
-                          : "text-emerald-800"
+                          : activeTelemetry.statusSeverity === "warning"
+                            ? "text-amber-800"
+                            : "text-emerald-800"
                       }`}
                     >
                       Active Corridor Alert
                     </span>
                     <span
                       className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded text-white ${
-                        isPorePressureCritical
+                        activeTelemetry.statusSeverity === "critical"
                           ? "bg-red-600 animate-pulse"
-                          : targetProps.status === "warning"
-                          ? "bg-amber-500"
-                          : "bg-emerald-600"
+                          : activeTelemetry.statusSeverity === "warning"
+                            ? "bg-amber-500"
+                            : "bg-emerald-600"
                       }`}
                     >
-                      {isPorePressureCritical
-                        ? "BLOCKED"
-                        : targetProps.status === "warning"
-                        ? "WARNING"
-                        : "PASSABLE"}
+                      {activeTelemetry.alertStatus}
                     </span>
                   </div>
                   <p
                     className={`text-xs font-bold mt-0.5 leading-snug ${
-                      isPorePressureCritical
+                      activeTelemetry.statusSeverity === "critical"
                         ? "text-red-950"
-                        : targetProps.status === "warning"
-                        ? "text-amber-950"
-                        : "text-emerald-950"
+                        : activeTelemetry.statusSeverity === "warning"
+                          ? "text-amber-950"
+                          : "text-emerald-950"
                     }`}
                   >
-                    NH-29 Pherima Segment - {isPorePressureCritical ? "BLOCKED" : targetProps.status === "warning" ? "CAUTION" : "NORMAL TRANSIT"}
+                    {activeTelemetry.statusSummary}
                   </p>
+                  {activeTelemetry.alertDescription && (
+                    <p className="text-[10px] text-[#173D32]/75 mt-1 leading-snug font-medium">
+                      {activeTelemetry.alertDescription}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -2246,16 +2497,12 @@ export default function RiskMap({
                     <span className="text-[10px] font-bold uppercase text-cyan-800 tracking-wider">
                       Rainfall Intensity
                     </span>
-                    <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-cyan-700 text-white">
-                      {rainfallIntensity} mm/h
+                    <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-cyan-700 text-white font-mono">
+                      {activeTelemetry.rainfallIntensity} mm/h
                     </span>
                   </div>
                   <p className="text-xs font-bold text-cyan-950 mt-0.5 leading-snug">
-                    {isPorePressureCritical
-                      ? "Extreme Saturation (Doppler Peak)"
-                      : rainfallIntensity >= 45
-                      ? "Heavy Monsoon Downpour"
-                      : "Light Baseline Drizzle"}
+                    {activeTelemetry.rainfallDescription}
                   </p>
                 </div>
               </div>
@@ -2270,13 +2517,76 @@ export default function RiskMap({
                     <span className="text-[10px] font-bold uppercase text-blue-800 tracking-wider">
                       Alternate Rescue Route
                     </span>
-                    <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-blue-600 text-white">
-                      ACTIVE
+                    <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded text-white ${
+                      activeTelemetry.alternateRouteStatus === "ACTIVE"
+                        ? "bg-blue-600 animate-pulse"
+                        : activeTelemetry.alternateRouteStatus === "OPEN"
+                          ? "bg-emerald-600"
+                          : activeTelemetry.alternateRouteStatus === "STANDBY"
+                            ? "bg-amber-600"
+                            : "bg-slate-600"
+                    }`}>
+                      {activeTelemetry.alternateRouteStatus}
                     </span>
                   </div>
                   <p className="text-xs font-bold text-blue-950 mt-0.5 leading-snug">
-                    Peducha Bypass Open for Convoys
+                    {activeTelemetry.alternateRouteName}
                   </p>
+                  {activeTelemetry.alternateRouteDescription && (
+                    <p className="text-[10px] text-blue-900/75 mt-1 leading-snug font-medium">
+                      {activeTelemetry.alternateRouteDescription}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* 4. Live Sensor Telemetry Strip */}
+              <div className="p-2.5 rounded-xl bg-[#FAF8F2] border border-[#173D32]/15 shadow-2xs">
+                <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-[#173D32]/10">
+                  <span className="text-[10px] font-bold uppercase text-[#173D32]/70 tracking-wider">
+                    Sensor Telemetry
+                  </span>
+                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#173D32]/10 text-[#173D32]">
+                    {activeTelemetry.elevation ? `${activeTelemetry.elevation} · ${activeTelemetry.stretchLength}` : activeTelemetry.stretchLength}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5 text-center">
+                  <div className="bg-[#173D32]/5 rounded-lg p-1.5">
+                    <span className="text-[9px] uppercase font-bold text-[#173D32]/60 block leading-tight">Soil Moisture</span>
+                    <span className={`text-xs font-black block mt-0.5 font-mono ${
+                      (activeTelemetry.soilMoisturePct || 0) >= 80
+                        ? "text-red-700"
+                        : (activeTelemetry.soilMoisturePct || 0) >= 60
+                          ? "text-amber-700"
+                          : "text-emerald-700"
+                    }`}>
+                      {activeTelemetry.soilMoisture}
+                    </span>
+                  </div>
+                  <div className="bg-[#173D32]/5 rounded-lg p-1.5">
+                    <span className="text-[9px] uppercase font-bold text-[#173D32]/60 block leading-tight">Pore Press.</span>
+                    <span className={`text-xs font-black block mt-0.5 font-mono ${
+                      (activeTelemetry.poreWaterPressureKpa || 0) >= 200
+                        ? "text-red-700"
+                        : (activeTelemetry.poreWaterPressureKpa || 0) >= 120
+                          ? "text-amber-700"
+                          : "text-emerald-700"
+                    }`}>
+                      {activeTelemetry.poreWaterPressure}
+                    </span>
+                  </div>
+                  <div className="bg-[#173D32]/5 rounded-lg p-1.5">
+                    <span className="text-[9px] uppercase font-bold text-[#173D32]/60 block leading-tight">Tilt Rate</span>
+                    <span className={`text-xs font-black block mt-0.5 font-mono ${
+                      (activeTelemetry.tiltRateMmH || 0) >= 0.2
+                        ? "text-red-700"
+                        : (activeTelemetry.tiltRateMmH || 0) >= 0.1
+                          ? "text-amber-700"
+                          : "text-emerald-700"
+                    }`}>
+                      {activeTelemetry.tiltRate}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>

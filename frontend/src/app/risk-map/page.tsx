@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import {
   AlertTriangle,
@@ -12,7 +12,7 @@ import {
   X,
 } from "lucide-react";
 import Header from "@/components/layout/Header";
-import RiskMap from "@/components/RiskMap";
+import RiskMap, { RiskMapHotspot } from "@/components/RiskMap";
 import { useApp } from "@/context/AppContext";
 import { publicApi } from "@/lib/api";
 import {
@@ -20,7 +20,6 @@ import {
   PublicRiskMapItem,
   PublicStats,
   roadStatusItemToAlertDetail,
-  riskMapItemToAlertDetail,
 } from "@/types/public";
 import {
   FALLBACK_ROADS,
@@ -39,6 +38,17 @@ const STATE_FILTERS = [
   "Mizoram",
   "Tripura",
 ];
+
+// Case-insensitive, alias-aware state filter matcher
+function matchesStateFilter(itemState?: string, filterState?: string): boolean {
+  if (!filterState || filterState === "All States" || filterState === "All" || filterState === "Default") return true;
+  if (!itemState) return false;
+  const a = itemState.toLowerCase().trim();
+  const b = filterState.toLowerCase().trim();
+  if (a === b) return true;
+  if (a.includes("arunachal") && b.includes("arunachal")) return true;
+  return a.includes(b) || b.includes(a);
+}
 
 // Deterministic coordinate resolver for Northeast states
 function resolveMapCoordinates(
@@ -77,17 +87,60 @@ function resolveMapCoordinates(
 }
 
 export default function RiskMapPage() {
-  const { openAlertModal, openReportModal, addToast } = useApp();
+  const { openAlertModal, openReportModal } = useApp();
   const [selectedState, setSelectedState] = useState("All States");
+  const [selectedCorridor, setSelectedCorridor] = useState<string | null>(null);
   const [selectedSeverity, setSelectedSeverity] = useState("All");
   const [search, setSearch] = useState("");
-  const [activeLayer, setActiveLayer] = useState<"topo" | "rainfall">("topo");
-  const [zoomLevel, setZoomLevel] = useState<number>(1.0);
 
   // Initialize with fallback demo data so corridor cards are immediately visible
   const [roads, setRoads] = useState<PublicRiskMapItem[]>(FALLBACK_ROADS);
   const [corridors, setCorridors] = useState<PublicRoadStatusItem[]>(FALLBACK_ROAD_STATUS);
   const [stats, setStats] = useState<PublicStats | null>(FALLBACK_STATS);
+
+  // Transform roads into interactive regional map hotspots
+  const hotspots: RiskMapHotspot[] = useMemo(() => {
+    return roads.map((r, i) => {
+      let coords: [number, number] = [94.025, 25.685];
+      const rawCoords = r.geometry?.coordinates;
+      if (
+        Array.isArray(rawCoords) &&
+        typeof rawCoords[0] === "number" &&
+        typeof rawCoords[1] === "number"
+      ) {
+        coords = [rawCoords[0], rawCoords[1]];
+      } else if (
+        Array.isArray(rawCoords) &&
+        Array.isArray(rawCoords[0]) &&
+        typeof rawCoords[0][0] === "number" &&
+        typeof rawCoords[0][1] === "number"
+      ) {
+        coords = [rawCoords[0][0], rawCoords[0][1]];
+      } else {
+        const mc = resolveMapCoordinates(r, i);
+        coords = [88.5 + (mc.x / 100) * 8.5, 23.0 + (mc.y / 100) * 5.5];
+      }
+      const sev: "Critical" | "Warning" | "Normal" =
+        r.riskLevel === "Critical" || r.status === "blocked"
+          ? "Critical"
+          : r.riskLevel === "High" || r.status === "caution"
+          ? "Warning"
+          : "Normal";
+
+      return {
+        id: r.id,
+        code: r.code,
+        title: r.name,
+        region: r.stretch,
+        state: r.state,
+        severity: sev,
+        riskLevel: r.riskLevel,
+        status: r.status,
+        coordinates: coords,
+        statusReason: r.statusReason,
+      };
+    });
+  }, [roads]);
 
   useEffect(() => {
     let isMounted = true;
@@ -108,36 +161,30 @@ export default function RiskMapPage() {
         if (roadData && roadData.length > 0) {
           setCorridors(roadData);
         } else {
-          const fallback =
-            selectedState === "All States"
-              ? FALLBACK_ROAD_STATUS
-              : FALLBACK_ROAD_STATUS.filter(
-                  (r) => r.state.toLowerCase() === selectedState.toLowerCase()
-                );
+          const fallback = FALLBACK_ROAD_STATUS.filter((r) =>
+            matchesStateFilter(r.state, selectedState)
+          );
           setCorridors(fallback);
         }
 
         if (riskData && riskData.length > 0) {
           setRoads(riskData);
         } else {
-          const fallbackRoads =
-            selectedState === "All States"
-              ? FALLBACK_ROADS
-              : FALLBACK_ROADS.filter(
-                  (r) => r.state.toLowerCase() === selectedState.toLowerCase()
-                );
+          const fallbackRoads = FALLBACK_ROADS.filter((r) =>
+            matchesStateFilter(r.state, selectedState)
+          );
           setRoads(fallbackRoads);
         }
       } catch {
         if (!isMounted) return;
-        const fallback =
-          selectedState === "All States"
-            ? FALLBACK_ROAD_STATUS
-            : FALLBACK_ROAD_STATUS.filter(
-                (r) => r.state.toLowerCase() === selectedState.toLowerCase()
-              );
+        const fallback = FALLBACK_ROAD_STATUS.filter((r) =>
+          matchesStateFilter(r.state, selectedState)
+        );
+        const fallbackRoads = FALLBACK_ROADS.filter((r) =>
+          matchesStateFilter(r.state, selectedState)
+        );
         setCorridors(fallback);
-        setRoads(FALLBACK_ROADS);
+        setRoads(fallbackRoads);
       }
     }
 
@@ -147,6 +194,18 @@ export default function RiskMapPage() {
       isMounted = false;
     };
   }, [selectedState]);
+
+  const handleSelectState = (s: string) => {
+    setSelectedState(s);
+    setSelectedCorridor(null);
+    // Directly invoke map camera navigation for responsive feedback
+    if (typeof window !== "undefined") {
+      const win = window as Window & { __riskMapFlyToState?: (state: string) => void };
+      if (typeof win.__riskMapFlyToState === "function") {
+        win.__riskMapFlyToState(s);
+      }
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -172,13 +231,6 @@ export default function RiskMapPage() {
     };
   }, []);
 
-  const handleZoom = (delta: number) => {
-    setZoomLevel((prev) => {
-      const next = Math.round((prev + delta) * 10) / 10;
-      return Math.min(Math.max(next, 0.8), 1.6);
-    });
-  };
-
   const filteredCorridors = corridors.filter((c) => {
     const matchesSeverity =
       selectedSeverity === "All" ||
@@ -196,7 +248,9 @@ export default function RiskMapPage() {
       c.stretch.toLowerCase().includes(query) ||
       c.state.toLowerCase().includes(query);
 
-    return matchesSeverity && matchesSearch;
+    const matchesState = matchesStateFilter(c.state, selectedState);
+
+    return matchesSeverity && matchesSearch && matchesState;
   });
 
   return (
@@ -370,8 +424,12 @@ export default function RiskMapPage() {
           <RiskMap
             variant="full"
             selectedState={selectedState}
+            selectedCorridor={selectedCorridor}
+            hotspots={hotspots}
+            onSelectHotspot={(h) => setSelectedCorridor(h.code || h.title)}
             className="w-full h-full"
             onSelectCorridor={(corridorId) => {
+              setSelectedCorridor(corridorId);
               const matched = corridors.find(
                 (c) =>
                   c.code.toLowerCase().includes(corridorId.toLowerCase()) ||
@@ -382,13 +440,6 @@ export default function RiskMapPage() {
               }
             }}
           />
-
-          {/* Doppler Rainfall Radar Sweep Overlay */}
-          {activeLayer === "rainfall" && (
-            <div className="absolute inset-0 bg-gradient-to-tr from-cyan-900/15 via-blue-800/10 to-teal-900/20 pointer-events-none animate-pulse z-10">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(6,182,212,0.15),transparent_70%)] animate-radar-pulse" />
-            </div>
-          )}
         </div>
 
         {/* Filter Controls Bar */}
@@ -399,7 +450,7 @@ export default function RiskMapPage() {
               <button
                 key={s}
                 type="button"
-                onClick={() => setSelectedState(s)}
+                onClick={() => handleSelectState(s)}
                 className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer ${
                   selectedState === s
                     ? "bg-[#173D32] text-[#F6F4EC] shadow-xs"
@@ -478,7 +529,10 @@ export default function RiskMapPage() {
             return (
               <article
                 key={corridor.id}
-                onClick={() => openAlertModal(alert)}
+                onClick={() => {
+                  setSelectedCorridor(corridor.code || corridor.name);
+                  openAlertModal(alert);
+                }}
                 className="relative bg-[#FAF8F2]/95 backdrop-blur-sm rounded-[26px] border border-[#173D32]/12 p-6 sm:p-7 shadow-[0_6px_28px_-6px_rgba(23,61,50,0.07)] hover:shadow-[0_18px_36px_-6px_rgba(23,61,50,0.14)] hover:-translate-y-1.5 transition-all duration-300 flex flex-col justify-between group cursor-pointer overflow-hidden"
               >
                 {/* Top Status Glow Bar */}
@@ -568,6 +622,7 @@ export default function RiskMapPage() {
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
+                      setSelectedCorridor(corridor.code || corridor.name);
                       openAlertModal(alert);
                     }}
                     className="inline-flex items-center gap-1.5 text-xs font-bold text-[#F6F4EC] bg-[#173D32] group-hover:bg-[#1a4437] px-4 py-1.5 rounded-full transition-all duration-200 cursor-pointer shadow-xs group-hover:shadow"

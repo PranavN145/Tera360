@@ -317,6 +317,45 @@ export const SEED_DEMO_ROADS: PublicRoadStatusItem[] = [
     coordinatesText: '23.53° N, 91.48° E',
     lastUpdated: new Date(Date.now() - 120 * 60 * 1000).toISOString(),
   },
+  {
+    id: 'road-nh6',
+    name: 'NH-6 Shillong – Jowai – Sonapur Tunnel',
+    code: 'NH-6',
+    state: 'Meghalaya',
+    stretch: 'KM 78 to KM 92 (East Jaintia Hills)',
+    status: 'caution',
+    riskLevel: 'High',
+    statusReason: 'Periodic mud accumulation near Sonapur tunnel entrance; single-lane convoy active.',
+    isMajorNH: true,
+    coordinatesText: '25.1050° N, 92.3600° E',
+    lastUpdated: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'road-nh415',
+    name: 'NH-415 Banderdewa – Itanagar Expressway',
+    code: 'NH-415',
+    state: 'Arunachal Pradesh',
+    stretch: 'KM 12 to KM 28 (Papum Pare Sector)',
+    status: 'open',
+    riskLevel: 'Watch',
+    statusReason: 'Minor tension cracks monitored; clear transit with speed precautions.',
+    isMajorNH: true,
+    coordinatesText: '27.1200° N, 93.8100° E',
+    lastUpdated: new Date(Date.now() - 50 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'road-nh54',
+    name: 'NH-54 Silchar – Vairengte – Aizawl Highway',
+    code: 'NH-54',
+    state: 'Mizoram',
+    stretch: 'KM 55 to KM 80 (Hmuifang Sector)',
+    status: 'open',
+    riskLevel: 'Low',
+    statusReason: 'Dry conditions; normal vehicular transit operating on schedule.',
+    isMajorNH: true,
+    coordinatesText: '23.4500° N, 92.7500° E',
+    lastUpdated: new Date(Date.now() - 70 * 60 * 1000).toISOString(),
+  },
 ];
 
 export const SEED_DEMO_REPORTS: HazardReportOutput[] = [
@@ -434,7 +473,82 @@ export const SEED_DEMO_RISK_MAP: PublicRiskMapItem[] = [
     mapCoordinates: { x: 93.04, y: 25.12 },
     lastUpdated: new Date().toISOString(),
   },
+  {
+    id: 'corridor-nh6',
+    name: 'NH-6 Shillong – Jowai – Silchar Highway',
+    code: 'NH-6',
+    state: 'Meghalaya',
+    stretch: 'KM 78 to KM 92 (East Jaintia Hills)',
+    status: 'caution',
+    riskLevel: 'High',
+    statusReason: 'Periodic mud accumulation near Sonapur tunnel entrance; single-lane convoy active.',
+    coordinatesText: '25.1050° N, 92.3600° E',
+    mapCoordinates: { x: 92.36, y: 25.105 },
+    lastUpdated: new Date().toISOString(),
+  },
+  {
+    id: 'corridor-nh415',
+    name: 'NH-415 Banderdewa – Itanagar Expressway',
+    code: 'NH-415',
+    state: 'Arunachal Pradesh',
+    stretch: 'KM 12 to KM 28 (Papum Pare Sector)',
+    status: 'open',
+    riskLevel: 'Watch',
+    statusReason: 'Minor tension cracks monitored; clear transit with speed precautions.',
+    coordinatesText: '27.1200° N, 93.8100° E',
+    mapCoordinates: { x: 93.81, y: 27.12 },
+    lastUpdated: new Date().toISOString(),
+  },
+  {
+    id: 'corridor-nh37',
+    name: 'NH-37 Imphal – Tupul – Jiribam Highway',
+    code: 'NH-37',
+    state: 'Manipur',
+    stretch: 'KM 45 to KM 62 (Noney Hill Pass)',
+    status: 'open',
+    riskLevel: 'Watch',
+    statusReason: 'Routine slope stabilization works; clear vehicular movement.',
+    coordinatesText: '24.8400° N, 93.6300° E',
+    mapCoordinates: { x: 93.63, y: 24.84 },
+    lastUpdated: new Date().toISOString(),
+  },
+  {
+    id: 'corridor-nh54',
+    name: 'NH-54 Aizawl – Thenzawl – Lunglei Mountain Road',
+    code: 'NH-54',
+    state: 'Mizoram',
+    stretch: 'KM 55 to KM 80 (Hmuifang Sector)',
+    status: 'open',
+    riskLevel: 'Low',
+    statusReason: 'Dry conditions; normal vehicular transit operating on schedule.',
+    coordinatesText: '23.4500° N, 92.7500° E',
+    mapCoordinates: { x: 92.75, y: 23.45 },
+    lastUpdated: new Date().toISOString(),
+  },
+  {
+    id: 'corridor-nh8',
+    name: 'NH-8 Agartala – Udaipur National Corridor',
+    code: 'NH-8',
+    state: 'Tripura',
+    stretch: 'KM 18 to KM 44 (Gomati River Sector)',
+    status: 'open',
+    riskLevel: 'Low',
+    statusReason: 'Optimal transit condition. All drainage culverts inspected and clear.',
+    coordinatesText: '23.5300° N, 91.4800° E',
+    mapCoordinates: { x: 91.48, y: 23.53 },
+    lastUpdated: new Date().toISOString(),
+  },
 ];
+
+function matchesStateQuery(stateName?: string, queryState?: string): boolean {
+  if (!queryState || queryState === 'All' || queryState === 'All States' || queryState === 'Default') return true;
+  if (!stateName) return false;
+  const a = stateName.toLowerCase().trim();
+  const b = queryState.toLowerCase().trim();
+  if (a === b) return true;
+  if (a.includes('arunachal') && b.includes('arunachal')) return true;
+  return a.includes(b) || b.includes(a);
+}
 
 // ==========================================
 // Centralized DemoDataManager Class
@@ -655,8 +769,8 @@ class DemoDataManager {
   }): PublicAlertsResponse {
     let list = this.getDemoAlerts();
 
-    if (query?.state && query.state !== 'All' && query.state !== 'All States') {
-      list = list.filter((a) => a.state.toLowerCase() === query.state!.toLowerCase());
+    if (query?.state) {
+      list = list.filter((a) => matchesStateQuery(a.state, query.state));
     }
     if (query?.severity && query.severity !== 'All') {
       list = list.filter((a) => a.severity.toLowerCase() === query.severity!.toLowerCase());
@@ -686,8 +800,8 @@ class DemoDataManager {
 
   public filterRoads(query?: { state?: string; status?: string }): PublicRoadStatusItem[] {
     let list = this.getDemoRoads();
-    if (query?.state && query.state !== 'All' && query.state !== 'All States') {
-      list = list.filter((r) => r.state.toLowerCase() === query.state!.toLowerCase());
+    if (query?.state) {
+      list = list.filter((r) => matchesStateQuery(r.state, query.state));
     }
     if (query?.status && query.status !== 'All') {
       list = list.filter((r) => r.status.toLowerCase() === query.status!.toLowerCase());
@@ -698,8 +812,8 @@ class DemoDataManager {
   // --- Risk Map Management ---
   public getDemoRiskMap(query?: { state?: string }): PublicRiskMapItem[] {
     let list = SEED_DEMO_RISK_MAP;
-    if (query?.state && query.state !== 'All' && query.state !== 'All States') {
-      list = list.filter((item) => item.state.toLowerCase() === query.state!.toLowerCase());
+    if (query?.state) {
+      list = list.filter((item) => matchesStateQuery(item.state, query.state));
     }
     return list;
   }

@@ -4,17 +4,325 @@
  */
 
 export const STATE_PRESETS = {
-  'All States': { center: [92.93, 25.80], zoom: 7.2, pitch: 45, bearing: -10 },
-  'Nagaland': { center: [94.02, 25.72], zoom: 13.5, pitch: 60, bearing: -20 },
-  'Sikkim': { center: [88.52, 27.20], zoom: 12.8, pitch: 62, bearing: -15 },
-  'Assam': { center: [92.95, 25.18], zoom: 12.5, pitch: 58, bearing: -25 },
-  'Meghalaya': { center: [91.89, 25.57], zoom: 12.5, pitch: 55, bearing: -10 },
-  'Arunachal': { center: [93.60, 27.10], zoom: 12.0, pitch: 60, bearing: -20 },
-  'Arunachal Pradesh': { center: [93.60, 27.10], zoom: 12.0, pitch: 60, bearing: -20 },
-  'Manipur': { center: [93.93, 24.81], zoom: 12.5, pitch: 55, bearing: -15 },
-  'Mizoram': { center: [92.71, 23.72], zoom: 12.5, pitch: 58, bearing: -20 },
-  'Tripura': { center: [91.98, 23.83], zoom: 12.0, pitch: 50, bearing: -10 },
+  'All States': { center: [92.9376, 26.2006], zoom: 7.2, pitch: 45, bearing: -10 },
+  'All': { center: [92.9376, 26.2006], zoom: 7.2, pitch: 45, bearing: -10 },
+  'Default': { center: [92.9376, 26.2006], zoom: 7.2, pitch: 45, bearing: -10 },
+  'Sikkim': { center: [88.5122, 27.5330], zoom: 9, pitch: 60, bearing: -15 },
+  'Assam': { center: [92.9376, 26.2006], zoom: 7.5, pitch: 60, bearing: -20 },
+  'Meghalaya': { center: [91.3662, 25.4670], zoom: 8.5, pitch: 60, bearing: -10 },
+  'Arunachal Pradesh': { center: [94.7278, 28.2180], zoom: 7.5, pitch: 60, bearing: -20 },
+  'Arunachal': { center: [94.7278, 28.2180], zoom: 7.5, pitch: 60, bearing: -20 },
+  'Nagaland': { center: [94.5624, 26.1584], zoom: 8.5, pitch: 60, bearing: -20 },
+  'Manipur': { center: [93.9063, 24.6637], zoom: 8.5, pitch: 60, bearing: -15 },
+  'Mizoram': { center: [92.8378, 23.1645], zoom: 8.5, pitch: 60, bearing: -20 },
+  'Tripura': { center: [91.9882, 23.7451], zoom: 8.5, pitch: 60, bearing: -10 },
 };
+
+/**
+ * Case-insensitive, alias-aware resolver for state preset coordinates.
+ */
+export function getStatePreset(stateName) {
+  if (!stateName) return STATE_PRESETS['All States'];
+  const normalized = String(stateName).trim().toLowerCase();
+  if (normalized === 'all' || normalized === 'all states' || normalized === 'default') {
+    return STATE_PRESETS['All States'];
+  }
+  for (const [key, val] of Object.entries(STATE_PRESETS)) {
+    if (key.toLowerCase() === normalized) {
+      return val;
+    }
+  }
+  if (normalized.includes('arunachal')) {
+    return STATE_PRESETS['Arunachal Pradesh'];
+  }
+  return null;
+}
+
+/**
+ * High-fidelity Live Corridor Telemetry and Alert Status dictionary for each NER state / corridor.
+ */
+export const STATE_CORRIDOR_TELEMETRY = {
+  'Sikkim': {
+    state: 'Sikkim',
+    corridorCode: 'North Sikkim Highway / NH-10',
+    corridorBadge: 'NH-10',
+    corridorName: 'North Sikkim Highway (Chungthang – Mangan – Gangtok)',
+    segmentName: 'Chungthang – 29th Mile River Gorge Cut',
+    alertStatus: 'BLOCKED',
+    statusSeverity: 'critical',
+    statusSummary: 'North Sikkim Highway - CHUNGTHANG CUT SEVERED',
+    alertDescription: 'Active slope failure and river toe scour along Teesta valley; heavy machinery clearance deployed under BRO supervision.',
+    rainfallIntensity: 96,
+    rainfallDescription: 'Torrential Cloudburst Runoff (Teesta Basin Peak)',
+    alternateRouteName: 'Panbu – Algarah – Lava Ridge Route',
+    alternateRouteStatus: 'ACTIVE',
+    alternateRouteDescription: 'Designated alternate path for light emergency convoys and medical evacuation avoiding Teesta gorge.',
+    soilMoisture: '89%',
+    soilMoisturePct: 89,
+    poreWaterPressure: '218 kPa',
+    poreWaterPressureKpa: 218,
+    tiltRate: '0.32 mm/h',
+    tiltRateMmH: 0.32,
+    elevation: '1,240m',
+    stretchLength: '14.2 km',
+    isCritical: true,
+    coordinates: [88.5122, 27.5330],
+  },
+  'Nagaland': {
+    state: 'Nagaland',
+    corridorCode: 'NH-29',
+    corridorBadge: 'NH-29',
+    corridorName: 'NH-29 Dimapur – Kohima – Mao Corridor',
+    segmentName: 'NH-29 Pherima Slide Cut (KM 44)',
+    alertStatus: 'BLOCKED',
+    statusSeverity: 'critical',
+    statusSummary: 'NH-29 Pherima Segment - BLOCKED (60m Collapse)',
+    alertDescription: 'Major 65m slope displacement near Dzüdza Bridge; continuous mudflow has severed main freight line between Dimapur and Kohima.',
+    rainfallIntensity: 84,
+    rainfallDescription: 'Extreme Saturation (Doppler Peak)',
+    alternateRouteName: 'Peducha Bypass Open for Convoys',
+    alternateRouteStatus: 'ACTIVE',
+    alternateRouteDescription: 'Peducha – Tsiesema Ridge Bypass active for NDRF convoys, emergency vehicles, and daylight light transit.',
+    soilMoisture: '84%',
+    soilMoisturePct: 84,
+    poreWaterPressure: '210 kPa',
+    poreWaterPressureKpa: 210,
+    tiltRate: '0.28 mm/h',
+    tiltRateMmH: 0.28,
+    elevation: '980m',
+    stretchLength: '12.4 km',
+    isCritical: true,
+    coordinates: [94.5624, 26.1584],
+  },
+  'Assam': {
+    state: 'Assam',
+    corridorCode: 'NH-27',
+    corridorBadge: 'NH-27',
+    corridorName: 'NH-27 Lumding – Haflong – Silchar Highway',
+    segmentName: 'Jatinga Valley Hill-Cutting Section (KM 118)',
+    alertStatus: 'WARNING',
+    statusSeverity: 'warning',
+    statusSummary: 'NH-27 Jatinga Section - CAUTION (Sub-surface Creep)',
+    alertDescription: 'Sensors detect sub-surface hydrostatic pressure and rock shooting along Barail hill curves. Speed capped at 25 km/h.',
+    rainfallIntensity: 48,
+    rainfallDescription: 'Heavy Monsoon Downpour (Barail Range)',
+    alternateRouteName: 'Harangajao Old Valley Link Active',
+    alternateRouteStatus: 'ACTIVE',
+    alternateRouteDescription: 'Harangajao local bypass open for LMVs under regulated police convoy.',
+    soilMoisture: '76%',
+    soilMoisturePct: 76,
+    poreWaterPressure: '142 kPa',
+    poreWaterPressureKpa: 142,
+    tiltRate: '0.14 mm/h',
+    tiltRateMmH: 0.14,
+    elevation: '610m',
+    stretchLength: '18.5 km',
+    isCritical: false,
+    coordinates: [92.9376, 26.2006],
+  },
+  'Manipur': {
+    state: 'Manipur',
+    corridorCode: 'NH-102 / NH-37',
+    corridorBadge: 'NH-102',
+    corridorName: 'NH-102 Imphal – Moreh & NH-37 Noney Valley Highway',
+    segmentName: 'Tupul – Noney Mountain Gorge & Tengnoupal Crest',
+    alertStatus: 'WARNING',
+    statusSeverity: 'warning',
+    statusSummary: 'NH-102 / NH-37 - CAUTION (Slope Instability)',
+    alertDescription: 'Acoustic sensors recorded slope creep along cut embankments near Tupul; BRO quick-response reinforcement units deployed.',
+    rainfallIntensity: 52,
+    rainfallDescription: 'Monsoon Heavy Downpour (Valley Stream Runoff)',
+    alternateRouteName: 'Old Cachar Road Diversion Active',
+    alternateRouteStatus: 'ACTIVE',
+    alternateRouteDescription: 'Light vehicular transit rerouted via Old Cachar road during active rainfall windows.',
+    soilMoisture: '69%',
+    soilMoisturePct: 69,
+    poreWaterPressure: '122 kPa',
+    poreWaterPressureKpa: 122,
+    tiltRate: '0.09 mm/h',
+    tiltRateMmH: 0.09,
+    elevation: '780m',
+    stretchLength: '21.0 km',
+    isCritical: false,
+    coordinates: [93.9063, 24.6637],
+  },
+  'Meghalaya': {
+    state: 'Meghalaya',
+    corridorCode: 'NH-6',
+    corridorBadge: 'NH-6',
+    corridorName: 'NH-6 Shillong – Jowai – Tamabil / Silchar Corridor',
+    segmentName: 'Sonapur Tunnel Approach & Umkiang Escarpment',
+    alertStatus: 'WARNING',
+    statusSeverity: 'warning',
+    statusSummary: 'NH-6 Sonapur Tunnel - CAUTION (Slurry Runoff)',
+    alertDescription: 'Hillside runoff bringing gravel and mud slurry across southern portal. Silt clearing teams active with earthmovers.',
+    rainfallIntensity: 68,
+    rainfallDescription: 'Intense Jaintia Hills Orographic Rainfall',
+    alternateRouteName: 'Mawryngkneng High Ridge Bypass',
+    alternateRouteStatus: 'ACTIVE',
+    alternateRouteDescription: 'Upper ridge arterial road open for emergency ambulance and supply transit.',
+    soilMoisture: '78%',
+    soilMoisturePct: 78,
+    poreWaterPressure: '158 kPa',
+    poreWaterPressureKpa: 158,
+    tiltRate: '0.16 mm/h',
+    tiltRateMmH: 0.16,
+    elevation: '940m',
+    stretchLength: '9.8 km',
+    isCritical: false,
+    coordinates: [91.3662, 25.4670],
+  },
+  'Mizoram': {
+    state: 'Mizoram',
+    corridorCode: 'Aizawl-Lunglei / NH-54',
+    corridorBadge: 'NH-54',
+    corridorName: 'Aizawl – Thenzawl – Lunglei Mountain Highway',
+    segmentName: 'Hmuifang Ridge & Vairengte Cut Sector',
+    alertStatus: 'PASSABLE',
+    statusSeverity: 'safe',
+    statusSummary: 'Aizawl-Lunglei Road - NORMAL TRANSIT (Stable)',
+    alertDescription: 'Stable slope conditions. Retaining gabions intact; routine passenger and freight transit running on normal schedule.',
+    rainfallIntensity: 24,
+    rainfallDescription: 'Intermittent Moderate Mountain Shower',
+    alternateRouteName: 'Thenzawl – Sialsuk Bypass Standby',
+    alternateRouteStatus: 'STANDBY',
+    alternateRouteDescription: 'Secondary valley route surveyed and on standby if cloudburst alert triggers.',
+    soilMoisture: '42%',
+    soilMoisturePct: 42,
+    poreWaterPressure: '38 kPa',
+    poreWaterPressureKpa: 38,
+    tiltRate: '0.01 mm/h',
+    tiltRateMmH: 0.01,
+    elevation: '1,130m',
+    stretchLength: '24.5 km',
+    isCritical: false,
+    coordinates: [92.8378, 23.1645],
+  },
+  'Arunachal Pradesh': {
+    state: 'Arunachal Pradesh',
+    corridorCode: 'Bhalukpong-Tawang / NH-415',
+    corridorBadge: 'NH-415',
+    corridorName: 'Bhalukpong – Bomdila – Tawang Route & NH-415',
+    segmentName: 'Sela Pass Approach & Banderdewa Berm Sector',
+    alertStatus: 'WATCH',
+    statusSeverity: 'warning',
+    statusSummary: 'Bhalukpong-Tawang Route - WATCH (Berm Monitored)',
+    alertDescription: 'Incipient tension cracks on roadside drainage berm; geological patrol monitoring piezometers with capped transit speed.',
+    rainfallIntensity: 38,
+    rainfallDescription: 'Steady Himalayan Downpour',
+    alternateRouteName: 'Orang – Kalaktang – Rupa Military Route',
+    alternateRouteStatus: 'ACTIVE',
+    alternateRouteDescription: 'Designated all-weather military bypass operational for convoy transit.',
+    soilMoisture: '58%',
+    soilMoisturePct: 58,
+    poreWaterPressure: '86 kPa',
+    poreWaterPressureKpa: 86,
+    tiltRate: '0.06 mm/h',
+    tiltRateMmH: 0.06,
+    elevation: '1,480m',
+    stretchLength: '28.6 km',
+    isCritical: false,
+    coordinates: [94.7278, 28.2180],
+  },
+  'Tripura': {
+    state: 'Tripura',
+    corridorCode: 'Jampui Hills / NH-8',
+    corridorBadge: 'NH-8',
+    corridorName: 'NH-8 Agartala – Udaipur & Jampui Hills Corridor',
+    segmentName: 'Baramura Ridge & Vanghmun Hill Sector',
+    alertStatus: 'PASSABLE',
+    statusSeverity: 'safe',
+    statusSummary: 'Jampui Hills Corridor - NORMAL TRANSIT (Clear)',
+    alertDescription: 'Optimal transit conditions across Gomati and Baramura sectors; drainage channels fully inspected and unobstructed.',
+    rainfallIntensity: 18,
+    rainfallDescription: 'Light Baseline Drizzle',
+    alternateRouteName: 'Kanchanpur – Vanghmun Bypass Standby',
+    alternateRouteStatus: 'STANDBY',
+    alternateRouteDescription: 'District arterial network functional as precautionary backup.',
+    soilMoisture: '34%',
+    soilMoisturePct: 34,
+    poreWaterPressure: '22 kPa',
+    poreWaterPressureKpa: 22,
+    tiltRate: '0.005 mm/h',
+    tiltRateMmH: 0.005,
+    elevation: '240m',
+    stretchLength: '19.8 km',
+    isCritical: false,
+    coordinates: [91.9882, 23.7451],
+  },
+  'All States': {
+    state: 'All States',
+    corridorCode: 'NER-HUD',
+    corridorBadge: 'REGIONAL',
+    corridorName: 'Northeast Landslide Corridors Overview',
+    segmentName: 'Regional Corridors (NH-29 Dzüdza Peak Alert)',
+    alertStatus: 'BLOCKED',
+    statusSeverity: 'critical',
+    statusSummary: 'NH-29 Pherima Segment - BLOCKED · NH-10 Disrupted',
+    alertDescription: 'Live telemetry active across 8 Northeast states. Critical roadblocks on NH-29 (Nagaland) and NH-10 (Sikkim); alternate bypasses operational.',
+    rainfallIntensity: 84,
+    rainfallDescription: 'Regional Doppler Satellite Sweep (Peak Saturation)',
+    alternateRouteName: 'Peducha & Panbu Bypass Routes Active',
+    alternateRouteStatus: 'ACTIVE',
+    alternateRouteDescription: 'Multiple state-level alternate relief routes activated for critical mountain corridors.',
+    soilMoisture: '84%',
+    soilMoisturePct: 84,
+    poreWaterPressure: '210 kPa',
+    poreWaterPressureKpa: 210,
+    tiltRate: '0.28 mm/h',
+    tiltRateMmH: 0.28,
+    elevation: 'Regional',
+    stretchLength: '8 States',
+    isCritical: true,
+    coordinates: [92.9376, 26.2006],
+  },
+};
+
+// State aliases
+STATE_CORRIDOR_TELEMETRY['Arunachal'] = STATE_CORRIDOR_TELEMETRY['Arunachal Pradesh'];
+STATE_CORRIDOR_TELEMETRY['Default'] = STATE_CORRIDOR_TELEMETRY['All States'];
+STATE_CORRIDOR_TELEMETRY['All'] = STATE_CORRIDOR_TELEMETRY['All States'];
+
+/**
+ * Resolves comprehensive corridor telemetry by state, corridor code, segment name, or keyword.
+ */
+export function getCorridorTelemetry(identifier) {
+  if (!identifier) return STATE_CORRIDOR_TELEMETRY['All States'];
+  const normalized = String(identifier).trim().toLowerCase();
+
+  if (normalized === 'all' || normalized === 'all states' || normalized === 'default') {
+    return STATE_CORRIDOR_TELEMETRY['All States'];
+  }
+
+  // 1. Direct state lookup
+  for (const [key, data] of Object.entries(STATE_CORRIDOR_TELEMETRY)) {
+    if (key.toLowerCase() === normalized) return data;
+  }
+
+  // 2. Exact or substring match on corridor code or badge
+  for (const data of Object.values(STATE_CORRIDOR_TELEMETRY)) {
+    const badgeLower = data.corridorBadge.toLowerCase();
+    const codeLower = data.corridorCode.toLowerCase();
+    if (
+      badgeLower === normalized ||
+      codeLower.includes(normalized) ||
+      normalized.includes(badgeLower) ||
+      data.segmentName.toLowerCase().includes(normalized) ||
+      data.corridorName.toLowerCase().includes(normalized)
+    ) {
+      return data;
+    }
+  }
+
+  // 3. Partial state match (e.g. "arunachal" matches "Arunachal Pradesh")
+  for (const [key, data] of Object.entries(STATE_CORRIDOR_TELEMETRY)) {
+    if (key.toLowerCase().includes(normalized) || normalized.includes(key.toLowerCase())) {
+      return data;
+    }
+  }
+
+  return STATE_CORRIDOR_TELEMETRY['All States'];
+}
 
 export const corridorRoutes = {
   type: 'FeatureCollection',
@@ -256,6 +564,143 @@ export const corridorRoutes = {
           [91.86, 25.55],
           [91.89, 25.57],
           [91.93, 25.59],
+        ],
+      },
+    },
+    // ── Arunachal Pradesh: NH-415 Banderdewa – Itanagar Corridor ──
+    {
+      type: 'Feature',
+      id: 8,
+      properties: {
+        id: 'nh415-seg-1',
+        name: 'NH-415 Banderdewa – Itanagar Foothill Sector',
+        segment_name: 'NH-415 Banderdewa – Itanagar Foothill Sector',
+        state: 'Arunachal Pradesh',
+        corridor: 'NH-415',
+        status: 'safe',
+        riskStatus: 'Safe',
+        soil_moisture_pct: 42,
+        soilMoisture: '42% (Optimal)',
+        soil_moisture: '42%',
+        pore_water_pressure_kpa: 18.2,
+        poreWaterPressure: '18.2 kPa',
+        pore_water_pressure: '18.2 kPa',
+        tilt_rate_mm_h: 0.005,
+        tiltRate: '0.12 mm/day (Stable)',
+        tilt_rate: '0.12 mm/day',
+        elevation: '420m',
+        stretchLength: '16.2 km',
+      },
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [93.75, 27.08],
+          [93.81, 27.12],
+          [93.95, 27.24],
+          [94.22, 27.65],
+          [94.7278, 28.2180],
+        ],
+      },
+    },
+    // ── Manipur: NH-37 Imphal – Noney – Jiribam Corridor ──────────
+    {
+      type: 'Feature',
+      id: 9,
+      properties: {
+        id: 'nh37-seg-1',
+        name: 'NH-37 Tupul – Noney Mountain Gorge',
+        segment_name: 'NH-37 Tupul – Noney Mountain Gorge',
+        state: 'Manipur',
+        corridor: 'NH-37',
+        status: 'warning',
+        riskStatus: 'Warning',
+        soil_moisture_pct: 68,
+        soilMoisture: '68% (Moderate)',
+        soil_moisture: '68%',
+        pore_water_pressure_kpa: 44.5,
+        poreWaterPressure: '44.5 kPa',
+        pore_water_pressure: '44.5 kPa',
+        tilt_rate_mm_h: 0.052,
+        tiltRate: '1.25 mm/day',
+        tilt_rate: '1.25 mm/day',
+        elevation: '780m',
+        stretchLength: '21.0 km',
+      },
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [93.55, 24.81],
+          [93.63, 24.84],
+          [93.75, 24.80],
+          [93.9063, 24.6637],
+        ],
+      },
+    },
+    // ── Mizoram: NH-54 Silchar – Vairengte – Aizawl Corridor ──────
+    {
+      type: 'Feature',
+      id: 10,
+      properties: {
+        id: 'nh54-seg-1',
+        name: 'NH-54 Vairengte – Kolasib – Aizawl Ridge Stretch',
+        segment_name: 'NH-54 Vairengte – Kolasib – Aizawl Ridge Stretch',
+        state: 'Mizoram',
+        corridor: 'NH-54',
+        status: 'safe',
+        riskStatus: 'Safe',
+        soil_moisture_pct: 38,
+        soilMoisture: '38% (Normal)',
+        soil_moisture: '38%',
+        pore_water_pressure_kpa: 15.0,
+        poreWaterPressure: '15.0 kPa',
+        pore_water_pressure: '15.0 kPa',
+        tilt_rate_mm_h: 0.002,
+        tiltRate: '0.05 mm/day (Stable)',
+        tilt_rate: '0.05 mm/day',
+        elevation: '1130m',
+        stretchLength: '24.5 km',
+      },
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [92.68, 24.30],
+          [92.72, 23.95],
+          [92.75, 23.73],
+          [92.8378, 23.1645],
+        ],
+      },
+    },
+    // ── Tripura: NH-8 Agartala – Teliamura – Udaipur Corridor ─────
+    {
+      type: 'Feature',
+      id: 11,
+      properties: {
+        id: 'nh8-seg-1',
+        name: 'NH-8 Baramura Ridge – Teliamura Section',
+        segment_name: 'NH-8 Baramura Ridge – Teliamura Section',
+        state: 'Tripura',
+        corridor: 'NH-8',
+        status: 'safe',
+        riskStatus: 'Safe',
+        soil_moisture_pct: 32,
+        soilMoisture: '32% (Optimal)',
+        soil_moisture: '32%',
+        pore_water_pressure_kpa: 11.2,
+        poreWaterPressure: '11.2 kPa',
+        pore_water_pressure: '11.2 kPa',
+        tilt_rate_mm_h: 0.001,
+        tiltRate: '0.02 mm/day',
+        tilt_rate: '0.02 mm/day',
+        elevation: '180m',
+        stretchLength: '19.8 km',
+      },
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [91.32, 23.85],
+          [91.55, 23.83],
+          [91.78, 23.78],
+          [91.9882, 23.7451],
         ],
       },
     },
