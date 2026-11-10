@@ -47,7 +47,7 @@ export interface RiskMapProps {
   selectedState?: string;
   /** Override visibility of top-left Live Corridor HUD (defaults to true for 'full' and 'dashboard', false for 'mini') */
   showHud?: boolean;
-  /** Override visibility of bottom Monsoon Simulation Playback bar (defaults to true for 'full', false for 'mini' and 'dashboard') */
+  /** Optional legacy showPlayback flag (kept for backwards compatibility) */
   showPlayback?: boolean;
   /** Override visibility of Mapbox Navigation Controls (defaults to true) */
   showControls?: boolean;
@@ -97,11 +97,6 @@ export default function RiskMap({
       ? showHud
       : variant !== "mini" && variant !== "simple";
 
-  const effectiveShowPlayback =
-    showPlayback !== undefined
-      ? showPlayback
-      : variant === "full";
-
   // Layer visibility toggle states
   const [terrainEnabled, setTerrainEnabled] = useState<boolean>(true);
   const [riskHeatmapEnabled, setRiskHeatmapEnabled] = useState<boolean>(true);
@@ -109,20 +104,15 @@ export default function RiskMap({
   const [fieldSensorsEnabled, setFieldSensorsEnabled] = useState<boolean>(true);
   const [isHudCollapsed, setIsHudCollapsed] = useState<boolean>(false);
 
-  // ── Monsoon Simulation Playback State ─────────────────────────
-  const [simulationHour, setSimulationHour] = useState<number>(14); // 00:00 to 24:00 (default peak hour 14)
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const playbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Compute dynamic simulated corridor routes GeoJSON based on simulation hour
+  // Compute live simulated corridor routes GeoJSON along NH-29 Pherima slope (peak conditions)
   const simulatedCorridorData = useMemo(() => {
-    return computeSimulatedCorridorRoutes(simulationHour);
-  }, [simulationHour]);
+    return computeSimulatedCorridorRoutes(14);
+  }, []);
 
-  // Compute dynamic simulated field sensor telemetry along NH-29 Pherima slope
+  // Compute live simulated field sensor telemetry along NH-29 Pherima slope
   const simulatedSensorsData = useMemo(() => {
-    return computeSimulatedSensors(simulationHour);
-  }, [simulationHour]);
+    return computeSimulatedSensors(14);
+  }, []);
 
   // Target segment (NH-29 Pherima Slide Cut) live telemetry values
   const targetSegment = simulatedCorridorData.features.find(
@@ -135,29 +125,7 @@ export default function RiskMap({
     tilt_rate_mm_h: 0.28,
   }) as Record<string, any>;
   const isPorePressureCritical = (targetProps.pore_water_pressure_kpa || 0) >= 200;
-  const rainfallIntensity = Math.round(
-    12 + 72 * Math.exp(-Math.pow(simulationHour - 14, 2) / (2 * Math.pow(3.5, 2)))
-  );
-
-  // Playback timer effect (advances 1 hour every 900ms when playing)
-  useEffect(() => {
-    if (isPlaying) {
-      playbackIntervalRef.current = setInterval(() => {
-        setSimulationHour((prev) => (prev >= 24 ? 0 : prev + 1));
-      }, 900);
-    } else {
-      if (playbackIntervalRef.current) {
-        clearInterval(playbackIntervalRef.current);
-        playbackIntervalRef.current = null;
-      }
-    }
-
-    return () => {
-      if (playbackIntervalRef.current) {
-        clearInterval(playbackIntervalRef.current);
-      }
-    };
-  }, [isPlaying]);
+  const rainfallIntensity = 84;
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -1409,134 +1377,6 @@ export default function RiskMap({
   </div>
 )}
 
-      {/* ── Bottom Anchored Monsoon Simulation Playback Control Bar ── */}
-      {effectiveShowPlayback && (
-      <div className="absolute bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 z-20 w-[95%] max-w-2xl bg-[#FAF8F2]/95 backdrop-blur-md rounded-2xl border border-[#173D32]/20 shadow-[0_12px_36px_rgba(23,61,50,0.18)] p-3 sm:p-4 text-[#173D32] transition-all select-none">
-        {/* Bar Header: Title, Time Badge, Peak Warning Indicator */}
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-2 pb-2 border-b border-[#173D32]/10">
-          <div className="flex items-center gap-2">
-            <span className="text-base sm:text-lg">🌧️</span>
-            <div>
-              <div className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-[#173D32] flex items-center gap-1.5">
-                <span>Monsoon Simulation Playback</span>
-                <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-[#173D32]/10 text-[#173D32]">
-                  24-Hour Cycle
-                </span>
-              </div>
-              <div className="text-[10px] sm:text-[11px] text-[#173D32]/70 font-semibold">
-                IMD Doppler & Geotechnical Stress Playback
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* Hour Time Badge */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#173D32] text-[#F6F4EC] font-black text-xs shadow-xs">
-              <span>⏱️</span>
-              <span>{String(simulationHour).padStart(2, "0")}:00 IST</span>
-            </div>
-
-            {/* Peak Alert Indicator (Active when pore-water pressure >= 200 kPa) */}
-            {isPorePressureCritical ? (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-red-600 text-white font-black text-[10px] uppercase tracking-wide animate-pulse shadow-sm">
-                <span>⚠️</span> &gt;200 kPa Peak (#FF0000)
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-[#00E676]/20 text-[#173D32] font-extrabold text-[10px] uppercase">
-                <span>💧</span> {rainfallIntensity} mm/h
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Playback Controls Row: Play/Pause button + Slider */}
-        <div className="flex items-center gap-2.5 sm:gap-3 mb-2">
-          {/* Play/Pause Button */}
-          <button
-            type="button"
-            onClick={() => setIsPlaying(!isPlaying)}
-            className={`h-9 px-3.5 rounded-xl font-extrabold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer shrink-0 ${isPlaying
-                ? "bg-amber-500 hover:bg-amber-600 text-white"
-                : "bg-[#173D32] hover:bg-[#1f4e40] text-[#F6F4EC]"
-              }`}
-            aria-label={isPlaying ? "Pause Simulation" : "Play Simulation"}
-          >
-            <span className="text-sm">{isPlaying ? "⏸" : "▶"}</span>
-            <span>{isPlaying ? "Pause" : "Play"}</span>
-          </button>
-
-          {/* Reset button */}
-          <button
-            type="button"
-            onClick={() => {
-              setIsPlaying(false);
-              setSimulationHour(0);
-            }}
-            className="h-9 px-2.5 rounded-xl border border-[#173D32]/20 hover:bg-[#173D32]/5 text-[#173D32] font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shrink-0"
-            title="Reset to 00:00"
-          >
-            <span>↺</span>
-            <span className="hidden sm:inline">Reset</span>
-          </button>
-
-          {/* 24-Hour Time Slider */}
-          <div className="flex-1 flex flex-col justify-center">
-            <input
-              type="range"
-              min="0"
-              max="24"
-              step="1"
-              value={simulationHour}
-              onChange={(e) => setSimulationHour(Number(e.target.value))}
-              aria-label="24-Hour Simulation Slider"
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#173D32]"
-            />
-            {/* Hour tick marks */}
-            <div className="flex justify-between text-[9px] font-bold text-[#173D32]/60 mt-1 px-0.5">
-              <span>00:00</span>
-              <span>06:00</span>
-              <span>12:00</span>
-              <span className={simulationHour === 14 ? "text-red-600 font-black animate-pulse" : "text-red-700 font-extrabold"}>
-                14:00 (Peak &gt;200kPa)
-              </span>
-              <span>18:00</span>
-              <span>24:00</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Live Segment Telemetry Bar for NH-29 Pherima Cut */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-2 border-t border-[#173D32]/10 text-[11px]">
-          <div className="px-2 py-1 rounded-lg bg-[#F6F4EC] border border-[#173D32]/10">
-            <span className="text-[#173D32]/60 font-semibold block text-[9.5px]">NH-29 Status</span>
-            <span className={`font-black text-xs uppercase ${isPorePressureCritical ? "text-red-600 animate-pulse" : targetProps.status === "warning" ? "text-amber-600" : "text-emerald-700"}`}>
-              {targetProps.status || "Safe"}
-            </span>
-          </div>
-
-          <div className="px-2 py-1 rounded-lg bg-[#F6F4EC] border border-[#173D32]/10">
-            <span className="text-[#173D32]/60 font-semibold block text-[9.5px]">Soil Moisture</span>
-            <span className="font-extrabold text-xs text-[#173D32]">
-              {targetProps.soil_moisture_pct}%
-            </span>
-          </div>
-
-          <div className={`px-2 py-1 rounded-lg border ${isPorePressureCritical ? "bg-red-50 border-red-300 text-red-900" : "bg-[#F6F4EC] border-[#173D32]/10"}`}>
-            <span className="text-[#173D32]/60 font-semibold block text-[9.5px]">Pore Pressure</span>
-            <span className={`font-black text-xs ${isPorePressureCritical ? "text-red-600 font-black" : "text-[#173D32]"}`}>
-              {targetProps.pore_water_pressure_kpa} kPa
-            </span>
-          </div>
-
-          <div className="px-2 py-1 rounded-lg bg-[#F6F4EC] border border-[#173D32]/10">
-            <span className="text-[#173D32]/60 font-semibold block text-[9.5px]">Tilt Rate</span>
-            <span className="font-extrabold text-xs text-[#173D32]">
-              {targetProps.tilt_rate_mm_h} mm/h
-            </span>
-          </div>
-        </div>
-      </div>
-      )}
     </div>
   );
 }
