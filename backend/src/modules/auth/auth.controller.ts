@@ -142,6 +142,30 @@ export class AuthController {
       next(error);
     }
   }
+
+  async acceptInvite(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const meta = {
+        userAgent: req.headers['user-agent'],
+        ip: req.ip || req.socket.remoteAddress,
+      };
+
+      const { user, accessToken, refreshToken } = await authService.acceptInvite(req.body, meta);
+      setRefreshTokenCookie(res, refreshToken);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          user,
+          accessToken,
+          refreshToken,
+          message: 'Staff account successfully created and verified. Welcome to Terra360.',
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const authController = new AuthController();

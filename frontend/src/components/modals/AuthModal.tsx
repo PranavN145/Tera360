@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Check, X } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { getRolePortalPath, ApiClientError } from "@/lib/api";
 
@@ -97,27 +98,6 @@ export default function AuthModal() {
     }
   };
 
-  const handleDemoLogin = async (demoEmail: string) => {
-    setIsLoading(true);
-    setErrorMessage(null);
-    try {
-      const loggedInUser = await login({
-        email: demoEmail,
-        password: "Password123!",
-      });
-      closeAuthModal();
-      router.push(getRolePortalPath(loggedInUser.role));
-    } catch (err: unknown) {
-      if (err instanceof ApiClientError) {
-        setErrorMessage(err.message);
-      } else {
-        setErrorMessage("Demo login failed. Make sure backend is running.");
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 md:p-6 bg-black/60 backdrop-blur-sm overflow-hidden animate-in fade-in duration-200"
@@ -138,9 +118,7 @@ export default function AuthModal() {
             className="absolute top-4 right-4 p-2 rounded-full text-[#173D32]/60 hover:text-[#173D32] hover:bg-[#173D32]/10 transition-colors focus-visible:outline-2 focus-visible:outline-[#173D32] cursor-pointer"
             aria-label="Close dialog"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="w-5 h-5" aria-hidden="true" />
           </button>
 
           {/* Brand header */}
@@ -196,7 +174,7 @@ export default function AuthModal() {
           {verificationPendingMsg ? (
             <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-center">
               <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto mb-2 font-bold text-lg">
-                ✓
+                <Check className="w-5 h-5" strokeWidth={2.5} aria-hidden="true" />
               </div>
               <h3 className="text-sm font-bold text-emerald-900 mb-1">Registration Successful</h3>
               <p className="text-xs text-emerald-800 mb-4">{verificationPendingMsg}</p>
@@ -219,47 +197,6 @@ export default function AuthModal() {
                   {errorMessage}
                 </div>
               )}
-
-              {/* Quick Demo Logins */}
-              <div className="pb-3 border-b border-[#173D32]/10 flex flex-col gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#173D32]/50 text-center">
-                  One-Click Demo Profiles (Seed Accounts)
-                </span>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    disabled={isLoading}
-                    onClick={() => handleDemoLogin("citizen@terra360.in")}
-                    className="px-3 py-2 rounded-xl bg-[#F6F4EC] hover:bg-[#DCE8D4] border border-[#173D32]/15 text-xs font-bold text-[#173D32] transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                  >
-                    <span>👤</span> Citizen
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isLoading}
-                    onClick={() => handleDemoLogin("driver@terra360.in")}
-                    className="px-3 py-2 rounded-xl bg-[#F6F4EC] hover:bg-[#DCE8D4] border border-[#173D32]/15 text-xs font-bold text-[#173D32] transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                  >
-                    <span>🚛</span> Driver
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isLoading}
-                    onClick={() => handleDemoLogin("field@terra360.in")}
-                    className="px-3 py-2 rounded-xl bg-[#DCE8D4]/70 hover:bg-[#DCE8D4] border border-[#173D32]/15 text-xs font-bold text-[#173D32] transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                  >
-                    <span>👮</span> Field Officer
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isLoading}
-                    onClick={() => handleDemoLogin("officer@terra360.in")}
-                    className="px-3 py-2 rounded-xl bg-[#DCE8D4]/70 hover:bg-[#DCE8D4] border border-[#173D32]/15 text-xs font-bold text-[#173D32] transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                  >
-                    <span>📊</span> Officer
-                  </button>
-                </div>
-              </div>
 
               {/* Standard Form */}
               <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">

@@ -22,7 +22,7 @@ import PortalSectionCard from "@/components/portal/PortalSectionCard";
 import PortalSplitLayout from "@/components/portal/PortalSplitLayout";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { useApp } from "@/context/AppContext";
-import { publicApi, reportsApi } from "@/lib/api";
+import { reportsApi, uploadsApi } from "@/lib/api";
 import { HazardReportOutput } from "@/types/public";
 import { DEMO_VILLAGES } from "@/data/villages";
 
@@ -279,17 +279,27 @@ export default function CitizenReportPage() {
             }
           : undefined;
 
-      const response = await publicApi.submitHazardReport({
+      let photoUrlToSubmit: string | undefined = undefined;
+      if (photos.length > 0 && photos[0].previewUrl) {
+        try {
+          const uploadRes = await uploadsApi.uploadFile(photos[0].previewUrl, photos[0].name);
+          photoUrlToSubmit = uploadRes.url;
+        } catch {
+          // If upload fails, continue with report submission
+        }
+      }
+
+      // AUD-06: Authenticated citizen reporting without CAPTCHA friction (PRD §14.4)
+      const response = await reportsApi.submitAuthenticatedReport({
         state,
         location: combinedLocation,
         hazardType: hazardCategory,
         severity,
         description: combinedDescription,
-        reporterName: reporterName.trim() || undefined,
-        reporterPhone: reporterPhone.trim() || undefined,
+        reporterName: reporterName.trim() || user?.name || undefined,
+        reporterPhone: reporterPhone.trim() || user?.phone || undefined,
+        photoUrl: photoUrlToSubmit,
         coordinates: coordinatesPayload,
-        captchaToken:
-          process.env.NEXT_PUBLIC_DEV_CAPTCHA_TOKEN || "1x0000000000000000000000000000000AA",
       });
 
       setSubmittedTicketId(response.reportId);

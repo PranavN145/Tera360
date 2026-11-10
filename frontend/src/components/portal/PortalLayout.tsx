@@ -42,7 +42,10 @@ export default function PortalLayout({
 
   // Auto-close mobile sidebar drawer on route transition
   useEffect(() => {
-    setIsMobileSidebarOpen(false);
+    const timer = setTimeout(() => {
+      setIsMobileSidebarOpen(false);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [pathname]);
 
   // Derive portal configuration dynamically based on the current user's role
@@ -66,69 +69,71 @@ export default function PortalLayout({
   };
 
   // If already nested inside a persistent PortalLayout (e.g. from app/officer/layout.tsx),
-  // render only the page-level breadcrumbs, title banner, and children.
-  // This prevents unmounting Header, Sidebar, and Footer when navigating between sibling tabs!
+  // render only the page-level breadcrumbs, title banner, and children while still strictly
+  // enforcing any inner page `allowedRoles` restrictions (AUD-08).
   if (parentLayout.isInsidePortalLayout) {
     return (
-      <div className="flex-1 flex flex-col w-full">
-        {/* Breadcrumb & Safe Back Navigation Bar */}
-        <div className="flex items-center gap-2 mb-4 text-xs">
-          {showBackButton && (
-            <button
-              type="button"
-              onClick={handleBack}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/80 hover:bg-white text-[#173D32] border border-[#173D32]/15 shadow-2xs transition-all cursor-pointer font-bold shrink-0"
-              aria-label="Go back to previous page"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-              </svg>
-              <span>Back</span>
-            </button>
-          )}
-          <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-[#173D32]/75 truncate">
-            <Link
-              href={portalConfig.homePath}
-              className="hover:text-[#173D32] hover:underline font-medium truncate"
-            >
-              {portalConfig.portalName}
-            </Link>
-            {title && !isHomePage && (
-              <>
-                <span className="text-[#173D32]/40 shrink-0">/</span>
-                <span className="text-[#173D32] font-extrabold truncate">{title}</span>
-              </>
+      <ProtectedRoute allowedRoles={allowedRoles}>
+        <div className="flex-1 flex flex-col w-full">
+          {/* Breadcrumb & Safe Back Navigation Bar */}
+          <div className="flex items-center gap-2 mb-4 text-xs">
+            {showBackButton && (
+              <button
+                type="button"
+                onClick={handleBack}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/80 hover:bg-white text-[#173D32] border border-[#173D32]/15 shadow-2xs transition-all cursor-pointer font-bold shrink-0"
+                aria-label="Go back to previous page"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+                </svg>
+                <span>Back</span>
+              </button>
             )}
-          </nav>
-        </div>
-
-        {/* Page Title Header Strip */}
-        {(title || headerActions) && (
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8 pb-5 border-b border-[#173D32]/12">
-            <div>
-              {title && (
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-[#173D32] tracking-tight">
-                  {title}
-                </h1>
+            <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-[#173D32]/75 truncate">
+              <Link
+                href={portalConfig.homePath}
+                className="hover:text-[#173D32] hover:underline font-medium truncate"
+              >
+                {portalConfig.portalName}
+              </Link>
+              {title && !isHomePage && (
+                <>
+                  <span className="text-[#173D32]/40 shrink-0">/</span>
+                  <span className="text-[#173D32] font-extrabold truncate">{title}</span>
+                </>
               )}
-              {subtitle && (
-                <p className="text-xs sm:text-sm text-[#173D32]/75 mt-1 font-normal max-w-3xl leading-relaxed">
-                  {subtitle}
-                </p>
+            </nav>
+          </div>
+
+          {/* Page Title Header Strip */}
+          {(title || headerActions) && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8 pb-5 border-b border-[#173D32]/12">
+              <div>
+                {title && (
+                  <h1 className="text-2xl sm:text-3xl font-extrabold text-[#173D32] tracking-tight">
+                    {title}
+                  </h1>
+                )}
+                {subtitle && (
+                  <p className="text-xs sm:text-sm text-[#173D32]/75 mt-1 font-normal max-w-3xl leading-relaxed">
+                    {subtitle}
+                  </p>
+                )}
+              </div>
+
+              {headerActions && (
+                <div className="flex flex-wrap items-center gap-2.5 sm:shrink-0">
+                  {headerActions}
+                </div>
               )}
             </div>
+          )}
 
-            {headerActions && (
-              <div className="flex flex-wrap items-center gap-2.5 sm:shrink-0">
-                {headerActions}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Page Body Viewport */}
-        <div className="flex-1 w-full">{children}</div>
-      </div>
+          {/* Page Body Viewport */}
+          <div className="flex-1 w-full">{children}</div>
+        </div>
+      </ProtectedRoute>
     );
   }
 

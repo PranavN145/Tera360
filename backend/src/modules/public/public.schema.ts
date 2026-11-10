@@ -2,6 +2,21 @@ import { z } from 'zod';
 
 export const getRiskMapQuerySchema = z.object({
   state: z.string().trim().optional(),
+  isMajorNH: z.preprocess((val) => {
+    if (val === undefined || val === null || val === '') return true;
+    if (val === 'false' || val === false) return false;
+    return true;
+  }, z.boolean()).default(true),
+  format: z.enum(['json', 'geojson']).default('json'),
+  bbox: z
+    .string()
+    .trim()
+    .regex(/^-?\d+(\.\d+)?,-?\d+(\.\d+)?,-?\d+(\.\d+)?,-?\d+(\.\d+)?$/, 'bbox must be in format minLng,minLat,maxLng,maxLat')
+    .optional(),
+  minLng: z.coerce.number().optional(),
+  minLat: z.coerce.number().optional(),
+  maxLng: z.coerce.number().optional(),
+  maxLat: z.coerce.number().optional(),
 });
 
 export const getAlertsQuerySchema = z.object({

@@ -46,6 +46,13 @@ export class UsersService {
       user.familyContacts = input.familyContacts as any;
     }
     if (input.alertPreferences !== undefined) {
+      if (!user.emailVerified) {
+        throw new UserOperationError(
+          'Email verification is required before editing alert preferences.',
+          'EMAIL_NOT_VERIFIED',
+          403
+        );
+      }
       user.alertPreferences = {
         ivrs: input.alertPreferences.ivrs,
         sms: input.alertPreferences.sms,
@@ -70,6 +77,15 @@ export class UsersService {
     const isValid = await user.comparePassword(input.currentPassword);
     if (!isValid) {
       throw new UserOperationError('Current password is incorrect.', 'INVALID_CREDENTIALS', 400);
+    }
+
+    // Enforce 12-character staff password requirement (PRD §7.1)
+    if (['officer', 'field_officer', 'admin'].includes(user.role) && input.newPassword.length < 12) {
+      throw new UserOperationError(
+        'Staff passwords must be at least 12 characters long.',
+        'VALIDATION_ERROR',
+        400
+      );
     }
 
     // Hash new password

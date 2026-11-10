@@ -18,8 +18,9 @@ import PortalLayout from "@/components/portal/PortalLayout";
 import PortalMetricGrid from "@/components/portal/PortalMetricGrid";
 import { PortalKpiCard } from "@/components/portal";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { publicApi } from "@/lib/api";
+import { publicApi, fieldOfficerApi } from "@/lib/api";
 import { PublicRoadStatusItem } from "@/types/public";
+import type { RoadCondition } from "@/types/fieldOfficer";
 
 const STATES = [
   "All States",
@@ -46,6 +47,34 @@ function FieldRoadsContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [selectedRoadForUpdate, setSelectedRoadForUpdate] = useState<PublicRoadStatusItem | null>(null);
+  const [newCondition, setNewCondition] = useState<RoadCondition>("Caution");
+  const [updateReason, setUpdateReason] = useState("");
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [statusNotice, setStatusNotice] = useState<string | null>(null);
+
+  const handleUpdateRoadStatus = async () => {
+    if (!selectedRoadForUpdate) return;
+    setIsUpdating(true);
+    setStatusNotice(null);
+    try {
+      await fieldOfficerApi.updateRoadStatus({
+        roadSegmentId: selectedRoadForUpdate.code,
+        stretchName: selectedRoadForUpdate.stretch,
+        condition: newCondition,
+        reason: updateReason || `Official status updated to ${newCondition}.`,
+      });
+      setStatusNotice(`Corridor ${selectedRoadForUpdate.code} successfully updated to ${newCondition}.`);
+      setSelectedRoadForUpdate(null);
+      setUpdateReason("");
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to update road status.";
+      setStatusNotice(`Update error: ${msg}`);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -392,17 +421,37 @@ function FieldRoadsContent() {
                         </span>
                       </div>
 
-                      <Link
-                        href="/field/map"
-                        className="text-xs sm:text-[13px] font-bold text-[#173D32] hover:text-[#112F26] hover:underline transition-colors inline-flex items-center gap-1.5 whitespace-nowrap"
-                      >
-                        <span>Locate on Map</span>
-                        <ArrowRight
-                          className="w-3.5 h-3.5"
-                          strokeWidth={2.2}
-                          aria-hidden="true"
-                        />
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedRoadForUpdate(road);
+                            setNewCondition(
+                              road.status === "blocked"
+                                ? "Blocked"
+                                : road.status === "caution" || road.status === "partial"
+                                ? "Caution"
+                                : "Open"
+                            );
+                            setUpdateReason(road.statusReason || "");
+                          }}
+                          className="px-3 py-1 rounded-full bg-[#173D32] hover:bg-[#1f4e40] text-[#F6F4EC] text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          Update Status
+                        </button>
+
+                        <Link
+                          href="/field/map"
+                          className="text-xs sm:text-[13px] font-bold text-[#173D32] hover:text-[#112F26] hover:underline transition-colors inline-flex items-center gap-1.5 whitespace-nowrap"
+                        >
+                          <span>Locate</span>
+                          <ArrowRight
+                            className="w-3.5 h-3.5"
+                            strokeWidth={2.2}
+                            aria-hidden="true"
+                          />
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 );
@@ -410,6 +459,63 @@ function FieldRoadsContent() {
             </div>
           )}
         </section>
+
+        {/* Update Road Status Modal */}
+        {selectedRoadForUpdate && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <div className="bg-[#FAF8F2] border border-[#173D32]/20 rounded-2xl p-6 max-w-lg w-full shadow-2xl">
+              <h3 className="text-base font-bold text-[#173D32] mb-1">
+                Update Road Status: {selectedRoadForUpdate.code}
+              </h3>
+              <p className="text-xs text-[#173D32]/70 mb-4">
+                {selectedRoadForUpdate.stretch} ({selectedRoadForUpdate.state})
+              </p>
+
+              <label className="block text-xs font-bold text-[#173D32] uppercase mb-1">
+                New Clearance Condition:
+              </label>
+              <select
+                value={newCondition}
+                onChange={(e) => setNewCondition(e.target.value as RoadCondition)}
+                className="w-full p-2.5 rounded-xl bg-white border border-[#173D32]/20 text-xs font-semibold text-[#173D32] mb-3"
+              >
+                <option value="Open">Open (Unrestricted highway transit)</option>
+                <option value="Caution">Caution (Single lane / active rockfall caution)</option>
+                <option value="Partially Blocked">Partially Blocked (Controlled convoy only)</option>
+                <option value="Blocked">Blocked (Complete transit halt / diversion active)</option>
+              </select>
+
+              <label className="block text-xs font-bold text-[#173D32] uppercase mb-1">
+                Reason & Advisory Details:
+              </label>
+              <textarea
+                rows={4}
+                value={updateReason}
+                onChange={(e) => setUpdateReason(e.target.value)}
+                placeholder="e.g. Mudslide debris cleared by BRO convoy; transit restored with caution."
+                className="w-full p-3 rounded-xl bg-white border border-[#173D32]/20 text-xs text-[#173D32] focus:outline-none focus:ring-1 focus:ring-[#173D32] mb-4"
+              />
+
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedRoadForUpdate(null)}
+                  className="px-4 py-2 rounded-full text-xs font-semibold text-[#173D32] hover:bg-black/5"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUpdateRoadStatus}
+                  disabled={isUpdating}
+                  className="px-5 py-2 rounded-full bg-[#173D32] hover:bg-[#1f4e40] text-white text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  {isUpdating ? "Synchronizing..." : "Confirm Road Update"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </PortalLayout>
   );

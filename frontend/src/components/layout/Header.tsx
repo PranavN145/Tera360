@@ -62,7 +62,10 @@ export default function Header() {
         window.history.replaceState(null, "", window.location.pathname);
       }
       window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-      setActiveSection("home");
+      const timer = setTimeout(() => {
+        setActiveSection("home");
+      }, 0);
+      return () => clearTimeout(timer);
     } else if (window.location.hash) {
       const targetId = window.location.hash.replace("#", "");
       let targetEl = document.getElementById(targetId);
@@ -70,13 +73,16 @@ export default function Header() {
         targetEl = document.getElementById("how-it-works") || document.getElementById("about");
       }
       if (targetEl) {
-        setActiveSection(targetId);
+        const timer = setTimeout(() => {
+          setActiveSection(targetId);
+        }, 0);
         isProgrammaticScrollRef.current = true;
         targetEl.scrollIntoView({ behavior: "smooth", block: "start" });
         scrollTimeoutRef.current = setTimeout(() => {
           isProgrammaticScrollRef.current = false;
           scrollTimeoutRef.current = null;
         }, 1200);
+        return () => clearTimeout(timer);
       }
     }
   }, [pathname]);

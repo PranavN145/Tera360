@@ -4,6 +4,9 @@ import { connectDB, disconnectDB } from '../config/db';
 import { User } from '../modules/users/user.model';
 import { Road } from '../modules/roads/road.model';
 import { Alert } from '../modules/alerts/alert.model';
+import { Village } from '../modules/villages/village.model';
+import { Shelter } from '../modules/villages/shelter.model';
+import { FieldOfficerTaskModel } from '../modules/fieldOfficer/fieldOfficer.model';
 
 interface DemoAccount {
   name: string;
@@ -272,7 +275,169 @@ async function seed() {
     }
   }
 
-  console.log('\n========================================================');
+  // 4. Seed Shelters & Villages
+  console.log('\n--- 4. Seeding Villages & Evacuation Shelters ---');
+  const DEMO_SHELTERS = [
+    {
+      name: 'Phesama Community Hall & Youth Center',
+      villageName: 'Phesama',
+      district: 'Kohima',
+      state: 'Nagaland',
+      address: 'Upper Sector, Near Phesama Baptist Church',
+      capacity: 450,
+      currentOccupancy: 35,
+      status: 'Operational' as const,
+      coordinates: { type: 'Point' as const, coordinates: [94.114, 25.645] as [number, number] },
+      helpline: '+91 94360 01122',
+      amenities: ['Drinking water', 'First aid station', 'Satellite wireless phone', 'Backup generator'],
+      walkingDirections: 'Ascend paved village stairway 200m east of primary market square',
+      drivingDirections: 'Turn uphill at KM 44 landmark; 800m concrete link road',
+      contactPersonName: 'Keviselie Angami',
+      contactPersonPhone: '+91 98620 54321',
+      isActive: true,
+    },
+    {
+      name: 'Dzüdza High Ground Relief Camp',
+      villageName: 'Dzüdza',
+      district: 'Kohima',
+      state: 'Nagaland',
+      address: 'Hilltop Terrace, Dzüdza Bridge Diversion',
+      capacity: 600,
+      currentOccupancy: 120,
+      status: 'Operational' as const,
+      coordinates: { type: 'Point' as const, coordinates: [94.028, 25.688] as [number, number] },
+      helpline: '+91 94360 01133',
+      amenities: ['Emergency rations', 'Medical triage tent', 'Water storage tanks', 'Radio relay'],
+      walkingDirections: 'Follow marked emergency evacuation ribbons up the west ridge',
+      contactPersonName: 'Neituo Sekhose',
+      contactPersonPhone: '+91 98621 65432',
+      isActive: true,
+    },
+  ];
+
+  const shelterMap = new Map<string, any>();
+  for (const s of DEMO_SHELTERS) {
+    const existing = await Shelter.findOne({ name: s.name });
+    if (existing) {
+      Object.assign(existing, s);
+      await existing.save();
+      shelterMap.set(s.villageName, existing._id);
+    } else {
+      const created = await Shelter.create(s);
+      shelterMap.set(s.villageName, created._id);
+    }
+  }
+
+  const DEMO_VILLAGES = [
+    {
+      villageName: 'Phesama',
+      state: 'Nagaland',
+      district: 'Kohima',
+      population: 3400,
+      riskLevel: 'Moderate' as const,
+      coordinates: { type: 'Point' as const, coordinates: [94.112, 25.642] as [number, number] },
+      rainfall24h: 88,
+      saturationIndex: 78,
+      evacuationStatus: 'Advisory' as const,
+      primaryShelterId: shelterMap.get('Phesama'),
+      contactPersons: [
+        { name: 'Keviselie Angami', phone: '+91 98620 54321', designation: 'Village Council Chairman' },
+      ],
+      notes: 'Active runoff along steep residential terraces; light debris clearing underway.',
+    },
+    {
+      villageName: 'Dzüdza',
+      state: 'Nagaland',
+      district: 'Kohima',
+      population: 1200,
+      riskLevel: 'Critical' as const,
+      coordinates: { type: 'Point' as const, coordinates: [94.025, 25.685] as [number, number] },
+      rainfall24h: 142,
+      saturationIndex: 94,
+      evacuationStatus: 'Evacuate' as const,
+      primaryShelterId: shelterMap.get('Dzüdza'),
+      contactPersons: [
+        { name: 'Neituo Sekhose', phone: '+91 98621 65432', designation: 'Head GB / Community Lead' },
+      ],
+      notes: '60m active mudflow blockage on highway toe; immediate evacuation alert active.',
+    },
+    {
+      villageName: 'Khonoma',
+      state: 'Nagaland',
+      district: 'Kohima',
+      population: 2100,
+      riskLevel: 'Low' as const,
+      coordinates: { type: 'Point' as const, coordinates: [94.02, 25.65] as [number, number] },
+      rainfall24h: 45,
+      saturationIndex: 52,
+      evacuationStatus: 'Normal' as const,
+      contactPersons: [
+        { name: 'Vitsolie Punyü', phone: '+91 98622 76543', designation: 'Community Elder' },
+      ],
+      notes: 'Normal conditions; terraces well maintained.',
+    },
+  ];
+
+  for (const v of DEMO_VILLAGES) {
+    const existing = await Village.findOne({ villageName: v.villageName, state: v.state });
+    if (existing) {
+      Object.assign(existing, v);
+      await existing.save();
+    } else {
+      await Village.create(v);
+    }
+  }
+
+  // 5. Seed Field Tasks
+  console.log('\n--- 5. Seeding Field Officer Tasks ---');
+  const fieldOfficer = await User.findOne({ role: 'field_officer' });
+  const DEMO_TASKS = [
+    {
+      taskId: 'TSK-201',
+      sector: 'Sector 4 - Kohima Ridge',
+      location: {
+        type: 'Point' as const,
+        coordinates: [94.025, 25.685] as [number, number],
+        chainageName: 'NH-29 KM 42 (Phesama Cut)',
+        landmark: 'Dzüdza Bridge Approach',
+      },
+      riskLevel: 'Critical' as const,
+      reason: 'Inspect debris fence tension and drainage runoff after 142mm heavy precipitation.',
+      deadline: new Date(Date.now() + 24 * 3600000),
+      status: 'Assigned' as const,
+      assignedBy: 'Disaster Officer Vikram Sharma',
+      assignedTo: fieldOfficer?._id,
+      assignedAt: new Date(),
+    },
+    {
+      taskId: 'TSK-202',
+      sector: 'Sector 4 - Kohima Ridge',
+      location: {
+        type: 'Point' as const,
+        coordinates: [94.112, 25.642] as [number, number],
+        chainageName: 'Phesama Bypass Cut KM 44',
+        landmark: 'Phesama Baptist School Curve',
+      },
+      riskLevel: 'High' as const,
+      reason: 'Verify tension crack width across highway retaining wall.',
+      deadline: new Date(Date.now() + 48 * 3600000),
+      status: 'In_Progress' as const,
+      assignedBy: 'Disaster Officer Vikram Sharma',
+      assignedTo: fieldOfficer?._id,
+      assignedAt: new Date(Date.now() - 3600000),
+      startedAt: new Date(Date.now() - 1800000),
+    },
+  ];
+
+  for (const t of DEMO_TASKS) {
+    const existing = await FieldOfficerTaskModel.findOne({ taskId: t.taskId });
+    if (existing) {
+      Object.assign(existing, t);
+      await existing.save();
+    } else {
+      await FieldOfficerTaskModel.create(t);
+    }
+  }
   console.log('✅ ALL DEMO DATA SEEDED SUCCESSFULLY');
   console.log('========================================================');
   console.log('Corridors: 3 (NH-29 Nagaland, NH-10 Sikkim, NH-27 Assam)');

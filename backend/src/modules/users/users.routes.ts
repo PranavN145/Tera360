@@ -6,6 +6,7 @@ import {
   updateMeSchema,
   changePasswordSchema,
   deleteAccountSchema,
+  revokeSessionParamsSchema,
 } from './users.schema';
 
 const router = Router();
@@ -33,7 +34,11 @@ router.patch(
 router.get('/me/sessions', usersController.getSessions);
 
 // DELETE /api/v1/users/me/sessions/:id
-router.delete('/me/sessions/:id', usersController.revokeSession);
+router.delete(
+  '/me/sessions/:id',
+  validate({ params: revokeSessionParamsSchema }),
+  usersController.revokeSession
+);
 
 // 4. Personal Data Export
 // GET /api/v1/users/me/export

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useMemo } from "react";
+import { Compass } from "lucide-react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import {
@@ -199,15 +200,6 @@ function parseRainfallMm(rainfallText?: string | null, severity?: string): numbe
   if (severity === "Critical") return 168;
   if (severity === "Warning") return 112;
   return 42;
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }
 
 export interface RiskMapProps {
@@ -738,26 +730,45 @@ export default function RiskMap({
       const badgeBg = isCrit ? "#FEE2E2" : isWarn ? "#FEF3C7" : "#DCFCE7";
       const badgeText = isCrit ? "#B91C1C" : isWarn ? "#B45309" : "#166534";
 
+      // Safe DOM construction for hotspot popup (AUD-04 XSS Prevention)
+      const popupContainer = document.createElement("div");
+      popupContainer.style.cssText =
+        "font-family:system-ui,-apple-system,sans-serif;padding:4px 6px;color:#173D32;min-width:min(190px,70vw);max-width:min(248px,80vw);box-sizing:border-box;";
+
+      const headerDiv = document.createElement("div");
+      headerDiv.style.cssText =
+        "display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px;";
+
+      const titleStrong = document.createElement("strong");
+      titleStrong.style.cssText = "font-size:12px;font-weight:800;color:#173D32;";
+      titleStrong.textContent = hotspot.title || "";
+
+      const badgeSpan = document.createElement("span");
+      badgeSpan.style.cssText = `font-size:10px;font-weight:700;padding:2px 7px;border-radius:9999px;background:${badgeBg};color:${badgeText};white-space:nowrap;`;
+      badgeSpan.textContent = hotspot.severity === "Normal" ? "Safe" : (hotspot.severity || "");
+
+      headerDiv.appendChild(titleStrong);
+      headerDiv.appendChild(badgeSpan);
+      popupContainer.appendChild(headerDiv);
+
+      const regionDiv = document.createElement("div");
+      regionDiv.style.cssText = "font-size:11px;color:#4B5563;font-weight:600;";
+      regionDiv.textContent = hotspot.region || "";
+      popupContainer.appendChild(regionDiv);
+
+      if (hotspot.statusReason) {
+        const reasonDiv = document.createElement("div");
+        reasonDiv.style.cssText =
+          "font-size:10.5px;color:#374151;margin-top:5px;line-height:1.4;background:#F6F4EC;padding:5px 7px;border-radius:6px;";
+        reasonDiv.textContent = hotspot.statusReason;
+        popupContainer.appendChild(reasonDiv);
+      }
+
       const popup = new mapboxgl.Popup({
         offset: 18,
         closeButton: true,
         maxWidth: "260px",
-      }).setHTML(`
-        <div style="font-family:system-ui,-apple-system,sans-serif;padding:4px 6px;color:#173D32;min-width:min(190px,70vw);max-width:min(248px,80vw);box-sizing:border-box;">
-          <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px;">
-            <strong style="font-size:12px;font-weight:800;color:#173D32;">${escapeHtml(hotspot.title)}</strong>
-            <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:9999px;background:${badgeBg};color:${badgeText};white-space:nowrap;">
-              ${escapeHtml(hotspot.severity === "Normal" ? "Safe" : hotspot.severity)}
-            </span>
-          </div>
-          <div style="font-size:11px;color:#4B5563;font-weight:600;">${escapeHtml(hotspot.region)}</div>
-          ${
-            hotspot.statusReason
-              ? `<div style="font-size:10.5px;color:#374151;margin-top:5px;line-height:1.4;background:#F6F4EC;padding:5px 7px;border-radius:6px;">${escapeHtml(hotspot.statusReason)}</div>`
-              : ""
-          }
-        </div>
-      `);
+      }).setDOMContent(popupContainer);
 
       el.addEventListener("click", (ev) => {
         ev.stopPropagation();
@@ -1576,7 +1587,6 @@ export default function RiskMap({
         const props = (feature.properties || {}) as Record<string, any>;
         const coordinates = ((feature.geometry && feature.geometry.coordinates) || []).slice();
         const id = props.id || props.sensor_id || "DAS-NODE-04";
-        const name = props.name || "Slope Field Sensor";
         const type = props.type || "DAS Fiber Interferometer";
         const location = props.location || "Pherima Slope Cut";
         const strain = props.slope_strain || `${props.strain_microstrain || 48} µε`;
@@ -1586,31 +1596,59 @@ export default function RiskMap({
         const statusColor = isExceeding ? "#DC2626" : "#16A34A";
         const statusBg = isExceeding ? "#FEF2F2" : "#ECFDF5";
         const statusBorder = isExceeding ? "#FECACA" : "#A7F3D0";
-        const depth = props.depth
-          ? `<div style="color: #6B7280; font-size: 9.5px; margin-top: 2px;">📍 ${location} • ${props.depth}</div>`
-          : "";
+        // Safe DOM construction for sensor tooltip (AUD-04 XSS Prevention)
+        const tooltipContainer = document.createElement("div");
+        tooltipContainer.style.cssText =
+          "font-family: system-ui, -apple-system, sans-serif; padding: 7px 9px; min-width: min(215px, 72vw); max-width: min(280px, 84vw); box-sizing: border-box; color: #173D32;";
 
-        const tooltipHTML = `
-          <div style="font-family: system-ui, -apple-system, sans-serif; padding: 7px 9px; min-width: min(215px, 72vw); max-width: min(280px, 84vw); box-sizing: border-box; color: #173D32;">
-            <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 3px;">
-              <span style="font-weight: 800; font-size: 11.5px; letter-spacing: 0.03em; color: #111827; display: flex; align-items: center; gap: 5px;">
-                <span style="display: inline-block; width: 7px; height: 7px; border-radius: 9999px; background-color: ${statusColor}; box-shadow: 0 0 6px ${statusColor};"></span>
-                ${id}
-              </span>
-              <span style="font-size: 9px; font-weight: 800; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background-color: ${statusBg}; color: ${statusColor}; border: 1px solid ${statusBorder};">
-                ${statusLabel}
-              </span>
-            </div>
-            <div style="font-size: 10.5px; color: #374151; font-weight: 700; margin-bottom: 2px;">
-              ${type}
-            </div>
-            ${depth}
-            <div style="margin-top: 6px; display: flex; align-items: center; justify-content: space-between; background-color: #F8FAFC; padding: 4px 8px; border-radius: 6px; border: 1px solid #E2E8F0; font-size: 10.5px;">
-              <span style="color: #4B5563; font-weight: 600;">Slope Strain:</span>
-              <span style="font-weight: 800; color: ${statusColor};">${strain}</span>
-            </div>
-          </div>
-        `;
+        const topRow = document.createElement("div");
+        topRow.style.cssText =
+          "display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 3px;";
+
+        const idSpan = document.createElement("span");
+        idSpan.style.cssText =
+          "font-weight: 800; font-size: 11.5px; letter-spacing: 0.03em; color: #111827; display: flex; align-items: center; gap: 5px;";
+
+        const dotSpan = document.createElement("span");
+        dotSpan.style.cssText = `display: inline-block; width: 7px; height: 7px; border-radius: 9999px; background-color: ${statusColor}; box-shadow: 0 0 6px ${statusColor};`;
+        idSpan.appendChild(dotSpan);
+        idSpan.appendChild(document.createTextNode(id));
+
+        const badgeSpan = document.createElement("span");
+        badgeSpan.style.cssText = `font-size: 9px; font-weight: 800; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background-color: ${statusBg}; color: ${statusColor}; border: 1px solid ${statusBorder};`;
+        badgeSpan.textContent = statusLabel;
+
+        topRow.appendChild(idSpan);
+        topRow.appendChild(badgeSpan);
+        tooltipContainer.appendChild(topRow);
+
+        const typeDiv = document.createElement("div");
+        typeDiv.style.cssText = "font-size: 10.5px; color: #374151; font-weight: 700; margin-bottom: 2px;";
+        typeDiv.textContent = String(type);
+        tooltipContainer.appendChild(typeDiv);
+
+        if (props.depth) {
+          const depthDiv = document.createElement("div");
+          depthDiv.style.cssText = "color: #6B7280; font-size: 9.5px; margin-top: 2px;";
+          depthDiv.textContent = `📍 ${location} • ${props.depth}`;
+          tooltipContainer.appendChild(depthDiv);
+        }
+
+        const strainRow = document.createElement("div");
+        strainRow.style.cssText =
+          "margin-top: 6px; display: flex; align-items: center; justify-content: space-between; background-color: #F8FAFC; padding: 4px 8px; border-radius: 6px; border: 1px solid #E2E8F0; font-size: 10.5px;";
+
+        const strainLabel = document.createElement("span");
+        strainLabel.style.cssText = "color: #4B5563; font-weight: 600;";
+        strainLabel.textContent = "Slope Strain:";
+
+        const strainValue = document.createElement("span");
+        strainValue.style.cssText = `font-weight: 800; color: ${statusColor};`;
+        strainValue.textContent = String(strain);
+
+        strainRow.appendChild(strainLabel);
+        strainRow.appendChild(strainValue);
+        tooltipContainer.appendChild(strainRow);
 
         if (sensorTooltipPopup) {
           sensorTooltipPopup.remove();
@@ -1623,7 +1661,7 @@ export default function RiskMap({
           className: "sensor-node-tooltip",
         })
           .setLngLat(coordinates)
-          .setHTML(tooltipHTML)
+          .setDOMContent(tooltipContainer)
           .addTo(map);
       };
 
@@ -1690,83 +1728,92 @@ export default function RiskMap({
             ? "#FFA500"
             : "#00E676";
 
-        const popupHTML = `
-          <div style="font-family: system-ui, -apple-system, sans-serif; padding: 6px; min-width: min(240px, 72vw); max-width: min(300px, 84vw); box-sizing: border-box; color: #173D32;">
-            <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 6px; border-bottom: 1px solid rgba(23,61,50,0.15); padding-bottom: 6px;">
-              <div style="font-weight: 800; font-size: 13px; line-height: 1.3;">
-                ${segmentName}
-              </div>
-              <span style="font-size: 10px; font-weight: 800; text-transform: uppercase; padding: 2px 8px; border-radius: 9999px; background-color: ${badgeBg}; color: #ffffff; white-space: nowrap;">
-                ${status}
-              </span>
-            </div>
+        // Safe DOM construction for corridor popup (AUD-04 XSS Prevention)
+        const popupContainer = document.createElement("div");
+        popupContainer.style.cssText =
+          "font-family: system-ui, -apple-system, sans-serif; padding: 6px; min-width: min(240px, 72vw); max-width: min(300px, 84vw); box-sizing: border-box; color: #173D32;";
 
-            <div style="font-size: 11.5px; line-height: 1.6; background-color: #F6F4EC; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(23,61,50,0.1); margin-bottom: 8px;">
-              <div><strong style="color: #173D32;">Segment Name:</strong> ${segmentName}</div>
-              <div><strong style="color: #173D32;">Status:</strong> ${status}</div>
-              <div><strong style="color: #173D32;">Soil Moisture:</strong> ${soilMoisture}</div>
-              <div><strong style="color: #173D32;">Pore-Water Pressure:</strong> ${poreWaterPressure}</div>
-              <div><strong style="color: #173D32;">Tilt Rate:</strong> ${tiltRate}</div>
-            </div>
+        const headerDiv = document.createElement("div");
+        headerDiv.style.cssText =
+          "display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 6px; border-bottom: 1px solid rgba(23,61,50,0.15); padding-bottom: 6px;";
 
-            ${
-              isRedOrOrange
-                ? `
-              <button
-                id="dispatch-rescue-btn"
-                type="button"
-                style="
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  gap: 6px;
-                  width: 100%;
-                  padding: 8px 12px;
-                  background-color: #DC2626;
-                  color: #FFFFFF;
-                  font-size: 11.5px;
-                  font-weight: 800;
-                  border-radius: 8px;
-                  border: none;
-                  cursor: pointer;
-                  box-shadow: 0 2px 4px rgba(220,38,38,0.25);
-                  transition: all 0.2s ease-in-out;
-                "
-                onmouseover="this.style.backgroundColor='#B91C1C'; this.style.transform='translateY(-1px)';"
-                onmouseout="this.style.backgroundColor='#DC2626'; this.style.transform='translateY(0)';"
-              >
-                <span>🚑</span> Dispatch Rescue Unit to Detour
-              </button>
-            `
-                : ""
+        const titleDiv = document.createElement("div");
+        titleDiv.style.cssText = "font-weight: 800; font-size: 13px; line-height: 1.3;";
+        titleDiv.textContent = String(segmentName);
+
+        const badgeSpan = document.createElement("span");
+        badgeSpan.style.cssText = `font-size: 10px; font-weight: 800; text-transform: uppercase; padding: 2px 8px; border-radius: 9999px; background-color: ${badgeBg}; color: #ffffff; white-space: nowrap;`;
+        badgeSpan.textContent = String(status);
+
+        headerDiv.appendChild(titleDiv);
+        headerDiv.appendChild(badgeSpan);
+        popupContainer.appendChild(headerDiv);
+
+        const metricsBox = document.createElement("div");
+        metricsBox.style.cssText =
+          "font-size: 11.5px; line-height: 1.6; background-color: #F6F4EC; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(23,61,50,0.1); margin-bottom: 8px;";
+
+        const metricRows: [string, string][] = [
+          ["Segment Name:", String(segmentName)],
+          ["Status:", String(status)],
+          ["Soil Moisture:", String(soilMoisture)],
+          ["Pore-Water Pressure:", String(poreWaterPressure)],
+          ["Tilt Rate:", String(tiltRate)],
+        ];
+
+        for (const [label, val] of metricRows) {
+          const row = document.createElement("div");
+          const strong = document.createElement("strong");
+          strong.style.color = "#173D32";
+          strong.textContent = label + " ";
+          row.appendChild(strong);
+          row.appendChild(document.createTextNode(val));
+          metricsBox.appendChild(row);
+        }
+        popupContainer.appendChild(metricsBox);
+
+        if (isRedOrOrange) {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.style.cssText =
+            "display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; padding: 8px 12px; background-color: #DC2626; color: #FFFFFF; font-size: 11.5px; font-weight: 800; border-radius: 8px; border: none; cursor: pointer; box-shadow: 0 2px 4px rgba(220,38,38,0.25); transition: all 0.2s ease-in-out;";
+
+          const iconSpan = document.createElement("span");
+          iconSpan.textContent = "🚑";
+          const textSpan = document.createElement("span");
+          textSpan.textContent = " Dispatch Rescue Unit to Detour";
+          btn.appendChild(iconSpan);
+          btn.appendChild(textSpan);
+
+          // Safe DOM event listeners replace inline string handlers (AUD-04)
+          btn.addEventListener("mouseenter", () => {
+            btn.style.backgroundColor = "#B91C1C";
+            btn.style.transform = "translateY(-1px)";
+          });
+          btn.addEventListener("mouseleave", () => {
+            btn.style.backgroundColor = "#DC2626";
+            btn.style.transform = "translateY(0)";
+          });
+          btn.addEventListener("click", () => {
+            iconSpan.textContent = "✅";
+            textSpan.textContent = " Rescue Unit Dispatched to Detour";
+            btn.style.backgroundColor = "#16A34A";
+            btn.style.boxShadow = "0 2px 4px rgba(22,163,74,0.25)";
+            btn.style.transform = "none";
+
+            if (map.getLayer("rescue-route-lines")) {
+              map.setLayoutProperty("rescue-route-lines", "visibility", "visible");
+              map.setPaintProperty("rescue-route-lines", "line-width", 6.5);
             }
-          </div>
-        `;
+          });
+
+          popupContainer.appendChild(btn);
+        }
 
         new mapboxgl.Popup({ offset: 12, closeButton: true, maxWidth: "320px" })
           .setLngLat(e.lngLat)
-          .setHTML(popupHTML)
+          .setDOMContent(popupContainer)
           .addTo(map);
-
-        // Interactive dispatch action handler
-        if (isRedOrOrange) {
-          setTimeout(() => {
-            const btn = document.getElementById("dispatch-rescue-btn");
-            if (btn) {
-              btn.onclick = () => {
-                btn.innerHTML = "<span>✅</span> Rescue Unit Dispatched to Detour";
-                btn.style.backgroundColor = "#16A34A";
-                btn.style.boxShadow = "0 2px 4px rgba(22,163,74,0.25)";
-
-                // Ensure rescue detour layer is visible and highlighted
-                if (map.getLayer("rescue-route-lines")) {
-                  map.setLayoutProperty("rescue-route-lines", "visibility", "visible");
-                  map.setPaintProperty("rescue-route-lines", "line-width", 6.5);
-                }
-              };
-            }
-          }, 60);
-        }
       };
 
       map.on("click", "corridor-layer", handleCorridorClick);
@@ -1815,20 +1862,25 @@ export default function RiskMap({
           props.detourNote ||
           "Designated alternate path for NDRF rescue convoys and emergency transit.";
 
-        const detourHTML = `
-          <div style="font-family: system-ui, -apple-system, sans-serif; padding: 6px; min-width: 220px; color: #173D32;">
-            <div style="font-weight: 800; font-size: 13px; color: #0077B6; margin-bottom: 4px;">
-              🚑 ${name}
-            </div>
-            <div style="font-size: 11px; color: #374151; line-height: 1.45; background-color: #F0F9FF; padding: 6px 8px; border-radius: 6px; border: 1px solid #BAE6FD;">
-              ${note}
-            </div>
-          </div>
-        `;
+        // Safe DOM construction for detour popup (AUD-04 XSS Prevention)
+        const detourContainer = document.createElement("div");
+        detourContainer.style.cssText =
+          "font-family: system-ui, -apple-system, sans-serif; padding: 6px; min-width: 220px; color: #173D32;";
+
+        const titleDiv = document.createElement("div");
+        titleDiv.style.cssText = "font-weight: 800; font-size: 13px; color: #0077B6; margin-bottom: 4px;";
+        titleDiv.textContent = `🚑 ${name}`;
+        detourContainer.appendChild(titleDiv);
+
+        const noteDiv = document.createElement("div");
+        noteDiv.style.cssText =
+          "font-size: 11px; color: #374151; line-height: 1.45; background-color: #F0F9FF; padding: 6px 8px; border-radius: 6px; border: 1px solid #BAE6FD;";
+        noteDiv.textContent = String(note);
+        detourContainer.appendChild(noteDiv);
 
         new mapboxgl.Popup({ offset: 12, closeButton: true, maxWidth: "290px" })
           .setLngLat(e.lngLat)
-          .setHTML(detourHTML)
+          .setDOMContent(detourContainer)
           .addTo(map);
       });
 
@@ -1874,23 +1926,48 @@ export default function RiskMap({
           </div>
         `;
 
+        // Safe DOM construction for obstacle popup (AUD-04 XSS Prevention)
+        const obstacleContainer = document.createElement("div");
+        obstacleContainer.style.cssText =
+          "font-family: system-ui, -apple-system, sans-serif; padding: 6px; color: #173D32;";
+
+        const titleHeader = document.createElement("div");
+        titleHeader.style.cssText =
+          "display: flex; align-items: center; gap: 6px; color: #DC2626; font-weight: 800; font-size: 12px; margin-bottom: 4px;";
+        const iconSpan = document.createElement("span");
+        iconSpan.textContent = "⛔";
+        const titleSpan = document.createElement("span");
+        titleSpan.textContent = " SLIDE COLLAPSE - NO PASSAGE";
+        titleHeader.appendChild(iconSpan);
+        titleHeader.appendChild(titleSpan);
+        obstacleContainer.appendChild(titleHeader);
+
+        const obstacleBox = document.createElement("div");
+        obstacleBox.style.cssText =
+          "font-size: 11px; line-height: 1.5; color: #374151; background: #FEF2F2; padding: 6px 8px; border-radius: 6px; border: 1px solid #FECACA;";
+
+        const obstacleRows: [string, string][] = [
+          ["Exact Obstacle Location:", "[94.02, 25.72]"],
+          ["Highway:", "NH-29 Pherima / Dzüdza Gorge"],
+          ["Severity:", "Road Severed (60m Collapse)"],
+          ["Action:", "Divert via Peducha Alternate Bypass"],
+        ];
+
+        for (const [k, v] of obstacleRows) {
+          const row = document.createElement("div");
+          const strong = document.createElement("strong");
+          strong.textContent = k + " ";
+          row.appendChild(strong);
+          row.appendChild(document.createTextNode(v));
+          obstacleBox.appendChild(row);
+        }
+        obstacleContainer.appendChild(obstacleBox);
+
         const obstaclePopup = new mapboxgl.Popup({
           offset: 16,
           closeButton: true,
           maxWidth: "290px",
-        }).setHTML(`
-          <div style="font-family: system-ui, -apple-system, sans-serif; padding: 6px; color: #173D32;">
-            <div style="display: flex; align-items: center; gap: 6px; color: #DC2626; font-weight: 800; font-size: 12px; margin-bottom: 4px;">
-              <span>⛔</span> SLIDE COLLAPSE - NO PASSAGE
-            </div>
-            <div style="font-size: 11px; line-height: 1.5; color: #374151; background: #FEF2F2; padding: 6px 8px; border-radius: 6px; border: 1px solid #FECACA;">
-              <strong>Exact Obstacle Location:</strong> [94.02, 25.72]<br/>
-              <strong>Highway:</strong> NH-29 Pherima / Dzüdza Gorge<br/>
-              <strong>Severity:</strong> Road Severed (60m Collapse)<br/>
-              <strong>Action:</strong> Divert via Peducha Alternate Bypass
-            </div>
-          </div>
-        `);
+        }).setDOMContent(obstacleContainer);
 
         obstacleMarkerRef.current = new mapboxgl.Marker({ element: obstacleEl, anchor: "center" })
           .setLngLat([94.02, 25.72])
@@ -2335,13 +2412,18 @@ export default function RiskMap({
       />
 
       {!hasValidToken && (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#173D32]/85 backdrop-blur-xs p-6 text-center select-none">
-          <div className="max-w-md w-full p-6 sm:p-8 rounded-3xl bg-[#FAF8F2]/95 border border-[#173D32]/15 shadow-2xl flex flex-col items-center text-[#173D32]">
-            <div className="w-14 h-14 rounded-2xl bg-[#D6A65D]/20 border border-[#D6A65D]/40 flex items-center justify-center text-2xl mb-4 shadow-xs">
-              🗺️
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#173D32]/85 backdrop-blur-xs p-6 text-center select-none overflow-hidden">
+          {/* Subtle Cartographic Background Graphic */}
+          <div
+            className="absolute inset-0 opacity-20 bg-cover bg-center pointer-events-none"
+            style={{ backgroundImage: "url('/images/map.png')" }}
+          />
+          <div className="relative max-w-md w-full p-6 sm:p-8 rounded-3xl bg-[#FAF8F2]/95 border border-[#173D32]/15 shadow-2xl flex flex-col items-center text-[#173D32] z-10">
+            <div className="w-14 h-14 rounded-2xl bg-[#D6A65D]/20 border border-[#D6A65D]/40 flex items-center justify-center mb-4 shadow-xs text-[#173D32]">
+              <Compass className="w-7 h-7 text-[#173D32]" />
             </div>
             <h3 className="text-lg sm:text-xl font-black tracking-tight text-[#173D32] mb-2">
-              Mapbox Access Token Required
+              Interactive 3D Terrain Engine
             </h3>
             <p className="text-xs sm:text-sm text-[#173D32]/80 mb-4 leading-relaxed font-normal">
               Interactive 3D mountain terrain, slope telemetry, and corridor risk heatmaps require an active Mapbox access token.
@@ -2350,7 +2432,7 @@ export default function RiskMap({
               NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
             </div>
             <p className="text-[11px] text-[#173D32]/60">
-              Add this key in your Vercel Project Environment Variables and redeploy.
+              Configure in <code className="font-mono text-[#173D32]">frontend/.env.local</code> to activate live 3D DEM elevation.
             </p>
           </div>
         </div>

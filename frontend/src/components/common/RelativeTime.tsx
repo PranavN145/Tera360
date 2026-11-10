@@ -24,7 +24,10 @@ export default function RelativeTime({
 
   useEffect(() => {
     if (date) {
-      setDisplayText(formatRelativeTime(date));
+      const timer = setTimeout(() => {
+        setDisplayText(formatRelativeTime(date));
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [date]);
 

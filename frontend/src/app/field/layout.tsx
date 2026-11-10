@@ -9,7 +9,7 @@ export default function FieldOfficerLayout({
   children: React.ReactNode;
 }) {
   return (
-    <PortalLayout allowedRoles={["field_officer", "admin"]}>
+    <PortalLayout allowedRoles={["field_officer"]}>
       {children}
     </PortalLayout>
   );

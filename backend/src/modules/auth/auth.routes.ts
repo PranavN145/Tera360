@@ -8,20 +8,22 @@ import {
   verifyEmailSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  acceptInviteSchema,
 } from './auth.schema';
 
 const router = Router();
 
-// Strict rate limiter for authentication routes per PRD §13.1 & §15
+// Strict rate limiter for authentication routes per PRD §13.1 & §15 (10 attempts/min, skip successful)
 const authLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 15, // Max 15 attempts per minute per IP
+  max: 10, // Max 10 attempts per minute per IP
+  skipSuccessfulRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
     success: false,
     error: {
-      code: 'TOO_MANY_REQUESTS',
+      code: 'RATE_LIMIT_EXCEEDED',
       message: 'Too many authentication attempts. Please try again in one minute.',
     },
   },
@@ -49,6 +51,9 @@ router.post('/forgot-password', validate({ body: forgotPasswordSchema }), authCo
 
 // POST /api/v1/auth/reset-password
 router.post('/reset-password', validate({ body: resetPasswordSchema }), authController.resetPassword);
+
+// POST /api/v1/auth/accept-invite (Staff invitation onboarding per PRD §7.1, §14.4)
+router.post('/accept-invite', validate({ body: acceptInviteSchema }), authController.acceptInvite);
 
 export default router;
 

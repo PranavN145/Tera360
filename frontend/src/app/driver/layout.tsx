@@ -9,7 +9,7 @@ export default function DriverLayout({
   children: React.ReactNode;
 }) {
   return (
-    <PortalLayout allowedRoles={["driver", "admin"]}>
+    <PortalLayout allowedRoles={["driver"]}>
       {children}
     </PortalLayout>
   );

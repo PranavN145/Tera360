@@ -41,7 +41,10 @@ export default function DropdownPortal({
   });
 
   useEffect(() => {
-    setMounted(true);
+    const timer = setTimeout(() => {
+      setMounted(true);
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   const updatePosition = useCallback(() => {

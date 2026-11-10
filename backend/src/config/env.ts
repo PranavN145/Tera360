@@ -34,7 +34,7 @@ export const envSchema = z.object({
   COOKIE_SAMESITE: z.enum(['strict', 'lax', 'none']).default('none'),
   ENCRYPTION_KEY: z
     .string()
-    .min(32)
+    .regex(/^[0-9a-fA-F]{64}$/, 'ENCRYPTION_KEY must be a 64-character hexadecimal string')
     .default('0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().optional(),

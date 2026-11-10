@@ -7,8 +7,8 @@ async function bootstrap() {
     // 1. Connect to MongoDB
     await connectDB();
 
-    // 2. Start HTTP server (Explicitly bind 0.0.0.0 for Render/container routing)
-    const server = app.listen(env.PORT, '0.0.0.0', () => {
+    // 2. Start HTTP server (Dual-stack IPv4/IPv6 localhost and container routing)
+    const server = app.listen(env.PORT, () => {
       console.log(`\n==================================================`);
       console.log(`🚀 Terra360 Backend API running on port ${env.PORT}`);
       console.log(`📡 Environment: ${env.NODE_ENV}`);

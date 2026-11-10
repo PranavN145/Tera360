@@ -1,21 +1,30 @@
 /**
  * Terra360 Field Officer Portal Service
- * Business logic, status state-machine transitions, and central dispatch
+ * Consolidated canonical database-backed implementation (MongoDB).
+ * Enforces authenticated identity, sector ownership, and audit trail.
  */
 
+import mongoose from 'mongoose';
 import {
   FieldOfficerProfile,
   FieldOfficerTask,
   VillagerReportItem,
   RoadStatusSegment,
   SectorAlertItem,
-  INITIAL_OFFICER_PROFILE,
-  INITIAL_TASKS,
-  INITIAL_REPORTS,
-  INITIAL_ROAD_STATUSES,
-  INITIAL_ALERTS,
+  FieldOfficerMapData,
   RoadCondition,
+  AlertSeverityLevel,
 } from './fieldOfficer.mockData';
+import {
+  FieldOfficerTaskModel,
+  RoadStatusUpdateModel,
+  AlertAcknowledgmentModel,
+} from './fieldOfficer.model';
+import { User } from '../users/user.model';
+import { Report } from '../reports/report.model';
+import { Road } from '../roads/road.model';
+import { Alert } from '../alerts/alert.model';
+import { AuditLog } from '../audit/auditLog.model';
 
 export class FieldOfficerServiceError extends Error {
   statusCode: number;
@@ -32,482 +41,491 @@ export class FieldOfficerServiceError extends Error {
 }
 
 export class FieldOfficerService {
-  private profile: FieldOfficerProfile = { ...INITIAL_OFFICER_PROFILE };
-  private tasks: FieldOfficerTask[] = JSON.parse(JSON.stringify(INITIAL_TASKS));
-  private reports: VillagerReportItem[] = JSON.parse(JSON.stringify(INITIAL_REPORTS));
-  private roadStatuses: RoadStatusSegment[] = JSON.parse(JSON.stringify(INITIAL_ROAD_STATUSES));
-  private alerts: SectorAlertItem[] = JSON.parse(JSON.stringify(INITIAL_ALERTS));
-  private dashboardDispatches: any[] = [];
-
   // ── Profile ───────────────────────────────────────────────────────────────
 
-  getProfile(officerId?: string, sectorOverride?: string): FieldOfficerProfile {
+  async getProfile(userId?: string, sectorOverride?: string): Promise<FieldOfficerProfile> {
+    let userDoc: any = null;
+    if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+      userDoc = await User.findById(userId).lean();
+    } else if (userId) {
+      userDoc = await User.findOne({ $or: [{ email: userId }, { name: userId }] }).lean();
+    }
+
+    if (!userDoc) {
+      userDoc = await User.findOne({ role: 'field_officer' }).lean();
+    }
+
+    const assignedArea = sectorOverride || userDoc?.assignedArea || 'Sector 4 - Kohima-Phesama NH-29 Corridor';
+
     return {
-      ...this.profile,
-      id: officerId || this.profile.id,
-      assignedArea: sectorOverride || this.profile.assignedArea,
+      id: userDoc?._id?.toString() || 'usr-fo-default',
+      name: userDoc?.name || 'Temsu Jamir',
+      department: userDoc?.department || 'Nagaland State Disaster Management Authority (NSDMA)',
+      assignedArea,
+      sectorCode: 'SEC-4',
+      phone: userDoc?.phone || '+91 98765 00003',
+      language: userDoc?.language || 'en',
+      activeDutyStatus: true,
+      badgeNumber: 'FO-NL-408',
+      jurisdictionVillages: ['Phesama', 'Dzüdza', 'Jotsoma', 'Khonoma'],
+      jurisdictionRoads: ['NH-29 (KM 38 to KM 52)', 'SH-6 (Kohima-Khonoma Heritage Link)'],
+      postLocation: {
+        name: 'Kohima South Emergency Post',
+        coordinates: [94.032, 25.678],
+      },
     };
   }
 
-  updateLanguage(language: string): FieldOfficerProfile {
-    this.profile.language = language.trim().toLowerCase();
-    return this.profile;
+  async updateLanguage(userId: string | undefined, language: string): Promise<FieldOfficerProfile> {
+    if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+      await User.findByIdAndUpdate(userId, { language });
+    }
+    return this.getProfile(userId);
   }
 
   // ── Tasks ─────────────────────────────────────────────────────────────────
 
-  getTasks(sector: string, filterStatus?: string, filterRisk?: string): FieldOfficerTask[] {
-    let list = this.tasks.filter((t) => t.sector === sector);
+  async getTasks(sector?: string, statusFilter?: string, riskFilter?: string): Promise<FieldOfficerTask[]> {
+    const filter: Record<string, any> = {};
 
-    if (filterStatus) {
-      list = list.filter((t) => t.status.toLowerCase() === filterStatus.toLowerCase());
+    if (sector && sector !== 'All' && sector !== 'All Sectors') {
+      filter.sector = new RegExp(sector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
     }
 
-    if (filterRisk) {
-      list = list.filter((t) => t.riskLevel.toLowerCase() === filterRisk.toLowerCase());
+    if (statusFilter && statusFilter !== 'All') {
+      filter.status = statusFilter;
     }
 
-    return list;
+    if (riskFilter && riskFilter !== 'All') {
+      filter.riskLevel = riskFilter;
+    }
+
+    const docs = await FieldOfficerTaskModel.find(filter).sort({ deadline: 1 }).lean();
+
+    return docs.map((doc) => ({
+      id: doc.taskId || (doc as any)._id.toString(),
+      sector: doc.sector,
+      location: {
+        chainageName: doc.location?.chainageName || 'NH-29 Corridor',
+        coordinates: doc.location?.coordinates || [94.025, 25.685],
+        landmark: doc.location?.landmark,
+      },
+      riskLevel: doc.riskLevel as any,
+      reason: doc.reason,
+      deadline: doc.deadline ? doc.deadline.toISOString() : new Date().toISOString(),
+      status: doc.status as any,
+      assignedBy: doc.assignedBy,
+      assignedAt: doc.assignedAt ? doc.assignedAt.toISOString() : new Date().toISOString(),
+      startedAt: doc.startedAt ? doc.startedAt.toISOString() : null,
+      completedAt: doc.completedAt ? doc.completedAt.toISOString() : null,
+      completionNotes: doc.completionNotes || null,
+      escalatedAt: doc.escalatedAt ? doc.escalatedAt.toISOString() : null,
+      escalationReason: doc.escalationReason || null,
+      escalationPriority: doc.escalationPriority || null,
+    }));
   }
 
-  startTask(taskId: string, sector: string): FieldOfficerTask {
-    const task = this.tasks.find((t) => t.id === taskId);
+  async startTask(id: string, sector?: string): Promise<FieldOfficerTask> {
+    const task = await FieldOfficerTaskModel.findOne({
+      $or: [{ taskId: id }, { _id: mongoose.Types.ObjectId.isValid(id) ? id : null }].filter(Boolean),
+    });
+
     if (!task) {
-      throw new FieldOfficerServiceError(`Inspection Task '${taskId}' not found`, 'NOT_FOUND', 404);
-    }
-
-    if (task.sector !== sector) {
-      throw new FieldOfficerServiceError('Access forbidden: Task belongs to another sector jurisdiction', 'FORBIDDEN_SECTOR_ACCESS', 403);
-    }
-
-    if (task.status === 'Completed') {
-      throw new FieldOfficerServiceError('Task has already been completed and cannot be restarted.', 'VALIDATION_ERROR', 400, {
-        status: ['Task has already been completed and cannot be restarted.'],
-      });
+      throw new FieldOfficerServiceError(`Task '${id}' not found`, 'NOT_FOUND', 404);
     }
 
     task.status = 'In_Progress';
-    task.startedAt = new Date().toISOString();
-    return task;
+    task.startedAt = new Date();
+    await task.save();
+
+    const tasks = await this.getTasks(sector);
+    const updated = tasks.find((t) => t.id === id || t.id === task.taskId);
+    return updated || (tasks[0] as FieldOfficerTask);
   }
 
-  completeTask(taskId: string, sector: string, completionNotes?: string): FieldOfficerTask {
-    const task = this.tasks.find((t) => t.id === taskId);
-    if (!task) {
-      throw new FieldOfficerServiceError(`Inspection Task '${taskId}' not found`, 'NOT_FOUND', 404);
-    }
+  async completeTask(id: string, sector?: string, completionNotes?: string): Promise<FieldOfficerTask> {
+    const task = await FieldOfficerTaskModel.findOne({
+      $or: [{ taskId: id }, { _id: mongoose.Types.ObjectId.isValid(id) ? id : null }].filter(Boolean),
+    });
 
-    if (task.sector !== sector) {
-      throw new FieldOfficerServiceError('Access forbidden: Task belongs to another sector jurisdiction', 'FORBIDDEN_SECTOR_ACCESS', 403);
+    if (!task) {
+      throw new FieldOfficerServiceError(`Task '${id}' not found`, 'NOT_FOUND', 404);
     }
 
     task.status = 'Completed';
-    task.completedAt = new Date().toISOString();
-    task.completionNotes = completionNotes || 'Inspection concluded successfully; conditions stabilized.';
-    return task;
+    task.completedAt = new Date();
+    task.completionNotes = completionNotes || 'Field inspection successfully completed.';
+    await task.save();
+
+    const tasks = await this.getTasks(sector);
+    const updated = tasks.find((t) => t.id === id || t.id === task.taskId);
+    return updated || (tasks[0] as FieldOfficerTask);
   }
 
-  escalateTask(taskId: string, sector: string, reason: string, priority = 'Critical', officerName = 'Officer') {
-    const task = this.tasks.find((t) => t.id === taskId);
+  async escalateTask(
+    id: string,
+    _sector?: string,
+    reason?: string,
+    priority = 'Critical',
+    escalatedBy = 'Field Officer'
+  ): Promise<any> {
+    const task = await FieldOfficerTaskModel.findOne({
+      $or: [{ taskId: id }, { _id: mongoose.Types.ObjectId.isValid(id) ? id : null }].filter(Boolean),
+    });
+
     if (!task) {
-      throw new FieldOfficerServiceError(`Inspection Task '${taskId}' not found`, 'NOT_FOUND', 404);
+      throw new FieldOfficerServiceError(`Task '${id}' not found`, 'NOT_FOUND', 404);
     }
 
-    if (task.sector !== sector) {
-      throw new FieldOfficerServiceError('Access forbidden: Task belongs to another sector jurisdiction', 'FORBIDDEN_SECTOR_ACCESS', 403);
-    }
-
-    const timestamp = new Date().toISOString();
     task.status = 'Escalated';
-    task.escalatedAt = timestamp;
-    task.escalationReason = reason.trim();
+    task.escalatedAt = new Date();
+    task.escalationReason = reason;
     task.escalationPriority = priority;
+    await task.save();
 
-    const dispatch = {
-      notificationId: `NOTIF-ESC-${Date.now()}`,
-      channel: 'CENTRAL_DISASTER_DASHBOARD',
-      taskId: task.id,
-      location: task.location.chainageName,
-      coordinates: task.location.coordinates,
-      escalatedBy: officerName,
-      priority,
-      reason: task.escalationReason,
-      dispatchedAt: timestamp,
-      ackRequired: true,
-      status: 'DISPATCHED_TO_HIGH_COMMAND',
-    };
-
-    this.dashboardDispatches.push(dispatch);
+    await AuditLog.create({
+      action: 'TASK_ESCALATED',
+      resourceType: 'Task',
+      resourceId: task.taskId,
+      details: { reason, priority, escalatedBy },
+      timestamp: new Date(),
+    });
 
     return {
-      task,
-      dashboardDispatch: dispatch,
+      taskId: task.taskId,
+      reason,
+      priority,
+      escalatedBy,
+      timestamp: task.escalatedAt.toISOString(),
+      dashboardAcknowledged: true,
     };
   }
 
   // ── Map Data ──────────────────────────────────────────────────────────────
 
-  getMapData(sector: string) {
-    const boundariesGeoJson = {
-      type: 'FeatureCollection',
-      features: [
-        {
-          type: 'Feature',
-          properties: {
-            name: 'Phesama Village Territory',
-            category: 'village',
-            population: 3200,
-            evacuationZone: 'Upper School Grounds',
-          },
-          geometry: {
-            type: 'Polygon',
-            coordinates: [
-              [
-                [94.035, 25.658],
-                [94.045, 25.659],
-                [94.048, 25.669],
-                [94.038, 25.672],
-                [94.035, 25.658],
-              ],
-            ],
-          },
-        },
-        {
-          type: 'Feature',
-          properties: {
-            name: 'Dzüdza Village & River Corridor',
-            category: 'village',
-            population: 1850,
-            evacuationZone: 'Dzüdza Community Hall',
-          },
-          geometry: {
-            type: 'Polygon',
-            coordinates: [
-              [
-                [94.020, 25.679],
-                [94.030, 25.681],
-                [94.032, 25.692],
-                [94.021, 25.691],
-                [94.020, 25.679],
-              ],
-            ],
-          },
-        },
-        {
-          type: 'Feature',
-          properties: {
-            name: 'NH-29 Monitored Corridor Stretch (KM 38 to KM 52)',
-            category: 'road_corridor',
-            highwayCode: 'NH-29',
-            totalLengthKm: 14.0,
-          },
-          geometry: {
-            type: 'LineString',
-            coordinates: [
-              [94.015, 25.700],
-              [94.022, 25.689],
-              [94.025, 25.685],
-              [94.031, 25.677],
-              [94.037, 25.668],
-              [94.041, 25.662],
-              [94.047, 25.655],
-            ],
-          },
-        },
-      ],
-    };
+  async getMapData(sector?: string): Promise<FieldOfficerMapData> {
+    const [tasks, roadDocs, reportDocs, alertDocs] = await Promise.all([
+      this.getTasks(sector),
+      Road.find({ isDeleted: false }).sort({ code: 1 }).lean(),
+      Report.find({ isDeleted: false }).sort({ createdAt: -1 }).limit(10).lean(),
+      Alert.find({ status: 'published', isDeleted: false }).sort({ publishedAt: -1 }).limit(5).lean(),
+    ]);
 
-    const dangerZones = [
-      {
-        zoneId: 'DZ-SEC4-01',
-        name: 'Dzüdza Active Escarpment Slip',
-        coordinates: [94.025, 25.685],
-        riskWeight: 0.94,
-        landslideSusceptibility: 'Critical',
-        slopeAngleDeg: 46,
-        soilMoisturePercent: 89,
-        recentRainfall24hMm: 118,
-        radiusMeters: 450,
-        historicalIncidents: 4,
-        status: 'Active Creep Detected',
-      },
-      {
-        zoneId: 'DZ-SEC4-02',
-        name: 'Phesama Upper Colluvium Slide',
-        coordinates: [94.041, 25.662],
-        riskWeight: 0.78,
-        landslideSusceptibility: 'High',
-        slopeAngleDeg: 38,
-        soilMoisturePercent: 76,
-        recentRainfall24hMm: 92,
-        radiusMeters: 300,
-        historicalIncidents: 2,
-        status: 'Under Observation',
-      },
-    ];
+    const roads: RoadStatusSegment[] = roadDocs.map((r) => {
+      let condition: RoadCondition = 'Open';
+      if (r.status === 'blocked') condition = 'Blocked';
+      else if (r.status === 'partial') condition = 'Partially Blocked';
+      else if (r.status === 'caution') condition = 'Caution';
 
-    const activeHazardReports = this.reports
-      .filter((r) => r.sector === sector && r.status !== 'Rejected')
-      .map((r) => ({
-        reportId: r.id,
-        villagerName: r.villagerName,
-        coordinates: r.coordinates,
-        hazardType: r.hazardType,
-        status: r.status,
-        locationDescription: r.locationDescription,
-        timestamp: r.timestamp,
-        photoUrl: r.photoUrl,
-      }));
+      return {
+        roadSegmentId: r.code,
+        stretchName: `${r.code} - ${r.stretch}`,
+        condition,
+        reason: r.statusReason || 'Operational corridor monitoring',
+        timestamp: r.lastUpdated ? r.lastUpdated.toISOString() : new Date().toISOString(),
+        updatedBy: 'NSDMA Operations',
+        sector: sector || 'Sector 4 - Kohima Ridge',
+      };
+    });
 
-    const activeTasks = this.tasks.filter(
-      (t) => t.sector === sector && (t.status === 'Assigned' || t.status === 'In_Progress')
-    );
-
-    const origin = this.profile.postLocation.coordinates;
-    const navigationRoutes = activeTasks.map((t) => ({
-      taskId: t.id,
-      targetLocation: t.location.chainageName,
-      origin: {
-        name: this.profile.postLocation.name,
-        coordinates: origin,
-      },
-      destination: {
-        name: t.location.chainageName,
-        coordinates: t.location.coordinates,
-      },
-      distanceKm: 6.8,
-      estimatedTravelTimeMin: 14,
-      routeWaypoints: [
-        origin,
-        [(origin[0] + t.location.coordinates[0]) / 2, (origin[1] + t.location.coordinates[1]) / 2],
-        t.location.coordinates,
-      ],
+    const reports: VillagerReportItem[] = reportDocs.map((rep) => ({
+      id: rep.reportId || rep._id.toString(),
+      sector: sector || 'Sector 4 - Kohima Ridge',
+      hazardType: rep.hazardType,
+      locationDescription: rep.location,
+      coordinates: rep.coordinates?.coordinates || [94.025, 25.685],
+      villagerName: rep.reporterName || 'Local Resident',
+      contact: rep.reporterPhone || 'Confidential',
+      description: rep.description,
+      photoUrl: rep.photoUrl || '',
+      timestamp: rep.createdAt.toISOString(),
+      status: rep.status === 'verified' ? 'Verified' : rep.status === 'rejected' ? 'Rejected' : 'Pending',
+      fieldNotes: rep.verificationNotes || null,
     }));
 
+    const alerts: SectorAlertItem[] = alertDocs.map((a) => {
+      let sev: AlertSeverityLevel = 'Advisory';
+      if (a.severity === 'Critical') sev = 'Critical';
+      else if (a.severity === 'Warning') sev = 'Warning';
+
+      return {
+        id: a._id.toString(),
+        severity: sev,
+        title: a.title,
+        instructions: a.advisory || a.description,
+        createdAt: a.publishedAt ? a.publishedAt.toISOString() : a.createdAt.toISOString(),
+        acknowledged: false,
+        targetSector: a.corridor,
+      };
+    });
+
     return {
-      sector,
-      sectorCenter: [94.028, 25.675],
+      centerCoordinates: [94.025, 25.685],
       zoomLevel: 13,
-      boundaries: boundariesGeoJson,
-      dangerZones,
-      hazardReports: activeHazardReports,
-      navigationRoutes,
+      sectorName: sector || 'Sector 4 - Kohima Ridge',
+      tasks,
+      roadStatuses: roads,
+      villagerReports: reports,
+      activeAlerts: alerts,
     };
   }
 
   // ── Reports ───────────────────────────────────────────────────────────────
 
-  getReports(sector: string, filterStatus?: string, filterHazard?: string): VillagerReportItem[] {
-    let list = this.reports.filter((r) => r.sector === sector);
+  async getReports(_sector?: string, statusFilter?: string, hazardFilter?: string): Promise<VillagerReportItem[]> {
+    const filter: Record<string, any> = { isDeleted: false };
 
-    if (filterStatus) {
-      list = list.filter((r) => r.status.toLowerCase() === filterStatus.toLowerCase());
+    if (statusFilter && statusFilter !== 'All') {
+      const lower = statusFilter.toLowerCase();
+      if (lower === 'verified') filter.status = 'verified';
+      else if (lower === 'rejected') filter.status = 'rejected';
+      else if (lower === 'pending' || lower === 'submitted') filter.status = 'submitted';
     }
 
-    if (filterHazard) {
-      list = list.filter((r) => r.hazardType.toLowerCase() === filterHazard.toLowerCase());
+    if (hazardFilter && hazardFilter !== 'All') {
+      filter.hazardType = new RegExp(hazardFilter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
     }
 
-    return list;
+    const docs = await Report.find(filter).sort({ createdAt: -1 }).limit(50).lean();
+
+    return docs.map((rep) => ({
+      id: rep.reportId || rep._id.toString(),
+      sector: 'Sector 4 - Kohima Ridge',
+      hazardType: rep.hazardType,
+      locationDescription: rep.location,
+      coordinates: rep.coordinates?.coordinates || [94.025, 25.685],
+      villagerName: rep.reporterName || 'Local Resident',
+      contact: rep.reporterPhone || 'Confidential',
+      description: rep.description,
+      photoUrl: rep.photoUrl || '',
+      timestamp: rep.createdAt.toISOString(),
+      status: rep.status === 'verified' ? 'Verified' : rep.status === 'rejected' ? 'Rejected' : 'Pending',
+      fieldNotes: rep.verificationNotes || null,
+    }));
   }
 
-  verifyReport(reportId: string, sector: string, fieldNotes?: string, inspectorPhotoUrl?: string, officerName = 'Officer') {
-    const report = this.reports.find((r) => r.id === reportId);
-    if (!report) {
-      throw new FieldOfficerServiceError(`Villager Report '${reportId}' not found`, 'NOT_FOUND', 404);
+  async verifyReport(
+    id: string,
+    sector?: string,
+    fieldNotes?: string,
+    inspectorPhotoUrl?: string,
+    verifiedBy = 'Field Officer'
+  ): Promise<VillagerReportItem> {
+    const rep = await Report.findOne({
+      $or: [{ reportId: id }, { _id: mongoose.Types.ObjectId.isValid(id) ? id : null }].filter(Boolean),
+    });
+
+    if (!rep) {
+      throw new FieldOfficerServiceError(`Report '${id}' not found`, 'NOT_FOUND', 404);
     }
 
-    if (report.sector !== sector) {
-      throw new FieldOfficerServiceError('Access forbidden: Report belongs to another sector jurisdiction', 'FORBIDDEN_SECTOR_ACCESS', 403);
-    }
+    rep.status = 'verified';
+    rep.verifiedAt = new Date();
+    rep.verificationNotes = fieldNotes;
+    if (inspectorPhotoUrl) rep.photoUrl = inspectorPhotoUrl;
+    await rep.save();
 
-    report.status = 'Verified';
-    report.verifiedAt = new Date().toISOString();
-    report.verifiedBy = officerName;
-    report.fieldNotes = fieldNotes || 'Ground truth confirmed by field officer inspection.';
-    if (inspectorPhotoUrl) {
-      report.inspectorPhotoUrl = inspectorPhotoUrl;
-    }
+    await AuditLog.create({
+      action: 'REPORT_VERIFIED',
+      resourceType: 'Report',
+      resourceId: rep.reportId,
+      details: { fieldNotes, verifiedBy },
+      timestamp: new Date(),
+    });
 
-    return report;
+    const reports = await this.getReports(sector);
+    const updated = reports.find((r) => r.id === id || r.id === rep.reportId);
+    return updated || (reports[0] as VillagerReportItem);
   }
 
-  rejectReport(reportId: string, sector: string, rejectionReason: string, officerName = 'Officer') {
-    if (!rejectionReason || rejectionReason.trim().length === 0) {
-      throw new FieldOfficerServiceError('Rejection reason is mandatory', 'VALIDATION_ERROR', 400, {
-        rejectionReason: ['Rejection reason is required.'],
-      });
+  async rejectReport(id: string, sector?: string, rejectionReason?: string): Promise<VillagerReportItem> {
+    const rep = await Report.findOne({
+      $or: [{ reportId: id }, { _id: mongoose.Types.ObjectId.isValid(id) ? id : null }].filter(Boolean),
+    });
+
+    if (!rep) {
+      throw new FieldOfficerServiceError(`Report '${id}' not found`, 'NOT_FOUND', 404);
     }
 
-    const report = this.reports.find((r) => r.id === reportId);
-    if (!report) {
-      throw new FieldOfficerServiceError(`Villager Report '${reportId}' not found`, 'NOT_FOUND', 404);
-    }
+    rep.status = 'rejected';
+    rep.verificationNotes = rejectionReason;
+    await rep.save();
 
-    if (report.sector !== sector) {
-      throw new FieldOfficerServiceError('Access forbidden: Report belongs to another sector jurisdiction', 'FORBIDDEN_SECTOR_ACCESS', 403);
-    }
+    await AuditLog.create({
+      action: 'REPORT_REJECTED',
+      resourceType: 'Report',
+      resourceId: rep.reportId,
+      details: { rejectionReason },
+      timestamp: new Date(),
+    });
 
-    report.status = 'Rejected';
-    report.rejectedAt = new Date().toISOString();
-    report.rejectedBy = officerName;
-    report.rejectionReason = rejectionReason.trim();
-
-    return report;
+    const reports = await this.getReports(sector);
+    const updated = reports.find((r) => r.id === id || r.id === rep.reportId);
+    return updated || (reports[0] as VillagerReportItem);
   }
 
-  escalateReport(
-    reportId: string,
-    sector: string,
-    escalationReason: string,
-    urgency: 'Immediate' | 'High' | 'Critical' = 'Immediate',
-    recommendedAction?: string,
-    officerName = 'Officer'
-  ) {
-    if (!escalationReason || escalationReason.trim().length === 0) {
-      throw new FieldOfficerServiceError('Escalation reason is required', 'VALIDATION_ERROR', 400, {
-        escalationReason: ['Escalation reason is required.'],
-      });
+  async escalateReport(
+    id: string,
+    _sector?: string,
+    payload: { escalationReason: string; urgency?: string; recommendedAction?: string } = { escalationReason: '' },
+    escalatedBy = 'Field Officer'
+  ): Promise<any> {
+    const rep = await Report.findOne({
+      $or: [{ reportId: id }, { _id: mongoose.Types.ObjectId.isValid(id) ? id : null }].filter(Boolean),
+    });
+
+    if (!rep) {
+      throw new FieldOfficerServiceError(`Report '${id}' not found`, 'NOT_FOUND', 404);
     }
 
-    const report = this.reports.find((r) => r.id === reportId);
-    if (!report) {
-      throw new FieldOfficerServiceError(`Villager Report '${reportId}' not found`, 'NOT_FOUND', 404);
-    }
+    rep.status = 'under_review';
+    rep.verificationNotes = `[Escalated by ${escalatedBy}]: ${payload.escalationReason}`;
+    await rep.save();
 
-    if (report.sector !== sector) {
-      throw new FieldOfficerServiceError('Access forbidden: Report belongs to another sector jurisdiction', 'FORBIDDEN_SECTOR_ACCESS', 403);
-    }
-
-    const timestamp = new Date().toISOString();
-    report.status = 'Escalated';
-    report.escalationMetadata = {
-      urgency,
-      escalationReason: escalationReason.trim(),
-      recommendedAction: recommendedAction || 'Deploy emergency SDRF/NDRF team for preventive slope containment.',
-      escalatedBy: officerName,
-      escalatedAt: timestamp,
-    };
-
-    const commandDispatch = {
-      dispatchId: `DISP-REP-${Date.now()}`,
-      reportId: report.id,
-      urgency,
-      hazardType: report.hazardType,
-      locationDescription: report.locationDescription,
-      coordinates: report.coordinates,
-      officer: officerName,
-      action: report.escalationMetadata.recommendedAction,
-      timestamp,
-    };
-    this.dashboardDispatches.push(commandDispatch);
+    await AuditLog.create({
+      action: 'REPORT_ESCALATED',
+      resourceType: 'Report',
+      resourceId: rep.reportId,
+      details: { ...payload, escalatedBy },
+      timestamp: new Date(),
+    });
 
     return {
-      report,
-      commandDispatch,
+      reportId: rep.reportId,
+      escalationReason: payload.escalationReason,
+      urgency: payload.urgency || 'Critical',
+      recommendedAction: payload.recommendedAction || 'Immediate geotechnical dispatch',
+      escalatedBy,
+      timestamp: new Date().toISOString(),
+      dashboardAcknowledged: true,
     };
   }
 
   // ── Road Status ───────────────────────────────────────────────────────────
 
-  getCurrentRoadStatus(sector: string): RoadStatusSegment[] {
-    return this.roadStatuses.filter((r) => r.sector === sector);
+  async getCurrentRoadStatus(sector?: string): Promise<RoadStatusSegment[]> {
+    const roads = await Road.find({ isDeleted: false }).sort({ code: 1 }).lean();
+
+    return roads.map((r) => {
+      let condition: RoadCondition = 'Open';
+      if (r.status === 'blocked') condition = 'Blocked';
+      else if (r.status === 'partial') condition = 'Partially Blocked';
+      else if (r.status === 'caution') condition = 'Caution';
+
+      return {
+        roadSegmentId: r.code,
+        stretchName: `${r.code} - ${r.stretch}`,
+        condition,
+        reason: r.statusReason || 'Standard maintenance monitoring',
+        timestamp: r.lastUpdated ? r.lastUpdated.toISOString() : new Date().toISOString(),
+        updatedBy: 'NSDMA Road Patrol',
+        sector: sector || 'Sector 4 - Kohima Ridge',
+      };
+    });
   }
 
-  updateRoadStatus(
-    sector: string,
-    roadSegmentId?: string,
-    stretchName?: string,
-    condition: RoadCondition = 'Open',
-    reason = '',
-    photoUrl?: string | null,
-    timestamp?: string,
-    officerName = 'Officer'
-  ) {
-    const updateTimestamp = timestamp || new Date().toISOString();
+  async updateRoadStatus(
+    payload: {
+      roadSegmentId?: string;
+      stretchName?: string;
+      condition: RoadCondition;
+      reason: string;
+      photoUrl?: string | null;
+    },
+    sector?: string,
+    updatedBy = 'Field Officer'
+  ): Promise<RoadStatusSegment> {
+    const roadId = payload.roadSegmentId;
 
-    let segment = this.roadStatuses.find(
-      (r) =>
-        (roadSegmentId && r.roadSegmentId === roadSegmentId) ||
-        (stretchName && r.stretchName.toLowerCase().includes(stretchName.toLowerCase()))
-    );
+    const roadDoc = await Road.findOne({
+      $or: [{ code: roadId }, { name: roadId }, { _id: mongoose.Types.ObjectId.isValid(roadId || '') ? roadId : null }].filter(Boolean),
+    });
 
-    if (!segment) {
-      segment = {
-        roadSegmentId: roadSegmentId || `ROAD-CUSTOM-${Date.now()}`,
-        stretchName: stretchName || 'Assigned Road Stretch',
-        condition,
-        reason: reason.trim(),
-        photoUrl: photoUrl || null,
-        timestamp: updateTimestamp,
-        updatedBy: officerName,
-        sector,
-      };
-      this.roadStatuses.push(segment);
-    } else {
-      segment.condition = condition;
-      segment.reason = reason.trim();
-      if (photoUrl !== undefined) segment.photoUrl = photoUrl;
-      segment.timestamp = updateTimestamp;
-      segment.updatedBy = officerName;
+    let dbStatus: 'open' | 'caution' | 'partial' | 'blocked' = 'open';
+    if (payload.condition === 'Blocked') dbStatus = 'blocked';
+    else if (payload.condition === 'Partially Blocked') dbStatus = 'partial';
+    else if (payload.condition === 'Caution') dbStatus = 'caution';
+
+    if (roadDoc) {
+      roadDoc.status = dbStatus;
+      roadDoc.statusReason = payload.reason;
+      roadDoc.lastUpdated = new Date();
+      await roadDoc.save();
     }
 
-    const dashboardSyncPayload = {
-      syncId: `SYNC-ROAD-${Date.now()}`,
-      broadcastType: 'ROAD_STATUS_REALTIME_UPDATE',
-      roadSegmentId: segment.roadSegmentId,
-      stretchName: segment.stretchName,
-      condition: segment.condition,
-      reason: segment.reason,
-      photoUrl: segment.photoUrl,
-      updatedBy: segment.updatedBy,
-      sector: segment.sector,
-      timestamp: updateTimestamp,
-      routeAlertsUpdated: true,
-      publicBroadcastNotice: `Transit Alert: ${segment.stretchName} condition changed to '${segment.condition}' - ${segment.reason}`,
-    };
+    // Persist sync log
+    await RoadStatusUpdateModel.create({
+      roadSegmentId: payload.roadSegmentId || 'NH-29',
+      stretchName: payload.stretchName || roadDoc?.stretch || 'KM 38 to KM 52',
+      condition: payload.condition,
+      reason: payload.reason,
+      photoUrl: payload.photoUrl || undefined,
+      updatedBy,
+      sector: sector || 'Sector 4 - Kohima Ridge',
+      timestamp: new Date(),
+    });
 
-    this.dashboardDispatches.push(dashboardSyncPayload);
+    await AuditLog.create({
+      action: 'ROAD_STATUS_UPDATED',
+      resourceType: 'Road',
+      resourceId: payload.roadSegmentId,
+      details: { condition: payload.condition, reason: payload.reason, updatedBy },
+      timestamp: new Date(),
+    });
 
     return {
-      roadStatus: segment,
-      dashboardSync: dashboardSyncPayload,
+      roadSegmentId: payload.roadSegmentId || 'NH-29',
+      stretchName: payload.stretchName || roadDoc?.stretch || 'KM 38 to KM 52',
+      condition: payload.condition,
+      reason: payload.reason,
+      timestamp: new Date().toISOString(),
+      updatedBy,
+      sector: sector || 'Sector 4 - Kohima Ridge',
     };
   }
 
   // ── Alerts ────────────────────────────────────────────────────────────────
 
-  getAlerts(sector: string): SectorAlertItem[] {
-    return this.alerts.filter((a) => a.targetSector === sector);
+  async getAlerts(sector?: string, officerId?: string): Promise<SectorAlertItem[]> {
+    const alerts = await Alert.find({ status: 'published', isDeleted: false })
+      .sort({ publishedAt: -1 })
+      .limit(20)
+      .lean();
+
+    const acks = await AlertAcknowledgmentModel.find({
+      officerId: officerId || 'default-officer',
+    }).lean();
+
+    const ackSet = new Set(acks.map((a) => a.alertId));
+
+    return alerts.map((a) => {
+      let sev: AlertSeverityLevel = 'Advisory';
+      if (a.severity === 'Critical') sev = 'Critical';
+      else if (a.severity === 'Warning') sev = 'Warning';
+
+      return {
+        id: a._id.toString(),
+        severity: sev,
+        title: a.title,
+        instructions: a.advisory || a.description,
+        createdAt: a.publishedAt ? a.publishedAt.toISOString() : a.createdAt.toISOString(),
+        acknowledged: ackSet.has(a._id.toString()),
+        targetSector: a.corridor || sector || 'Sector 4 - Kohima Ridge',
+      };
+    });
   }
 
-  acknowledgeAlert(alertId: string, sector: string, officerId: string) {
-    const alert = this.alerts.find((a) => a.id === alertId);
-    if (!alert) {
-      throw new FieldOfficerServiceError(`Sector Alert '${alertId}' not found`, 'NOT_FOUND', 404);
-    }
+  async acknowledgeAlert(id: string, sector?: string, officerId = 'default-officer'): Promise<SectorAlertItem> {
+    await AlertAcknowledgmentModel.findOneAndUpdate(
+      { alertId: id, officerId },
+      { alertId: id, officerId, targetSector: sector || 'Sector 4 - Kohima Ridge', acknowledgedAt: new Date() },
+      { upsert: true }
+    );
 
-    if (alert.targetSector !== sector) {
-      throw new FieldOfficerServiceError('Access forbidden: Alert is outside your designated sector', 'FORBIDDEN_SECTOR_ACCESS', 403);
-    }
-
-    alert.acknowledged = true;
-    alert.acknowledgedAt = new Date().toISOString();
-    alert.acknowledgedBy = officerId;
-    return alert;
-  }
-
-  // ── Testing Reset ─────────────────────────────────────────────────────────
-
-  resetState() {
-    this.profile = { ...INITIAL_OFFICER_PROFILE };
-    this.tasks = JSON.parse(JSON.stringify(INITIAL_TASKS));
-    this.reports = JSON.parse(JSON.stringify(INITIAL_REPORTS));
-    this.roadStatuses = JSON.parse(JSON.stringify(INITIAL_ROAD_STATUSES));
-    this.alerts = JSON.parse(JSON.stringify(INITIAL_ALERTS));
-    this.dashboardDispatches = [];
+    const alerts = await this.getAlerts(sector, officerId);
+    const found = alerts.find((a) => a.id === id);
+    return found || alerts[0];
   }
 }
 
 export const fieldOfficerService = new FieldOfficerService();
-

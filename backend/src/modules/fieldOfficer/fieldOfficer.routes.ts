@@ -5,7 +5,8 @@
 import { Router } from 'express';
 import { fieldOfficerController } from './fieldOfficer.controller';
 import { validate } from '../../middleware/validate';
-import { optionalAuth } from '../../middleware/requireAuth';
+import { requireAuth } from '../../middleware/requireAuth';
+import { roleGuard } from '../../middleware/roleGuard';
 import {
   updateLanguageSchema,
   taskParamsSchema,
@@ -20,7 +21,8 @@ import {
 } from './fieldOfficer.schema';
 
 const router = Router();
-router.use(optionalAuth);
+// AUD-01 / AUD-07: Canonical authenticated identity & sector ownership
+router.use(requireAuth, roleGuard('field_officer', 'officer', 'admin'));
 
 // ── Profile ─────────────────────────────────────────────────────────────────
 router.get('/profile', fieldOfficerController.getProfile);

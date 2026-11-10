@@ -3,7 +3,7 @@
 import React, { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Check, X } from "lucide-react";
+import { ArrowLeft, Check, X } from "lucide-react";
 import { authApi, ApiClientError } from "@/lib/api";
 
 function VerifyEmailContent() {
@@ -55,7 +55,23 @@ function VerifyEmailContent() {
   }, [token]);
 
   return (
-    <div className="min-h-[85vh] flex items-center justify-center p-4 sm:p-6 bg-[#FAF8F2]">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 bg-[#FAF8F2]">
+      <div className="w-full max-w-md mb-4 flex items-center justify-between">
+        <Link
+          href="/login"
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-[#173D32] hover:opacity-80 transition-opacity"
+        >
+          <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+          <span>Back to Sign In</span>
+        </Link>
+        <Link
+          href="/"
+          className="text-xs font-semibold text-[#173D32]/60 hover:text-[#173D32] hover:underline"
+        >
+          Public Home
+        </Link>
+      </div>
+
       <div className="w-full max-w-md bg-[#F6F4EC] border border-[#173D32]/15 rounded-3xl p-6 sm:p-8 shadow-xl text-[#173D32]">
         {/* Header */}
         <div className="text-center mb-6">

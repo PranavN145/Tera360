@@ -148,7 +148,7 @@ export default function AlertsPage() {
 
       <Header />
 
-      <main className="relative z-10 flex-1 max-w-[1340px] w-full mx-auto px-4 sm:px-6 lg:px-10 py-10 sm:py-14">
+      <main className="relative z-10 flex-1 max-w-[1340px] w-full mx-auto px-4 sm:px-6 lg:px-10 pt-28 pb-14 sm:pt-32 sm:pb-16 lg:pt-36 lg:pb-20">
         {/* Page Header with Signature Brush Stroke */}
         <div className="mb-10 pb-8 border-b border-[#173D32]/10">
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-[#173D32] tracking-tight leading-[1.12]">

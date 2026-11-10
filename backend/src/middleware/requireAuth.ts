@@ -38,6 +38,10 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
       name: user.name,
       emailVerified: user.emailVerified,
       isActive: user.isActive,
+      department: user.department,
+      assignedArea: user.assignedArea,
+      phone: user.phone,
+      language: user.language,
     };
 
     next();
@@ -45,7 +49,7 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
     if (error.name === 'TokenExpiredError') {
       return next(new AuthError('Access token has expired', 'TOKEN_EXPIRED', 401));
     }
-    return next(new AuthError('Invalid or corrupted access token', 'INVALID_TOKEN', 401));
+    return next(new AuthError('Invalid or corrupted access token', 'TOKEN_INVALID', 401));
   }
 }
 
@@ -70,6 +74,10 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
         name: user.name,
         emailVerified: user.emailVerified,
         isActive: user.isActive,
+        department: user.department,
+        assignedArea: user.assignedArea,
+        phone: user.phone,
+        language: user.language,
       };
     }
   } catch {

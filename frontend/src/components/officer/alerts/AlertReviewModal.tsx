@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   AlertTriangle,
   Ban,
+  CheckCircle2,
   Lock,
   Radio,
   Shield,
@@ -10,6 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
+import { officerApi } from '@/lib/api';
 
 export interface AlertDraftData {
   severity: 'Critical' | 'Warning' | 'Watch';
@@ -37,6 +39,7 @@ export default function AlertReviewModal({
   isOpen,
   onClose,
   draft,
+  onConfirmSuccess,
 }: AlertReviewModalProps) {
   const [criticalConfirmed, setCriticalConfirmed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -47,20 +50,61 @@ export default function AlertReviewModal({
   const isCritical = draft.severity === 'Critical';
   const canSubmit = !isCritical || criticalConfirmed;
 
-  const handleAttemptSend = () => {
+  const handleAttemptSend = async () => {
     if (!canSubmit || isSubmitting) return;
 
     setIsSubmitting(true);
     setSubmissionNotice(null);
 
-    // In accordance with PRD constraints: Backend does NOT have POST /api/v1/alerts or SMS/IVRS gateways.
-    // We clearly state this as unavailable rather than simulating success or making up fake endpoints.
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      // 1. Create draft alert in backend MongoDB (AUD-05)
+      const createdRes = await officerApi.createAlertDraft({
+        title: draft.title,
+        severity: draft.severity,
+        state: draft.state,
+        corridor: draft.targetLocation || draft.title,
+        location: draft.locationDetails,
+        description: draft.description,
+        advisory: draft.advisory,
+        channels: draft.channels.map((c) =>
+          c.toLowerCase().includes('sms')
+            ? 'sms'
+            : c.toLowerCase().includes('ivrs')
+            ? 'ivrs'
+            : 'push'
+        ),
+        audience: {
+          roles: draft.audiences.map((a) =>
+            a.toLowerCase().includes('villager')
+              ? 'citizen'
+              : a.toLowerCase().includes('driver')
+              ? 'driver'
+              : 'field_officer'
+          ),
+        },
+      });
+
+      const alertId = createdRes._id || createdRes.id;
+
+      // 2. Approve & queue delivery (enforces confirm flag for Critical)
+      const approval = await officerApi.approveAlert(alertId, isCritical ? criticalConfirmed : true);
+
       setSubmissionNotice(
-        'Action Blocked: External SMS Gateway, IVRS Telephony, and alert broadcast endpoints are not deployed on this server. This alert cannot be broadcast.'
+        `Alert successfully broadcast to ${approval.queuedRecipients || 'regional'} subscribers. Dispatch verified and logged in MongoDB audit trail.`
       );
-    }, 600);
+
+      if (onConfirmSuccess) {
+        setTimeout(() => {
+          onConfirmSuccess();
+          onClose();
+        }, 1200);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to dispatch alert.';
+      setSubmissionNotice(`Broadcast Error: ${msg}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

@@ -8,6 +8,12 @@ export interface IAlertCoordinates {
   coordinates: [number, number]; // [longitude, latitude]
 }
 
+export interface IAlertAudience {
+  roles?: string[];
+  villageIds?: string[];
+  roadIds?: string[];
+}
+
 export interface IAlert extends Document {
   _id: mongoose.Types.ObjectId;
   title: string;
@@ -23,6 +29,12 @@ export interface IAlert extends Document {
   trafficStatus?: string;
   advisory: string;
   status: AlertStatus;
+  audience?: IAlertAudience;
+  channels?: string[];
+  messages?: Record<string, string>;
+  expiresAt?: Date;
+  approvedBy?: mongoose.Types.ObjectId;
+  approvedAt?: Date;
   publishedAt?: Date;
   createdBy?: mongoose.Types.ObjectId;
   isDeleted: boolean;
@@ -135,6 +147,26 @@ const AlertSchema = new Schema<IAlert>(
       },
       default: 'draft',
       index: true,
+    },
+    audience: {
+      roles: [{ type: String }],
+      villageIds: [{ type: String }],
+      roadIds: [{ type: String }],
+    },
+    channels: [{ type: String }],
+    messages: {
+      type: Map,
+      of: String,
+    },
+    expiresAt: {
+      type: Date,
+    },
+    approvedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    approvedAt: {
+      type: Date,
     },
     publishedAt: {
       type: Date,

@@ -23,7 +23,7 @@ import PortalMetricGrid from "@/components/portal/PortalMetricGrid";
 import PortalSplitLayout from "@/components/portal/PortalSplitLayout";
 import { PortalKpiCard } from "@/components/portal";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { reportsApi } from "@/lib/api";
+import { reportsApi, fieldOfficerApi } from "@/lib/api";
 import { HazardReportOutput } from "@/types/public";
 
 function getSeverityBarClass(severity: string): string {
@@ -46,6 +46,48 @@ export default function FieldReportsPage() {
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isTriagePending, setIsTriagePending] = useState(false);
+  const [triageNotice, setTriageNotice] = useState<string | null>(null);
+  const [activeTriageModal, setActiveTriageModal] = useState<"verify" | "reject" | "escalate" | null>(null);
+  const [triageNotes, setTriageNotes] = useState("");
+
+  const handleTriageSubmit = async () => {
+    if (!selectedReport || !activeTriageModal) return;
+    setIsTriagePending(true);
+    setTriageNotice(null);
+    try {
+      if (activeTriageModal === "verify") {
+        await fieldOfficerApi.verifyReport(
+          selectedReport.reportId,
+          triageNotes || "Field inspection confirmed ground truth hazard."
+        );
+        setTriageNotice(`Report #${selectedReport.reportId} verified and updated.`);
+      } else if (activeTriageModal === "reject") {
+        await fieldOfficerApi.rejectReport(
+          selectedReport.reportId,
+          triageNotes || "Inspected on site: slope normal, false alarm."
+        );
+        setTriageNotice(`Report #${selectedReport.reportId} marked as rejected.`);
+      } else if (activeTriageModal === "escalate") {
+        await fieldOfficerApi.escalateReport(selectedReport.reportId, {
+          escalationReason: triageNotes || "Immediate geotechnical hazard response required.",
+        });
+        setTriageNotice(`Report #${selectedReport.reportId} escalated to Emergency Operations Command.`);
+      }
+
+      setActiveTriageModal(null);
+      setTriageNotes("");
+      const refreshed = await reportsApi.getReports();
+      setReports(refreshed);
+      const found = refreshed.find((r) => r.reportId === selectedReport.reportId);
+      if (found) setSelectedReport(found);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to execute triage operation.";
+      setTriageNotice(`Error: ${msg}`);
+    } finally {
+      setIsTriagePending(false);
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -406,6 +448,45 @@ export default function FieldReportsPage() {
                     Click any ground report to inspect incident evidence.
                   </div>
                 )}
+                {/* Field Triage Actions (AUD-07) */}
+                {selectedReport && (
+                  <div className="mt-4 pt-3 border-t border-[#173D32]/10">
+                    <span className="text-[10px] uppercase font-bold text-[#173D32]/55 tracking-wide block mb-2">
+                      Field Triage & Verification Actions
+                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setActiveTriageModal("verify")}
+                        disabled={isTriagePending || selectedReport.status === "verified"}
+                        className="px-3.5 py-1.5 rounded-full bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-40"
+                      >
+                        ✓ Verify Ground Hazard
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTriageModal("reject")}
+                        disabled={isTriagePending || selectedReport.status === "rejected"}
+                        className="px-3.5 py-1.5 rounded-full bg-white hover:bg-red-50 text-red-700 border border-red-200 text-xs font-bold transition-colors cursor-pointer disabled:opacity-40"
+                      >
+                        ✕ Reject / False Alarm
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTriageModal("escalate")}
+                        disabled={isTriagePending}
+                        className="px-3.5 py-1.5 rounded-full bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-40"
+                      >
+                        ⚠ Escalate to HQ
+                      </button>
+                    </div>
+                    {triageNotice && (
+                      <p className="text-xs text-[#173D32] bg-emerald-50 border border-emerald-200 p-2 rounded-xl mt-2 font-medium">
+                        {triageNotice}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="relative mt-6 pt-4 border-t border-[#173D32]/10 flex flex-wrap items-center justify-between gap-3 text-xs">
@@ -430,6 +511,56 @@ export default function FieldReportsPage() {
           }
         />
       </div>
+
+      {/* Field Triage Action Modal */}
+      {activeTriageModal && selectedReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-[#FAF8F2] border border-[#173D32]/20 rounded-2xl p-6 max-w-lg w-full shadow-2xl">
+            <h3 className="text-base font-bold text-[#173D32] mb-1">
+              {activeTriageModal === "verify" && `Verify Incident #${selectedReport.reportId}`}
+              {activeTriageModal === "reject" && `Reject Report #${selectedReport.reportId}`}
+              {activeTriageModal === "escalate" && `Escalate Incident #${selectedReport.reportId} to HQ`}
+            </h3>
+            <p className="text-xs text-[#173D32]/70 mb-4">
+              {selectedReport.location} • {selectedReport.hazardType}
+            </p>
+
+            <label className="block text-xs font-bold text-[#173D32] uppercase mb-1">
+              {activeTriageModal === "verify" && "Field Verification Notes:"}
+              {activeTriageModal === "reject" && "Reason for Rejection / False Alarm:"}
+              {activeTriageModal === "escalate" && "Urgent Escalation Summary:"}
+            </label>
+            <textarea
+              rows={4}
+              value={triageNotes}
+              onChange={(e) => setTriageNotes(e.target.value)}
+              placeholder="Enter official observations..."
+              className="w-full p-3 rounded-xl bg-white border border-[#173D32]/20 text-xs text-[#173D32] focus:outline-none focus:ring-1 focus:ring-[#173D32] mb-4"
+            />
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTriageModal(null);
+                  setTriageNotes("");
+                }}
+                className="px-4 py-2 rounded-full text-xs font-semibold text-[#173D32] hover:bg-black/5"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleTriageSubmit}
+                disabled={isTriagePending}
+                className="px-5 py-2 rounded-full bg-[#173D32] hover:bg-[#1f4e40] text-white text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                {isTriagePending ? "Submitting..." : "Confirm Action"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </PortalLayout>
   );
 }

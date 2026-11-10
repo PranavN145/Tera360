@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { Check } from "lucide-react";
+import { Check, AlertTriangle, ArrowLeft } from "lucide-react";
 import { authApi, ApiClientError } from "@/lib/api";
 
 export default function ForgotPasswordPage() {
@@ -38,7 +38,23 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-[85vh] flex items-center justify-center p-4 sm:p-6 bg-[#FAF8F2]">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 bg-[#FAF8F2]">
+      <div className="w-full max-w-md mb-4 flex items-center justify-between">
+        <Link
+          href="/login"
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-[#173D32] hover:opacity-80 transition-opacity"
+        >
+          <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+          <span>Back to Sign In</span>
+        </Link>
+        <Link
+          href="/"
+          className="text-xs font-semibold text-[#173D32]/60 hover:text-[#173D32] hover:underline"
+        >
+          Public Home
+        </Link>
+      </div>
+
       <div className="w-full max-w-md bg-[#F6F4EC] border border-[#173D32]/15 rounded-3xl p-6 sm:p-8 shadow-xl text-[#173D32]">
         {/* Brand / Header */}
         <div className="text-center mb-6">
@@ -79,8 +95,8 @@ export default function ForgotPasswordPage() {
           <>
             {errorMessage && (
               <div className="mb-5 p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs sm:text-sm text-red-700 flex items-start gap-2.5 animate-in fade-in duration-200">
-                <span className="font-bold text-red-800 text-base leading-none">!</span>
-                <div className="flex-1">{errorMessage}</div>
+                <AlertTriangle className="w-4 h-4 text-red-700 shrink-0 mt-0.5" aria-hidden="true" />
+                <div className="flex-1 leading-relaxed">{errorMessage}</div>
               </div>
             )}
 

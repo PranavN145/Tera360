@@ -301,7 +301,7 @@ function AccountDashboard() {
   return (
     <div className="min-h-screen bg-[#F6F4EC] text-[#173D32] flex flex-col">
       <Header />
-      <div className="flex-1 py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
+      <div className="flex-1 pt-28 pb-14 sm:pt-32 sm:pb-16 lg:pt-36 lg:pb-20 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         {/* Account Header Banner */}
         <div className="bg-[#FAF8F2] border border-[#173D32]/12 rounded-3xl p-6 sm:p-8 shadow-xs mb-8">

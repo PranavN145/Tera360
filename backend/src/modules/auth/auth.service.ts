@@ -1,6 +1,8 @@
 import bcrypt from 'bcryptjs';
+import mongoose from 'mongoose';
 import { User, IUser } from '../users/user.model';
-import { RegisterInput, LoginInput } from './auth.schema';
+import { Invite, IInvite } from './invite.model';
+import { RegisterInput, LoginInput, AcceptInviteInput } from './auth.schema';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../../utils/jwt';
 import { hashToken, generateRandomToken } from '../../utils/crypto';
 import { emailService } from '../../services/email.service';
@@ -17,7 +19,7 @@ export class ConflictError extends Error {
 
 export class BadRequestError extends Error {
   statusCode = 400;
-  code = 'BAD_REQUEST';
+  code = 'INVALID_REQUEST';
   constructor(message: string) {
     super(message);
     this.name = 'BadRequestError';
@@ -89,7 +91,7 @@ export class AuthService {
       throw new AuthError(
         `Account is temporarily locked due to multiple failed login attempts. Please try again in ${minutesRemaining} minute(s).`,
         'ACCOUNT_LOCKED',
-        401
+        403
       );
     }
 
@@ -190,7 +192,7 @@ export class AuthService {
     } catch {
       throw new AuthError(
         'Invalid or expired refresh token. Please sign in again.',
-        'INVALID_REFRESH_TOKEN',
+        'REFRESH_TOKEN_INVALID',
         401
       );
     }
@@ -287,7 +289,7 @@ export class AuthService {
     if (!existingSession) {
       throw new AuthError(
         'Invalid refresh token. Please sign in again.',
-        'INVALID_REFRESH_TOKEN',
+        'REFRESH_TOKEN_INVALID',
         401
       );
     }
@@ -296,7 +298,7 @@ export class AuthService {
     if (existingSession.expiresAt <= now) {
       throw new AuthError(
         'Invalid or expired refresh token. Please sign in again.',
-        'INVALID_REFRESH_TOKEN',
+        'REFRESH_TOKEN_INVALID',
         401
       );
     }
@@ -419,6 +421,11 @@ export class AuthService {
       throw new BadRequestError('Invalid or expired password reset token.');
     }
 
+    // Enforce 12-character staff password requirement (PRD §7.1)
+    if (['officer', 'field_officer', 'admin'].includes(user.role) && newPassword.length < 12) {
+      throw new BadRequestError('Staff passwords must be at least 12 characters long.');
+    }
+
     // Hash new password
     user.passwordHash = await bcrypt.hash(newPassword, 10);
     user.passwordResetToken = undefined;
@@ -437,6 +444,118 @@ export class AuthService {
     user.lockedUntil = undefined;
 
     await user.save();
+  }
+
+  /**
+   * Accept a staff invitation, configure password (min 12 chars), and activate account
+   */
+  async acceptInvite(
+    input: AcceptInviteInput,
+    meta: { userAgent?: string; ip?: string }
+  ): Promise<{ user: IUser; accessToken: string; refreshToken: string }> {
+    const tokenHash = hashToken(input.token);
+    const now = new Date();
+
+    const invite = await Invite.findOne({
+      tokenHash,
+      expiresAt: { $gt: now },
+      usedAt: { $exists: false },
+    });
+
+    if (!invite) {
+      throw new AuthError('Invite token is invalid or has expired.', 'INVALID_REQUEST', 400);
+    }
+
+    // Check if an account already exists with this email
+    const existing = await User.findOne({ email: invite.email });
+    if (existing && !existing.isDeleted) {
+      throw new ConflictError('An account with this email address already exists.');
+    }
+
+    // Enforce 12-character staff password requirement (PRD §7.1)
+    if (input.password.length < 12) {
+      throw new BadRequestError('Staff passwords must be at least 12 characters long.');
+    }
+
+    // Hash password with bcryptjs (cost >= 10)
+    const passwordHash = await bcrypt.hash(input.password, 10);
+
+    const user = new User({
+      name: input.name,
+      email: invite.email,
+      passwordHash,
+      role: invite.role,
+      department: invite.department,
+      assignedArea: invite.assignedArea,
+      phone: input.phone,
+      language: 'en',
+      emailVerified: true, // Invited staff email is verified
+      isActive: true,
+    });
+
+    // Mark invite as used
+    invite.usedAt = now;
+    await Promise.all([user.save(), invite.save()]);
+
+    // Issue JWT Access Token (15m)
+    const accessToken = signAccessToken({
+      sub: user._id.toString(),
+      email: user.email,
+      role: user.role,
+    });
+
+    // Issue JWT Refresh Token (7d)
+    const tokenId = generateRandomToken(16);
+    const refreshToken = signRefreshToken({
+      sub: user._id.toString(),
+      jti: tokenId,
+    });
+    const refreshTokenHash = hashToken(refreshToken);
+    const refreshExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    user.refreshTokens = [
+      {
+        hash: refreshTokenHash,
+        status: 'active',
+        createdAt: now,
+        expiresAt: refreshExpiresAt,
+        userAgent: meta.userAgent,
+        ip: meta.ip,
+      },
+    ];
+    await user.save();
+
+    return { user, accessToken, refreshToken };
+  }
+
+  /**
+   * Helper to generate a staff invite with 32-byte cryptographically secure token
+   */
+  async createInvite(params: {
+    email: string;
+    role: 'officer' | 'field_officer' | 'admin';
+    invitedBy?: string;
+    department?: string;
+    assignedArea?: string;
+    expiresInHours?: number;
+  }): Promise<{ invite: IInvite; rawToken: string }> {
+    const rawToken = generateRandomToken(32);
+    const tokenHash = hashToken(rawToken);
+    const hours = params.expiresInHours || 48;
+    const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000);
+
+    const invite = new Invite({
+      email: params.email.trim().toLowerCase(),
+      role: params.role,
+      tokenHash,
+      invitedBy: params.invitedBy ? new mongoose.Types.ObjectId(params.invitedBy) : undefined,
+      department: params.department,
+      assignedArea: params.assignedArea,
+      expiresAt,
+    });
+
+    await invite.save();
+    return { invite, rawToken };
   }
 }
 

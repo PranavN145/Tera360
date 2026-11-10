@@ -102,6 +102,16 @@ export interface SectorAlertItem {
   targetSector: string;
 }
 
+export interface FieldOfficerMapData {
+  centerCoordinates: [number, number];
+  zoomLevel: number;
+  sectorName: string;
+  tasks: FieldOfficerTask[];
+  roadStatuses: RoadStatusSegment[];
+  villagerReports: VillagerReportItem[];
+  activeAlerts: SectorAlertItem[];
+}
+
 export const INITIAL_OFFICER_PROFILE: FieldOfficerProfile = {
   id: 'fo-nh29-042',
   name: 'Temsu Jamir',

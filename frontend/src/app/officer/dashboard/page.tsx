@@ -37,8 +37,8 @@ export default function OfficerDashboardPage() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isAiUpdatesExpanded, setIsAiUpdatesExpanded] = useState(false);
 
-  const loadDashboard = useCallback(async () => {
-    setIsLoading(true);
+  const loadDashboard = useCallback(async (showSpinner = false) => {
+    if (showSpinner) setIsLoading(true);
     try {
       const [statsRes, alertsRes, roadsRes, riskMapRes, reportsRes] =
         await Promise.allSettled([
@@ -78,10 +78,14 @@ export default function OfficerDashboardPage() {
   }, []);
 
   useEffect(() => {
-    void loadDashboard();
+    const timer = setTimeout(() => {
+      void loadDashboard(false);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [loadDashboard, refreshTrigger]);
 
   const handleManualRefresh = () => {
+    setIsLoading(true);
     setRefreshTrigger((prev) => prev + 1);
   };
 

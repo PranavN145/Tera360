@@ -2,6 +2,7 @@ export type UserRole = 'citizen' | 'driver' | 'field_officer' | 'officer' | 'adm
 
 export interface AuthUser {
   id: string;
+  _id?: string;
   email: string;
   role: UserRole;
   name: string;

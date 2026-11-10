@@ -1,6 +1,7 @@
 import { Alert } from '../alerts/alert.model';
 import { Road } from '../roads/road.model';
 import { Report } from '../reports/report.model';
+import { escapeRegex } from '../../utils/crypto';
 import { GetRiskMapQuery, GetAlertsQuery, GetRoadStatusQuery } from './public.schema';
 
 export interface PublicRiskMapItem {
@@ -67,17 +68,52 @@ export class PublicService {
    * 1. GET /api/v1/public/risk-map
    * Returns road corridors with geometry/map coordinates for live risk mapping.
    */
-  async getRiskMap(query: GetRiskMapQuery): Promise<PublicRiskMapItem[]> {
+  async getRiskMap(query: GetRiskMapQuery): Promise<PublicRiskMapItem[] | { type: string; features: any[] }> {
     const filter: Record<string, any> = { isDeleted: false };
+
+    // AUD-14: Filter isMajorNH: true per PRD §14.4
+    if (query.isMajorNH !== false) {
+      filter.isMajorNH = true;
+    }
+
     if (query.state) {
-      filter.state = new RegExp(`^${query.state.trim()}$`, 'i');
+      filter.state = new RegExp(`^${escapeRegex(query.state.trim())}$`, 'i');
+    }
+
+    // AUD-14: Optional bounding box filtering
+    let minLng = query.minLng;
+    let minLat = query.minLat;
+    let maxLng = query.maxLng;
+    let maxLat = query.maxLat;
+
+    if (query.bbox) {
+      const parts = query.bbox.split(',').map((p) => parseFloat(p.trim()));
+      if (parts.length === 4 && parts.every((n) => !isNaN(n))) {
+        [minLng, minLat, maxLng, maxLat] = parts;
+      }
+    }
+
+    if (
+      minLng !== undefined &&
+      minLat !== undefined &&
+      maxLng !== undefined &&
+      maxLat !== undefined
+    ) {
+      filter['geometry.coordinates'] = {
+        $geoWithin: {
+          $box: [
+            [minLng, minLat],
+            [maxLng, maxLat],
+          ],
+        },
+      };
     }
 
     const roads = await Road.find(filter)
       .sort({ code: 1, name: 1 })
       .lean();
 
-    return roads.map((road) => ({
+    const items: PublicRiskMapItem[] = roads.map((road) => ({
       id: road._id.toString(),
       name: road.name,
       code: road.code,
@@ -91,6 +127,33 @@ export class PublicService {
       mapCoordinates: road.mapCoordinates || null,
       lastUpdated: road.lastUpdated || (road as any).updatedAt,
     }));
+
+    // AUD-14: Standard GeoJSON FeatureCollection serialization
+    if (query.format === 'geojson') {
+      return {
+        type: 'FeatureCollection',
+        features: items.map((item) => ({
+          type: 'Feature',
+          geometry: item.geometry || {
+            type: 'Point',
+            coordinates: [94.025, 25.685],
+          },
+          properties: {
+            id: item.id,
+            name: item.name,
+            code: item.code,
+            state: item.state,
+            stretch: item.stretch,
+            status: item.status,
+            riskLevel: item.riskLevel,
+            statusReason: item.statusReason,
+            lastUpdated: item.lastUpdated,
+          },
+        })),
+      };
+    }
+
+    return items;
   }
 
   /**
@@ -112,7 +175,7 @@ export class PublicService {
     };
 
     if (query.state) {
-      filter.state = new RegExp(`^${query.state.trim()}$`, 'i');
+      filter.state = new RegExp(`^${escapeRegex(query.state.trim())}$`, 'i');
     }
 
     if (query.severity) {
@@ -170,7 +233,7 @@ export class PublicService {
     const filter: Record<string, any> = { isDeleted: false };
 
     if (query.state) {
-      filter.state = new RegExp(`^${query.state.trim()}$`, 'i');
+      filter.state = new RegExp(`^${escapeRegex(query.state.trim())}$`, 'i');
     }
 
     if (query.status) {

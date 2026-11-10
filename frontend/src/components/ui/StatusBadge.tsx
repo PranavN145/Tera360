@@ -7,6 +7,8 @@ export type BadgeVariant =
   | 'Low'
   | 'Moderate'
   | 'High'
+  | 'Safe'
+  | 'Normal'
   | 'sent'
   | 'delivered'
   | 'failed'
@@ -22,6 +24,11 @@ export type BadgeVariant =
   | 'submitted'
   | 'under_review'
   | 'verified'
+  | 'false_alarm'
+  | 'assigned'
+  | 'in_progress'
+  | 'completed'
+  | 'escalated'
   | 'unavailable'
   | string;
 
@@ -43,7 +50,6 @@ const BADGE_CONFIG: Record<
     dot: string;
     ping?: string;
     defaultLabel: string;
-    icon?: string;
   }
 > = {
   // Severities
@@ -54,7 +60,6 @@ const BADGE_CONFIG: Record<
     dot: 'bg-red-600',
     ping: 'bg-red-400',
     defaultLabel: 'Critical',
-    icon: '🔴',
   },
   warning: {
     bg: 'bg-amber-50',
@@ -63,7 +68,6 @@ const BADGE_CONFIG: Record<
     dot: 'bg-amber-500',
     ping: 'bg-amber-400',
     defaultLabel: 'Warning',
-    icon: '🟡',
   },
   watch: {
     bg: 'bg-yellow-50',
@@ -71,7 +75,6 @@ const BADGE_CONFIG: Record<
     border: 'border-yellow-200',
     dot: 'bg-yellow-500',
     defaultLabel: 'Watch',
-    icon: '⚡',
   },
   high: {
     bg: 'bg-orange-50',
@@ -93,6 +96,20 @@ const BADGE_CONFIG: Record<
     border: 'border-emerald-200',
     dot: 'bg-emerald-500',
     defaultLabel: 'Low Risk',
+  },
+  safe: {
+    bg: 'bg-emerald-50',
+    text: 'text-emerald-800',
+    border: 'border-emerald-200',
+    dot: 'bg-emerald-600',
+    defaultLabel: 'Safe',
+  },
+  normal: {
+    bg: 'bg-emerald-50',
+    text: 'text-emerald-800',
+    border: 'border-emerald-200',
+    dot: 'bg-emerald-600',
+    defaultLabel: 'Normal',
   },
 
   // Alert Lifecycle & Delivery Statuses
@@ -124,7 +141,6 @@ const BADGE_CONFIG: Record<
     border: 'border-purple-200',
     dot: 'bg-purple-600',
     defaultLabel: 'Voice Call Completed',
-    icon: '📞',
   },
   voice_completed: {
     bg: 'bg-purple-50',
@@ -132,7 +148,6 @@ const BADGE_CONFIG: Record<
     border: 'border-purple-200',
     dot: 'bg-purple-600',
     defaultLabel: 'Voice Call Completed',
-    icon: '📞',
   },
   failed: {
     bg: 'bg-rose-50',
@@ -194,7 +209,7 @@ const BADGE_CONFIG: Record<
     defaultLabel: 'Partial Clearance',
   },
 
-  // Reports
+  // Reports & Field Tasks
   submitted: {
     bg: 'bg-sky-50',
     text: 'text-sky-800',
@@ -215,6 +230,43 @@ const BADGE_CONFIG: Record<
     border: 'border-emerald-200',
     dot: 'bg-emerald-600',
     defaultLabel: 'Verified',
+  },
+  false_alarm: {
+    bg: 'bg-gray-100',
+    text: 'text-gray-600',
+    border: 'border-gray-200',
+    dot: 'bg-gray-400',
+    defaultLabel: 'False Alarm',
+  },
+  assigned: {
+    bg: 'bg-blue-50',
+    text: 'text-blue-800',
+    border: 'border-blue-200',
+    dot: 'bg-blue-600',
+    defaultLabel: 'Assigned',
+  },
+  in_progress: {
+    bg: 'bg-amber-50',
+    text: 'text-amber-800',
+    border: 'border-amber-200',
+    dot: 'bg-amber-500',
+    ping: 'bg-amber-400',
+    defaultLabel: 'In Progress',
+  },
+  completed: {
+    bg: 'bg-emerald-50',
+    text: 'text-emerald-800',
+    border: 'border-emerald-200',
+    dot: 'bg-emerald-600',
+    defaultLabel: 'Completed',
+  },
+  escalated: {
+    bg: 'bg-red-50',
+    text: 'text-red-700',
+    border: 'border-red-200',
+    dot: 'bg-red-600',
+    ping: 'bg-red-400',
+    defaultLabel: 'Escalated',
   },
 };
 

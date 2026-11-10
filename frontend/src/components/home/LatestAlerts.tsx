@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { AlertTriangle, OctagonAlert, Zap, type LucideIcon } from "lucide-react";
 import SectionBackground from "@/components/ui/SectionBackground";
 import { useApp } from "@/context/AppContext";
 import { publicApi } from "@/lib/api";
@@ -18,7 +19,7 @@ const SEVERITY_THEME: Record<
     pingBg: string;
     hoverBorder: string;
     shadowGlow: string;
-    hazardIcon: string;
+    HazardIcon: LucideIcon;
     accentColor: string;
   }
 > = {
@@ -29,7 +30,7 @@ const SEVERITY_THEME: Record<
     pingBg: "bg-red-400",
     hoverBorder: "hover:border-red-300",
     shadowGlow: "hover:shadow-[0_20px_40px_-10px_rgba(220,38,38,0.18)]",
-    hazardIcon: "⛔",
+    HazardIcon: OctagonAlert,
     accentColor: "#DC2626",
   },
   Warning: {
@@ -39,7 +40,7 @@ const SEVERITY_THEME: Record<
     pingBg: "bg-amber-400",
     hoverBorder: "hover:border-amber-300",
     shadowGlow: "hover:shadow-[0_20px_40px_-10px_rgba(217,119,6,0.18)]",
-    hazardIcon: "⚠️",
+    HazardIcon: AlertTriangle,
     accentColor: "#D97706",
   },
   Watch: {
@@ -49,7 +50,7 @@ const SEVERITY_THEME: Record<
     pingBg: "bg-[#D6A65D]/50",
     hoverBorder: "hover:border-[#D6A65D]/60",
     shadowGlow: "hover:shadow-[0_20px_40px_-10px_rgba(214,166,93,0.20)]",
-    hazardIcon: "⚡",
+    HazardIcon: Zap,
     accentColor: "#D6A65D",
   },
 };
@@ -188,7 +189,7 @@ export default function LatestAlerts() {
                             className={`relative inline-flex rounded-full h-2 w-2 ${theme.dotBg}`}
                           />
                         </span>
-                        <span>{theme.hazardIcon}</span>
+                        <theme.HazardIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                         <span>{alert.severity}</span>
                       </span>
 

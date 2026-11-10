@@ -573,7 +573,12 @@ class DemoDataManager {
   }
 
   public isDemoModeActive(): boolean {
-    if (typeof window === 'undefined') return true;
+    if (process.env.NEXT_PUBLIC_DEMO_MODE === 'false') {
+      return false;
+    }
+    if (typeof window === 'undefined') {
+      return !!this.getActiveDemoUser() || process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+    }
     // Always active if backend was flagged offline, or if an active demo user exists
     return this.isOfflineDetected || !!this.getActiveDemoUser();
   }

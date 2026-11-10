@@ -126,13 +126,6 @@ export async function refreshAccessToken(): Promise<string | null> {
       });
 
       if (!res.ok) {
-        // Backend returned non-200. Check if active demo session is present in offline development mode
-        const activeDemo = demoDataManager.getActiveDemoUser();
-        if (activeDemo) {
-          const offlineToken = 'demo-offline-token';
-          setAccessToken(offlineToken);
-          return offlineToken;
-        }
         setAccessToken(null);
         if (typeof window !== 'undefined') {
           localStorage.removeItem('terra360_refresh_token');
@@ -162,13 +155,6 @@ export async function refreshAccessToken(): Promise<string | null> {
       return null;
     } catch {
       // Backend unreachable (network failure / connection refused)
-      demoDataManager.markBackendOffline(true);
-      const activeDemo = demoDataManager.getActiveDemoUser();
-      if (activeDemo) {
-        const offlineToken = 'demo-offline-token';
-        setAccessToken(offlineToken);
-        return offlineToken;
-      }
       setAccessToken(null);
       return null;
     } finally {
@@ -359,27 +345,6 @@ export const authApi = {
       }
       return data;
     } catch (err: unknown) {
-      if (err instanceof ApiClientError && err.code === 'NETWORK_ERROR') {
-        demoDataManager.markBackendOffline(true);
-        const demoUser = demoDataManager.findDemoUserByEmail(credentials.email);
-        if (demoUser) {
-          const offlineToken = 'demo-offline-token';
-          setAccessToken(offlineToken);
-          demoDataManager.setActiveDemoUser(demoUser);
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('terra360_has_session', 'true');
-          }
-          return {
-            user: demoUser,
-            accessToken: offlineToken,
-          };
-        }
-        throw new ApiClientError(
-          'Account not found in demo records. Please sign in with one of the predefined demo accounts.',
-          'INVALID_CREDENTIALS',
-          401
-        );
-      }
       throw err;
     }
   },
@@ -413,20 +378,10 @@ export const authApi = {
   },
 
   async getMe(): Promise<User> {
-    try {
-      const data = await apiClient<UserProfileSuccessData>('/api/v1/users/me', {
-        method: 'GET',
-      });
-      return data.user;
-    } catch (err: unknown) {
-      if (err instanceof ApiClientError && err.code === 'NETWORK_ERROR') {
-        demoDataManager.markBackendOffline(true);
-        const activeDemo = demoDataManager.getActiveDemoUser();
-        if (activeDemo) return activeDemo;
-        throw new ApiClientError('Not authenticated', 'UNAUTHENTICATED', 401);
-      }
-      throw err;
-    }
+    const data = await apiClient<UserProfileSuccessData>('/api/v1/users/me', {
+      method: 'GET',
+    });
+    return data.user;
   },
 
   async verifyEmail(token: string): Promise<MessageSuccessData> {
@@ -476,6 +431,30 @@ export const authApi = {
       throw err;
     }
   },
+
+  async acceptInvite(payload: {
+    token: string;
+    name: string;
+    password: string;
+    phone?: string;
+  }): Promise<AuthSuccessData> {
+    const data = await apiClient<AuthSuccessData>('/api/v1/auth/accept-invite', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      retryOnAuthError: false,
+    });
+    if (data.accessToken) {
+      setAccessToken(data.accessToken);
+    }
+    demoDataManager.setActiveDemoUser(data.user);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('terra360_has_session', 'true');
+      if (data.refreshToken) {
+        localStorage.setItem('terra360_refresh_token', data.refreshToken);
+      }
+    }
+    return data;
+  },
 };
 
 export const usersApi = {
@@ -484,20 +463,10 @@ export const usersApi = {
    * Fetches current authenticated user profile
    */
   async getMe(): Promise<User> {
-    try {
-      const data = await apiClient<UserProfileSuccessData>('/api/v1/users/me', {
-        method: 'GET',
-      });
-      return data.user;
-    } catch (err: unknown) {
-      if (err instanceof ApiClientError && err.code === 'NETWORK_ERROR') {
-        demoDataManager.markBackendOffline(true);
-        const activeDemo = demoDataManager.getActiveDemoUser();
-        if (activeDemo) return activeDemo;
-        throw new ApiClientError('Not authenticated', 'UNAUTHENTICATED', 401);
-      }
-      throw err;
-    }
+    const data = await apiClient<UserProfileSuccessData>('/api/v1/users/me', {
+      method: 'GET',
+    });
+    return data.user;
   },
 
   /**
@@ -890,6 +859,214 @@ export const reportsApi = {
       }
       throw err;
     }
+  },
+
+  /**
+   * POST /api/v1/reports
+   * Authenticated citizen hazard report without CAPTCHA friction.
+   */
+  async submitAuthenticatedReport(
+    payload: Omit<CreateHazardReportPayload, 'captchaToken'>
+  ): Promise<HazardReportOutput> {
+    return apiClient<HazardReportOutput>('/api/v1/reports', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /**
+   * PATCH /api/v1/reports/:id/status
+   * Triage report status (under_review, verified, rejected).
+   */
+  async triageReport(
+    id: string,
+    payload: { status: string; verificationNotes?: string }
+  ): Promise<HazardReportOutput> {
+    return apiClient<HazardReportOutput>(`/api/v1/reports/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /**
+   * POST /api/v1/tasks
+   * Assign inspection task to field officer.
+   */
+  async assignTask(payload: {
+    sector: string;
+    riskLevel?: string;
+    reason: string;
+    assignedTo?: string;
+    deadline?: string;
+    reportId?: string;
+  }): Promise<any> {
+    return apiClient('/api/v1/tasks', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+};
+
+export const officerApi = {
+  async getDashboard(): Promise<any> {
+    return apiClient('/api/v1/officer/dashboard');
+  },
+
+  async getDataStatus(): Promise<any> {
+    return apiClient('/api/v1/officer/data-status');
+  },
+
+  async createAlertDraft(payload: any): Promise<any> {
+    return apiClient('/api/v1/alerts', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async listAlerts(query?: Record<string, string>): Promise<any> {
+    const qs = query ? `?${new URLSearchParams(query).toString()}` : '';
+    return apiClient(`/api/v1/alerts${qs}`);
+  },
+
+  async getAlertById(id: string): Promise<any> {
+    return apiClient(`/api/v1/alerts/${id}`);
+  },
+
+  async previewAlert(id: string): Promise<any> {
+    return apiClient(`/api/v1/alerts/${id}/preview`, { method: 'POST' });
+  },
+
+  async approveAlert(id: string, confirm = false): Promise<any> {
+    return apiClient(`/api/v1/alerts/${id}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ confirm }),
+    });
+  },
+
+  async cancelAlert(id: string, reason?: string): Promise<any> {
+    return apiClient(`/api/v1/alerts/${id}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  },
+
+  async updateRoadStatus(
+    id: string,
+    payload: { status: string; riskLevel?: string; statusReason?: string }
+  ): Promise<any> {
+    return apiClient(`/api/v1/roads/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getImpactedRoads(): Promise<any> {
+    return apiClient('/api/v1/roads/impact');
+  },
+
+  async listVillages(query?: Record<string, string>): Promise<any> {
+    const qs = query ? `?${new URLSearchParams(query).toString()}` : '';
+    return apiClient(`/api/v1/villages${qs}`);
+  },
+
+  async getVillageById(id: string): Promise<any> {
+    return apiClient(`/api/v1/villages/${id}`);
+  },
+
+  async updateVillageEvacuation(
+    id: string,
+    payload: { evacuationStatus: string; notes?: string }
+  ): Promise<any> {
+    return apiClient(`/api/v1/villages/${id}/evacuation`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async listSafeRoutes(): Promise<any> {
+    return apiClient('/api/v1/safe-routes');
+  },
+
+  async computeSafeRoute(payload: {
+    origin: string;
+    destination: string;
+    state?: string;
+  }): Promise<any> {
+    return apiClient('/api/v1/routes/safe', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+};
+
+export const citizenApi = {
+  async getAreaInfo(): Promise<any> {
+    return apiClient('/api/v1/me/area');
+  },
+
+  async getAreaMap(): Promise<any> {
+    return apiClient('/api/v1/me/area/map');
+  },
+
+  async getSafePlace(): Promise<any> {
+    return apiClient('/api/v1/me/safe-place');
+  },
+
+  async submitCheckIn(payload: {
+    status: 'safe' | 'need_help';
+    message?: string;
+    locationName?: string;
+    coordinates?: any;
+  }): Promise<any> {
+    return apiClient('/api/v1/me/checkin', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getCheckIns(): Promise<any> {
+    return apiClient('/api/v1/me/checkins');
+  },
+
+  async getOfflineBundle(): Promise<any> {
+    return apiClient('/api/v1/me/offline-bundle');
+  },
+
+  async getNotifications(): Promise<any> {
+    return apiClient('/api/v1/notifications');
+  },
+
+  async markNotificationRead(id: string): Promise<any> {
+    return apiClient(`/api/v1/notifications/${id}/read`, {
+      method: 'PATCH',
+    });
+  },
+
+  async markAllNotificationsRead(): Promise<any> {
+    return apiClient('/api/v1/notifications/read-all', {
+      method: 'PATCH',
+    });
+  },
+};
+
+export const uploadsApi = {
+  async uploadFile(
+    base64OrDataUrl: string,
+    name?: string
+  ): Promise<{ url: string; fileId: string; mimeType: string }> {
+    return apiClient('/api/v1/uploads', {
+      method: 'POST',
+      body: JSON.stringify({ base64: base64OrDataUrl, name }),
+    });
+  },
+
+  async getSignedUrl(
+    filename: string
+  ): Promise<{ uploadUrl: string; publicUrl: string }> {
+    return apiClient('/api/v1/uploads/signed-url', {
+      method: 'POST',
+      body: JSON.stringify({ filename }),
+    });
   },
 };
 

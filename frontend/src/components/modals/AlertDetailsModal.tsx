@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useEffect } from "react";
+import { Clock, MapPin, Route, Share2, X } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import RelativeTime from "@/components/common/RelativeTime";
+import StatusBadge from "@/components/ui/StatusBadge";
 
 export default function AlertDetailsModal() {
   const { selectedAlert, closeAlertModal, addToast } = useApp();
@@ -74,17 +76,12 @@ export default function AlertDetailsModal() {
             className="absolute top-4 right-4 p-2 rounded-full text-[#173D32]/60 hover:text-[#173D32] hover:bg-[#173D32]/10 transition-colors focus-visible:outline-2 focus-visible:outline-[#173D32] cursor-pointer"
             aria-label="Close dialog"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="w-5 h-5" aria-hidden="true" />
           </button>
 
           {/* Top Badges */}
           <div className="flex items-center gap-2 mb-2 pr-6">
-            <span className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-bold border tracking-wide ${getSeverityBadge(selectedAlert.severity)}`}>
-              <span className="w-2 h-2 rounded-full bg-current" />
-              {selectedAlert.severity} Severity
-            </span>
+            <StatusBadge status={selectedAlert.severity} size="sm" pulse />
             <span className="text-xs font-semibold text-[#173D32]/70 bg-[#173D32]/5 px-2.5 py-0.5 rounded-md">
               {selectedAlert.state}
             </span>
@@ -96,10 +93,19 @@ export default function AlertDetailsModal() {
           </h2>
 
           {/* Timestamp & Coordinates */}
-          <div className="flex flex-wrap items-center gap-3 text-xs text-[#173D32]/65 mt-1.5">
-            <span>🕒 <RelativeTime date={selectedAlert.timestamp} fallback="Recently" /></span>
-            <span>📍 {selectedAlert.coordinates}</span>
-            <span>🛣️ Corridor: {selectedAlert.corridor}</span>
+          <div className="flex flex-wrap items-center gap-3 text-xs text-[#173D32]/75 mt-1.5">
+            <span className="inline-flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5 opacity-70" aria-hidden="true" />
+              <RelativeTime date={selectedAlert.timestamp} fallback="Recently" />
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <MapPin className="w-3.5 h-3.5 opacity-70" aria-hidden="true" />
+              {selectedAlert.coordinates}
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Route className="w-3.5 h-3.5 opacity-70" aria-hidden="true" />
+              Corridor: {selectedAlert.corridor}
+            </span>
           </div>
         </div>
 
@@ -156,9 +162,7 @@ export default function AlertDetailsModal() {
             onClick={handleShare}
             className="h-10 px-4 rounded-full text-xs sm:text-sm font-semibold text-[#173D32] border border-[#173D32]/20 hover:bg-[#173D32]/5 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-            </svg>
+            <Share2 className="w-4 h-4" aria-hidden="true" />
             <span>Share Alert</span>
           </button>
           <button

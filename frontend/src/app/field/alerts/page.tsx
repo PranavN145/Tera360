@@ -21,7 +21,7 @@ import PortalFilterBar from "@/components/portal/PortalFilterBar";
 import PortalSectionCard from "@/components/portal/PortalSectionCard";
 import { PortalKpiCard } from "@/components/portal";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { publicApi } from "@/lib/api";
+import { publicApi, fieldOfficerApi } from "@/lib/api";
 import { PublicAlertItem } from "@/types/public";
 
 const SEVERITY_FILTERS = ["All", "Critical", "Warning", "Watch"];
@@ -32,6 +32,16 @@ export default function FieldAlertsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [acknowledgedIds, setAcknowledgedIds] = useState<Set<string>>(new Set());
+
+  const handleAcknowledge = async (id: string) => {
+    try {
+      await fieldOfficerApi.acknowledgeAlert(id);
+      setAcknowledgedIds((prev) => new Set([...prev, id]));
+    } catch (err: unknown) {
+      console.warn("Acknowledge note:", err);
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -286,31 +296,49 @@ export default function FieldAlertsPage() {
                     </div>
                   )}
 
-                  <div className="mt-4 pt-3 border-t border-[#173D32]/10 flex flex-wrap items-center gap-4 text-xs text-[#173D32]/75">
-                    {alert.rainfall24h && (
-                      <span className="inline-flex items-center gap-1.5">
-                        <CloudRain className="w-3.5 h-3.5 text-[#1D4ED8]" aria-hidden="true" />
-                        <span>
-                          24h Rain: <strong className="text-[#173D32]">{alert.rainfall24h}</strong>
+                  <div className="mt-4 pt-3 border-t border-[#173D32]/10 flex flex-wrap items-center justify-between gap-4 text-xs text-[#173D32]/75">
+                    <div className="flex flex-wrap items-center gap-4">
+                      {alert.rainfall24h && (
+                        <span className="inline-flex items-center gap-1.5">
+                          <CloudRain className="w-3.5 h-3.5 text-[#1D4ED8]" aria-hidden="true" />
+                          <span>
+                            24h Rain: <strong className="text-[#173D32]">{alert.rainfall24h}</strong>
+                          </span>
                         </span>
-                      </span>
-                    )}
-                    {alert.saturation && (
-                      <span className="inline-flex items-center gap-1.5">
-                        <Droplets className="w-3.5 h-3.5 text-[#17688A]" aria-hidden="true" />
-                        <span>
-                          Saturation: <strong className="text-[#173D32]">{alert.saturation}</strong>
+                      )}
+                      {alert.saturation && (
+                        <span className="inline-flex items-center gap-1.5">
+                          <Droplets className="w-3.5 h-3.5 text-[#17688A]" aria-hidden="true" />
+                          <span>
+                            Saturation: <strong className="text-[#173D32]">{alert.saturation}</strong>
+                          </span>
                         </span>
-                      </span>
-                    )}
-                    {alert.trafficStatus && (
-                      <span className="inline-flex items-center gap-1.5">
-                        <AlertTriangle className="w-3.5 h-3.5 text-[#D97706]" aria-hidden="true" />
-                        <span>
-                          Traffic: <strong className="text-[#173D32]">{alert.trafficStatus}</strong>
+                      )}
+                      {alert.trafficStatus && (
+                        <span className="inline-flex items-center gap-1.5">
+                          <AlertTriangle className="w-3.5 h-3.5 text-[#D97706]" aria-hidden="true" />
+                          <span>
+                            Traffic: <strong className="text-[#173D32]">{alert.trafficStatus}</strong>
+                          </span>
                         </span>
-                      </span>
-                    )}
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {acknowledgedIds.has(alert.id) ? (
+                        <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">
+                          ✓ Acknowledged
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleAcknowledge(alert.id)}
+                          className="px-3.5 py-1 rounded-full bg-[#173D32] hover:bg-[#1f4e40] text-[#F6F4EC] font-bold text-xs transition-colors cursor-pointer"
+                        >
+                          Acknowledge Advisory
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

@@ -24,6 +24,64 @@ export class ReportController {
     }
   }
 
+  async submitAuthenticatedReport(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const ipAddress = req.ip || req.socket.remoteAddress;
+      const userAgent = req.headers['user-agent'] as string | undefined;
+
+      const report = await reportService.submitAuthenticatedReport(req.body, req.user, {
+        ipAddress,
+        userAgent,
+      });
+
+      res.status(201).json({
+        success: true,
+        message: 'Hazard report submitted successfully. Operations desk notified.',
+        data: report,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getReportById(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const report = await reportService.getReportById(req.params.id);
+      res.status(200).json({
+        success: true,
+        data: report,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async triageReport(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const report = await reportService.triageReport(req.params.id, req.body, req.user);
+      res.status(200).json({
+        success: true,
+        message: `Report status updated to '${report.status}'.`,
+        data: report,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async assignTask(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const task = await reportService.assignTask(req.body, req.user);
+      res.status(201).json({
+        success: true,
+        message: `Inspection task '${task.taskId}' assigned to field team.`,
+        data: task,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async listMyReports(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.user!.id;

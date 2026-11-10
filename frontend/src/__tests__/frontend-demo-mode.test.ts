@@ -26,8 +26,9 @@ function it(name: string, fn: () => void | Promise<void>) {
       console.log(`  ✓ ${name}`);
       passedTests++;
     }
-  } catch (err: any) {
-    console.error(`  ✗ ${name}:`, err.message);
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    console.error(`  ✗ ${name}:`, errorMsg);
     throw err;
   }
 }

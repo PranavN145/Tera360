@@ -144,7 +144,7 @@ export default function ContactPage() {
     <div className="relative w-full min-h-screen bg-[#F6F4EC] flex flex-col">
       <Header />
 
-      <main className="flex-1 max-w-[1200px] w-full mx-auto px-4 sm:px-6 lg:px-10 py-12 sm:py-16">
+      <main className="flex-1 max-w-[1200px] w-full mx-auto px-4 sm:px-6 lg:px-10 pt-28 pb-16 sm:pt-32 sm:pb-20 lg:pt-36 lg:pb-24">
         <div className="max-w-3xl mb-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#DCE8D4]/60 text-xs font-bold text-[#173D32] uppercase mb-3">
             <span className="w-2 h-2 rounded-full bg-[#D6A65D]" />

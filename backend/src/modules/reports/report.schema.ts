@@ -47,6 +47,11 @@ export function validatePhotoStorageUrl(urlStr: string): { valid: boolean; messa
     return { valid: true };
   }
 
+  // Allow relative upload paths served by our backend
+  if (trimmed.startsWith('/uploads/') || trimmed.startsWith('uploads/')) {
+    return { valid: true };
+  }
+
   // Reject unsafe pseudo-schemes immediately
   const lower = trimmed.toLowerCase();
   if (
@@ -63,6 +68,11 @@ export function validatePhotoStorageUrl(urlStr: string): { valid: boolean; messa
     parsed = new URL(trimmed);
   } catch {
     return { valid: false, message: 'Photo URL must be a valid, well-formed URL.' };
+  }
+
+  // Allow localhost/loopback in dev/test
+  if ((parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') && parsed.pathname.startsWith('/uploads')) {
+    return { valid: true };
   }
 
   // Enforce HTTPS
@@ -165,4 +175,89 @@ export const createPublicReportSchema = z.object({
     .min(1, 'CAPTCHA verification token is required'),
 });
 
+export const createAuthenticatedReportSchema = z.object({
+  state: z
+    .string()
+    .trim()
+    .min(1, 'State is required')
+    .max(100, 'State cannot exceed 100 characters'),
+  location: z
+    .string()
+    .trim()
+    .min(2, 'Location details or corridor stretch are required')
+    .max(300, 'Location cannot exceed 300 characters'),
+  hazardType: z
+    .string()
+    .trim()
+    .min(2, 'Hazard type is required')
+    .max(100, 'Hazard type cannot exceed 100 characters'),
+  description: z
+    .string()
+    .trim()
+    .min(5, 'Description must be at least 5 characters')
+    .max(3000, 'Description cannot exceed 3000 characters'),
+  severity: z
+    .enum(['Critical', 'Warning', 'Watch'], {
+      message: 'Severity must be Critical, Warning, or Watch',
+    })
+    .default('Warning'),
+  reporterName: z
+    .string()
+    .trim()
+    .max(100)
+    .optional()
+    .or(z.literal('')),
+  reporterPhone: z
+    .string()
+    .trim()
+    .max(20)
+    .optional()
+    .or(z.literal('')),
+  photoUrl: z
+    .string()
+    .trim()
+    .max(1000)
+    .optional()
+    .or(z.literal(''))
+    .superRefine((val, ctx) => {
+      if (!val || val.trim() === '') return;
+      const res = validatePhotoStorageUrl(val);
+      if (!res.valid) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: res.message || 'Invalid photo URL.',
+        });
+      }
+    }),
+  coordinates: reportCoordinatesSchema.optional(),
+});
+
+export const triageReportSchema = z.object({
+  status: z.enum(['submitted', 'under_review', 'verified', 'rejected', 'false_alarm']),
+  verificationNotes: z.string().trim().max(1000).optional(),
+});
+
+export const assignTaskSchema = z.object({
+  sector: z.string().trim().min(1, 'Sector is required'),
+  riskLevel: z.enum(['Low', 'Moderate', 'High', 'Critical']).default('High'),
+  reason: z.string().trim().min(5, 'Reason must be at least 5 characters').max(1000),
+  assignedTo: z.string().trim().optional(),
+  deadline: z.coerce.date().optional(),
+  reportId: z.string().trim().optional(),
+  chainageName: z.string().trim().optional(),
+  coordinates: z.tuple([z.number(), z.number()]).optional(),
+});
+
 export type CreatePublicReportInput = z.infer<typeof createPublicReportSchema>;
+export type CreateAuthenticatedReportInput = z.infer<typeof createAuthenticatedReportSchema>;
+export type TriageReportInput = z.infer<typeof triageReportSchema>;
+export type AssignTaskInput = z.infer<typeof assignTaskSchema>;
+
+export const getReportsQuerySchema = z.object({
+  state: z.string().trim().max(100).optional(),
+  status: z.string().trim().max(50).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+export type GetReportsQueryInput = z.infer<typeof getReportsQuerySchema>;
+

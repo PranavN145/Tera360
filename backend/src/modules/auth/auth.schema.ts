@@ -38,8 +38,19 @@ export const resetPasswordSchema = z.object({
     .max(128, 'Password must not exceed 128 characters'),
 });
 
+export const acceptInviteSchema = z.object({
+  token: z.string().trim().min(1, 'Invite token is required'),
+  name: z.string().trim().min(2, 'Name must be at least 2 characters').max(100),
+  password: z
+    .string()
+    .min(12, 'Staff password must be at least 12 characters')
+    .max(128, 'Password must not exceed 128 characters'),
+  phone: z.string().trim().max(25).optional(),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+export type AcceptInviteInput = z.infer<typeof acceptInviteSchema>;

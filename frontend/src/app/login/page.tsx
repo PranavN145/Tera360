@@ -15,7 +15,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
-import { getRolePortalPath, ApiClientError } from "@/lib/api";
+import { getRolePortalPath, ApiClientError, authApi } from "@/lib/api";
 
 const DEMO_ACCOUNTS: {
   role: string;
@@ -102,10 +102,19 @@ function LoginForm() {
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [demoBannerInfo, setDemoBannerInfo] = useState<string | null>(null);
 
+  // Staff Invitation Workflow (AUD-12)
+  const inviteToken = searchParams.get("inviteToken") || searchParams.get("token");
+  const isInviteMode = !!inviteToken;
+  const [inviteName, setInviteName] = useState("");
+  const [invitePhone, setInvitePhone] = useState("");
+
   // Sync email param if search query updates
   useEffect(() => {
     if (emailParam) {
-      setEmail(emailParam);
+      const timer = setTimeout(() => {
+        setEmail(emailParam);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [emailParam]);
 
@@ -174,6 +183,38 @@ function LoginForm() {
     } finally {
       setIsLoading(false);
       setActiveDemoRole(null);
+    }
+  };
+
+  const handleAcceptInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password.length < 12) {
+      setErrorMessage("Staff accounts require a password of at least 12 characters (PRD §7.1).");
+      setErrorCode("VALIDATION_ERROR");
+      return;
+    }
+    setIsLoading(true);
+    setErrorMessage(null);
+    setErrorCode(null);
+
+    try {
+      const data = await authApi.acceptInvite({
+        token: inviteToken!,
+        name: inviteName,
+        password,
+        phone: invitePhone || undefined,
+      });
+      const dest = redirectParam || getRolePortalPath(data.user.role);
+      window.location.href = dest;
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError) {
+        setErrorMessage(err.message);
+        setErrorCode(err.code);
+      } else {
+        setErrorMessage("Failed to accept invitation. The invitation link may have expired or is invalid.");
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -263,13 +304,15 @@ function LoginForm() {
           {/* Brand Header */}
           <div className="text-center mb-6">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#DCE8D4]/70 text-[11px] font-bold text-[#173D32] mb-2 uppercase tracking-wider">
-              Terra360 Platform
+              {isInviteMode ? "Staff Onboarding" : "Terra360 Platform"}
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#173D32]">
-              Sign In
+              {isInviteMode ? "Accept Staff Invitation" : "Sign In"}
             </h1>
             <p className="text-xs sm:text-sm text-[#173D32]/70 mt-1">
-              Access real-time landslide telemetry and role portals
+              {isInviteMode
+                ? "Configure your staff credentials to access operational portals (minimum 12 characters)"
+                : "Access real-time landslide telemetry and role portals"}
             </p>
           </div>
 
@@ -306,7 +349,7 @@ function LoginForm() {
           )}
 
           {/* ── Demo Login Utility Panel ── */}
-          {isDemoModeEnabled && (
+          {isDemoModeEnabled && !isInviteMode && (
             <div className="mb-4 p-2.5 sm:p-3 rounded-2xl bg-[#FAF8F2] border border-[#173D32]/12">
               <div className="flex items-center justify-between mb-2 px-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[#173D32]/70 flex items-center gap-1">
@@ -366,102 +409,206 @@ function LoginForm() {
             </div>
           )}
 
-          {/* Credentials Form */}
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <div>
-              <label
-                htmlFor="email-input"
-                className="block text-xs font-bold text-[#173D32] uppercase tracking-wide mb-1.5"
-              >
-                Email Address
-              </label>
-              <input
-                id="email-input"
-                type="email"
-                autoComplete="email"
-                placeholder="e.g. officer@terra360.in"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={isLoading}
-                className="w-full h-11 px-4 rounded-xl bg-[#FAF8F2] border border-[#173D32]/20 text-sm text-[#173D32] placeholder:text-[#173D32]/40 focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60"
-              />
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
+          {/* ── Form Section ── */}
+          {isInviteMode ? (
+            <form onSubmit={handleAcceptInvite} className="flex flex-col gap-4">
+              <div>
                 <label
-                  htmlFor="password-input"
-                  className="block text-xs font-bold text-[#173D32] uppercase tracking-wide"
+                  htmlFor="invite-name-input"
+                  className="block text-xs font-bold text-[#173D32] uppercase tracking-wide mb-1.5"
                 >
-                  Password
+                  Full Name
                 </label>
-                <Link
-                  href="/forgot-password"
-                  className="text-xs font-semibold text-[#173D32]/70 hover:text-[#173D32] hover:underline"
-                >
-                  Forgot password?
-                </Link>
-              </div>
-
-              <div className="relative">
                 <input
-                  id="password-input"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  id="invite-name-input"
+                  type="text"
+                  placeholder="e.g. Officer Temsu Jamir"
+                  value={inviteName}
+                  onChange={(e) => setInviteName(e.target.value)}
                   required
                   disabled={isLoading}
-                  className="w-full h-11 pl-4 pr-11 rounded-xl bg-[#FAF8F2] border border-[#173D32]/20 text-sm text-[#173D32] focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60"
+                  className="w-full h-11 px-4 rounded-xl bg-[#FAF8F2] border border-[#173D32]/20 text-sm text-[#173D32] placeholder:text-[#173D32]/40 focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#173D32]/60 hover:text-[#173D32] p-1 cursor-pointer"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? (
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
-                    </svg>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                  )}
-                </button>
               </div>
-            </div>
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full h-11 mt-2 rounded-full bg-[#173D32] hover:bg-[#1f4e40] text-[#F6F4EC] text-sm font-bold shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-            >
-              {isLoading && !activeDemoRole ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-[#F6F4EC]/30 border-t-[#F6F4EC] rounded-full animate-spin" />
-                  <span>Authenticating...</span>
-                </>
-              ) : (
-                "Sign In"
-              )}
-            </button>
-          </form>
+              <div>
+                <label
+                  htmlFor="invite-phone-input"
+                  className="block text-xs font-bold text-[#173D32] uppercase tracking-wide mb-1.5"
+                >
+                  Duty Phone Number (Optional)
+                </label>
+                <input
+                  id="invite-phone-input"
+                  type="tel"
+                  placeholder="+91 98765 43210"
+                  value={invitePhone}
+                  onChange={(e) => setInvitePhone(e.target.value)}
+                  disabled={isLoading}
+                  className="w-full h-11 px-4 rounded-xl bg-[#FAF8F2] border border-[#173D32]/20 text-sm text-[#173D32] placeholder:text-[#173D32]/40 focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label
+                    htmlFor="invite-password-input"
+                    className="block text-xs font-bold text-[#173D32] uppercase tracking-wide"
+                  >
+                    Staff Password
+                  </label>
+                  <span className="text-[10.5px] font-semibold text-[#173D32]/70">
+                    Min. 12 characters
+                  </span>
+                </div>
+
+                <div className="relative">
+                  <input
+                    id="invite-password-input"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    placeholder="••••••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={12}
+                    disabled={isLoading}
+                    className="w-full h-11 pl-4 pr-11 rounded-xl bg-[#FAF8F2] border border-[#173D32]/20 text-sm text-[#173D32] focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#173D32]/60 hover:text-[#173D32] p-1 cursor-pointer"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? (
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full h-11 mt-2 rounded-full bg-[#173D32] hover:bg-[#1f4e40] text-[#F6F4EC] text-sm font-bold shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+              >
+                {isLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-[#F6F4EC]/30 border-t-[#F6F4EC] rounded-full animate-spin" />
+                    <span>Activating Staff Account...</span>
+                  </>
+                ) : (
+                  <span>Accept Invitation & Enter Portal</span>
+                )}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+              <div>
+                <label
+                  htmlFor="email-input"
+                  className="block text-xs font-bold text-[#173D32] uppercase tracking-wide mb-1.5"
+                >
+                  Email Address
+                </label>
+                <input
+                  id="email-input"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="e.g. officer@terra360.in"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  className="w-full h-11 px-4 rounded-xl bg-[#FAF8F2] border border-[#173D32]/20 text-sm text-[#173D32] placeholder:text-[#173D32]/40 focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label
+                    htmlFor="password-input"
+                    className="block text-xs font-bold text-[#173D32] uppercase tracking-wide"
+                  >
+                    Password
+                  </label>
+                  <Link
+                    href="/forgot-password"
+                    className="text-xs font-semibold text-[#173D32]/70 hover:text-[#173D32] hover:underline"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
+
+                <div className="relative">
+                  <input
+                    id="password-input"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={isLoading}
+                    className="w-full h-11 pl-4 pr-11 rounded-xl bg-[#FAF8F2] border border-[#173D32]/20 text-sm text-[#173D32] focus:outline-none focus:ring-2 focus:ring-[#173D32] disabled:opacity-60"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#173D32]/60 hover:text-[#173D32] p-1 cursor-pointer"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? (
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full h-11 mt-2 rounded-full bg-[#173D32] hover:bg-[#1f4e40] text-[#F6F4EC] text-sm font-bold shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+              >
+                {isLoading && !activeDemoRole ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-[#F6F4EC]/30 border-t-[#F6F4EC] rounded-full animate-spin" />
+                    <span>Authenticating...</span>
+                  </>
+                ) : (
+                  "Sign In"
+                )}
+              </button>
+            </form>
+          )}
 
           {/* Switch to Register with preserved email parameter */}
-          <div className="mt-6 pt-5 border-t border-[#173D32]/10 text-center text-xs text-[#173D32]/70">
-            Do not have an account?{" "}
-            <Link
-              href={email ? `/register?email=${encodeURIComponent(email)}` : "/register"}
-              className="font-bold text-[#173D32] hover:underline"
-            >
-              Create an account
-            </Link>
-          </div>
+          {!isInviteMode && (
+            <div className="mt-6 pt-5 border-t border-[#173D32]/10 text-center text-xs text-[#173D32]/70">
+              Do not have an account?{" "}
+              <Link
+                href={email ? `/register?email=${encodeURIComponent(email)}` : "/register"}
+                className="font-bold text-[#173D32] hover:underline"
+              >
+                Create an account
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>

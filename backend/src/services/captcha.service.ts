@@ -40,6 +40,21 @@ export class CaptchaService {
 
     const trimmedToken = token.trim();
 
+    // ── 0. Strict Production Guard: Never accept dummy CAPTCHA tokens in production ──
+    if (process.env.NODE_ENV === 'production' || env.NODE_ENV === 'production') {
+      if (
+        trimmedToken === '1x0000000000000000000000000000000AA' ||
+        trimmedToken.startsWith('test-') ||
+        trimmedToken === 'demo-captcha-token'
+      ) {
+        throw new CaptchaVerificationError(
+          'Dummy or testing CAPTCHA tokens are strictly rejected in production environment.',
+          400,
+          'CAPTCHA_VERIFICATION_FAILED'
+        );
+      }
+    }
+
     // ── 1. Isolated Test Verifier (Restricted strictly to NODE_ENV === 'test') ──
     if (env.NODE_ENV === 'test') {
       if (

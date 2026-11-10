@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { officerApi } from "@/lib/api";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -89,12 +90,49 @@ function getRouteStatusBarClass(status: SafeRouteItem["status"]): string {
 }
 
 export default function OfficerRoutesPage() {
+  const [routesList, setRoutesList] = useState<SafeRouteItem[]>(EMERGENCY_SAFE_ROUTES);
   const [selectedRoute, setSelectedRoute] = useState<SafeRouteItem>(EMERGENCY_SAFE_ROUTES[0]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const totalRoutes = EMERGENCY_SAFE_ROUTES.length;
-  const clearCount = EMERGENCY_SAFE_ROUTES.filter((r) => r.status === "clear").length;
-  const cautionCount = EMERGENCY_SAFE_ROUTES.filter((r) => r.status === "caution").length;
-  const heavyTransitCount = EMERGENCY_SAFE_ROUTES.filter((r) =>
+  useEffect(() => {
+    let mounted = true;
+    async function loadRoutes() {
+      try {
+        setIsLoading(true);
+        const data = await officerApi.listSafeRoutes();
+        if (mounted && Array.isArray(data) && data.length > 0) {
+          const mapped: SafeRouteItem[] = data.map((d: any, idx: number) => ({
+            id: d.id || d._id || `SR-0${idx + 1}`,
+            name: d.name || d.corridor || "Emergency Route",
+            state: d.state || "Northeast",
+            primaryCorridor: d.primaryCorridor || d.corridor || "NH Corridor",
+            bypassStretch: d.bypassStretch || d.description || "Designated safe bypass corridor",
+            status: d.status === "blocked" ? "restricted" : d.status === "restricted" ? "caution" : "clear",
+            distanceKm: d.distanceKm || 35,
+            estimatedTransitTime: d.estimatedTransitTime || "1h 30m",
+            vehicleEligibility: d.vehicleEligibility || "LMVs & Emergency Ambulances",
+            lastInspected: d.lastInspected ? new Date(d.lastInspected).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Today, 09:00 AM",
+            advisoryNote: d.advisoryNote || d.notes || "Emergency diversion active.",
+          }));
+          setRoutesList(mapped);
+          setSelectedRoute(mapped[0]);
+        }
+      } catch (err) {
+        console.warn("Failed to load live safe routes, using defaults:", err);
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
+    }
+    loadRoutes();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const totalRoutes = routesList.length;
+  const clearCount = routesList.filter((r) => r.status === "clear").length;
+  const cautionCount = routesList.filter((r) => r.status === "caution").length;
+  const heavyTransitCount = routesList.filter((r) =>
     r.vehicleEligibility.toLowerCase().includes("heavy") || r.vehicleEligibility.toLowerCase().includes("all highway")
   ).length;
 
@@ -199,12 +237,12 @@ export default function OfficerRoutesPage() {
                   </div>
                 </div>
                 <span className="px-3 py-1 rounded-full bg-white border border-[#173D32]/12 text-[11px] font-bold text-[#173D32]/75 shrink-0">
-                  {EMERGENCY_SAFE_ROUTES.length} Verified
+                  {routesList.length} Verified
                 </span>
               </div>
 
               <div className="space-y-3">
-                {EMERGENCY_SAFE_ROUTES.map((route) => {
+                {routesList.map((route) => {
                   const isSelected = selectedRoute.id === route.id;
                   return (
                     <button

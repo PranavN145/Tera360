@@ -1,6 +1,7 @@
 import mongoose, { Document, Schema, Model } from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { UserRole } from '../../types/express';
+import { encrypt, decrypt } from '../../utils/crypto';
 
 export type SessionStatus = 'active' | 'rotated' | 'revoked';
 export type RevocationReason =
@@ -49,6 +50,8 @@ export interface IUser extends Document {
   email: string;
   passwordHash: string;
   role: UserRole;
+  department?: string;
+  assignedArea?: string;
   phone?: string;
   language: string;
   emailVerified: boolean;
@@ -113,10 +116,17 @@ const UserVillageSchema = new Schema<IUserVillage>(
 const FamilyContactSchema = new Schema<IFamilyContact>(
   {
     name: { type: String, required: true, trim: true, maxlength: 100 },
-    phone: { type: String, required: true, trim: true, maxlength: 25 },
+    phone: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 300,
+      get: (val: any): string => (val ? (decrypt(val) as string) : ''),
+      set: (val: any): string => (val ? (encrypt(val) as string) : ''),
+    },
     relationship: { type: String, trim: true, maxlength: 50 },
   },
-  { _id: true }
+  { _id: true, toJSON: { getters: true }, toObject: { getters: true } }
 );
 
 const AlertPreferencesSchema = new Schema<IAlertPreferences>(
@@ -158,6 +168,18 @@ const UserSchema = new Schema<IUser>(
     phone: {
       type: String,
       trim: true,
+      get: (val: any): string | undefined => (val ? (decrypt(val) as string) : undefined),
+      set: (val: any): string | undefined => (val ? (encrypt(val) as string) : undefined),
+    },
+    department: {
+      type: String,
+      trim: true,
+      maxlength: 100,
+    },
+    assignedArea: {
+      type: String,
+      trim: true,
+      maxlength: 100,
     },
     language: {
       type: String,
@@ -238,6 +260,7 @@ UserSchema.methods.isLocked = function (): boolean {
 
 // Transform to remove sensitive internal fields on toJSON()
 UserSchema.set('toJSON', {
+  getters: true,
   transform: (_doc, ret: Record<string, any>) => {
     delete ret.passwordHash;
     delete ret.refreshTokens;
@@ -249,5 +272,6 @@ UserSchema.set('toJSON', {
     return ret;
   },
 });
+UserSchema.set('toObject', { getters: true });
 
 export const User: Model<IUser> = mongoose.models.User || mongoose.model<IUser>('User', UserSchema);

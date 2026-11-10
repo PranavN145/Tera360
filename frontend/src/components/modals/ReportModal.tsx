@@ -2,6 +2,15 @@
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import Image from "next/image";
+import {
+  AlertTriangle,
+  Construction,
+  Mountain,
+  Waves,
+  X,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { publicApi, ApiClientError } from "@/lib/api";
 import { HazardReportOutput } from "@/types/public";
@@ -17,12 +26,12 @@ const NE_STATES = [
   "Tripura",
 ];
 
-const HAZARD_TYPES = [
-  { id: "active-slide", label: "Active Debris Slide", icon: "⚠️" },
-  { id: "slope-cracks", label: "Tension Cracks on Slope", icon: "⚡" },
-  { id: "road-subsidence", label: "Road Sinking / Subsidence", icon: "🚧" },
-  { id: "rockfall", label: "Rockfall / Falling Boulders", icon: "🪨" },
-  { id: "muddy-water", label: "Sudden Muddy Runoff / Creep", icon: "🌊" },
+const HAZARD_TYPES: { id: string; label: string; Icon: LucideIcon }[] = [
+  { id: "active-slide", label: "Active Debris Slide", Icon: AlertTriangle },
+  { id: "slope-cracks", label: "Tension Cracks on Slope", Icon: Zap },
+  { id: "road-subsidence", label: "Road Sinking / Subsidence", Icon: Construction },
+  { id: "rockfall", label: "Rockfall / Falling Boulders", Icon: Mountain },
+  { id: "muddy-water", label: "Sudden Muddy Runoff / Creep", Icon: Waves },
 ];
 
 export default function ReportModal() {
@@ -244,9 +253,7 @@ export default function ReportModal() {
             className="absolute top-4 right-4 p-2 rounded-full text-[#173D32]/60 hover:text-[#173D32] hover:bg-[#173D32]/10 transition-colors focus-visible:outline-2 focus-visible:outline-[#173D32] cursor-pointer"
             aria-label="Close dialog"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="w-5 h-5" aria-hidden="true" />
           </button>
 
           <div className="inline-flex items-center gap-2 px-3 py-0.5 rounded-full bg-[#DCE8D4]/70 text-[11px] font-bold text-[#173D32] uppercase mb-1.5">
@@ -389,22 +396,25 @@ export default function ReportModal() {
                   Type of Hazard Observation *
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                  {HAZARD_TYPES.map((h) => (
-                    <button
-                      key={h.id}
-                      type="button"
-                      disabled={isSubmitting}
-                      onClick={() => setHazardType(h.id)}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-left transition-all border cursor-pointer disabled:opacity-60 ${
-                        hazardType === h.id
-                          ? "bg-[#173D32] text-[#F6F4EC] border-[#173D32] shadow-xs"
-                          : "bg-[#F6F4EC] text-[#173D32]/80 border-[#173D32]/15 hover:border-[#173D32]/40"
-                      }`}
-                    >
-                      <span className="text-sm shrink-0">{h.icon}</span>
-                      <span className="truncate">{h.label}</span>
-                    </button>
-                  ))}
+                  {HAZARD_TYPES.map((h) => {
+                    const HazardIcon = h.Icon;
+                    return (
+                      <button
+                        key={h.id}
+                        type="button"
+                        disabled={isSubmitting}
+                        onClick={() => setHazardType(h.id)}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-left transition-all border cursor-pointer disabled:opacity-60 ${
+                          hazardType === h.id
+                            ? "bg-[#173D32] text-[#F6F4EC] border-[#173D32] shadow-xs"
+                            : "bg-[#F6F4EC] text-[#173D32]/80 border-[#173D32]/15 hover:border-[#173D32]/40"
+                        }`}
+                      >
+                        <HazardIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                        <span className="truncate">{h.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

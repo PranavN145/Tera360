@@ -22,6 +22,7 @@ function sanitize(obj: any): any {
 export function mongoSanitize(req: Request, _res: Response, next: NextFunction): void {
   if (req.body) req.body = sanitize(req.body);
   if (req.params) req.params = sanitize(req.params);
+  if (req.query) req.query = sanitize(req.query);
   next();
 }
 

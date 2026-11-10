@@ -1,8 +1,18 @@
 import crypto from 'crypto';
 import mongoose from 'mongoose';
 import { Report, IReportLocationPoint } from './report.model';
-import { CreatePublicReportInput } from './report.schema';
+import {
+  CreatePublicReportInput,
+  CreateAuthenticatedReportInput,
+  TriageReportInput,
+  AssignTaskInput,
+} from './report.schema';
+import { FieldOfficerTaskModel } from '../fieldOfficer/fieldOfficer.model';
+import { AuditLog } from '../audit/auditLog.model';
+import { User } from '../users/user.model';
+import { Notification } from '../notifications/notification.model';
 import { captchaService } from '../../services/captcha.service';
+import { escapeRegex } from '../../utils/crypto';
 
 export interface RequestClientMeta {
   ipAddress?: string;
@@ -112,7 +122,7 @@ export class ReportService {
   }): Promise<PublicReportOutput[]> {
     const filter: Record<string, any> = { isDeleted: false };
     if (query?.state && query.state !== 'All' && query.state !== 'All States') {
-      filter.state = new RegExp(`^${query.state.trim()}$`, 'i');
+      filter.state = new RegExp(`^${escapeRegex(query.state.trim())}$`, 'i');
     }
     if (query?.status && query.status !== 'All') {
       filter.status = query.status;
@@ -169,6 +179,191 @@ export class ReportService {
       source: r.source,
       createdAt: r.createdAt,
     }));
+  }
+  /**
+   * Submit authenticated hazard report (Citizen / Field Officer).
+   * No CAPTCHA required for verified, authenticated users (PRD §14.4).
+   */
+  async submitAuthenticatedReport(
+    input: CreateAuthenticatedReportInput,
+    user: any,
+    meta: RequestClientMeta = {}
+  ): Promise<PublicReportOutput> {
+    const reportId = await generateUniqueReportId();
+
+    const newReport = new Report({
+      reportId,
+      state: input.state,
+      location: input.location,
+      hazardType: input.hazardType,
+      severity: input.severity || 'Warning',
+      description: input.description,
+      reporterName: input.reporterName?.trim() || user?.name || undefined,
+      reporterPhone: input.reporterPhone?.trim() || user?.phone || undefined,
+      photoUrl: input.photoUrl?.trim() || undefined,
+      coordinates: input.coordinates,
+      status: 'submitted',
+      source: user?.role === 'field_officer' ? 'field_officer' : 'citizen',
+      reporterId: user?._id,
+      isDeleted: false,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+    });
+
+    await newReport.save();
+
+    await AuditLog.create({
+      userId: user?._id,
+      userEmail: user?.email,
+      role: user?.role || 'citizen',
+      action: 'HAZARD_REPORT_SUBMITTED',
+      resourceType: 'Report',
+      resourceId: newReport.reportId,
+      details: { hazardType: newReport.hazardType, severity: newReport.severity, location: newReport.location },
+      timestamp: new Date(),
+    });
+
+    return {
+      reportId: newReport.reportId,
+      state: newReport.state,
+      location: newReport.location,
+      hazardType: newReport.hazardType,
+      severity: newReport.severity,
+      description: newReport.description,
+      reporterName: newReport.reporterName,
+      reporterPhone: newReport.reporterPhone,
+      photoUrl: newReport.photoUrl,
+      coordinates: newReport.coordinates,
+      status: newReport.status,
+      source: newReport.source,
+      createdAt: newReport.createdAt,
+    };
+  }
+
+  async getReportById(id: string): Promise<any> {
+    const report = await Report.findOne({
+      $or: [
+        { reportId: id },
+        { _id: mongoose.Types.ObjectId.isValid(id) ? id : null },
+      ].filter(Boolean),
+      isDeleted: false,
+    }).lean();
+
+    if (!report) {
+      throw new Error(`Report '${id}' not found`);
+    }
+
+    return report;
+  }
+
+  async triageReport(
+    id: string,
+    payload: TriageReportInput,
+    officerUser: any
+  ): Promise<any> {
+    const report = await Report.findOne({
+      $or: [
+        { reportId: id },
+        { _id: mongoose.Types.ObjectId.isValid(id) ? id : null },
+      ].filter(Boolean),
+      isDeleted: false,
+    });
+
+    if (!report) {
+      throw new Error(`Report '${id}' not found`);
+    }
+
+    const previousStatus = report.status;
+    report.status = payload.status === 'false_alarm' ? 'rejected' : payload.status as any;
+    report.verifiedBy = officerUser?._id;
+    report.verifiedAt = new Date();
+    if (payload.verificationNotes) {
+      report.verificationNotes = payload.verificationNotes;
+    }
+    await report.save();
+
+    await AuditLog.create({
+      userId: officerUser?._id,
+      userEmail: officerUser?.email,
+      role: officerUser?.role || 'officer',
+      action: 'REPORT_TRIAGED',
+      resourceType: 'Report',
+      resourceId: report.reportId,
+      details: { previousStatus, newStatus: report.status, notes: payload.verificationNotes },
+      timestamp: new Date(),
+    });
+
+    return report;
+  }
+
+  async assignTask(
+    payload: AssignTaskInput,
+    officerUser: any
+  ): Promise<any> {
+    let assignedOfficer: any = null;
+    if (payload.assignedTo) {
+      assignedOfficer = await User.findOne({
+        $or: [
+          { _id: mongoose.Types.ObjectId.isValid(payload.assignedTo) ? payload.assignedTo : null },
+          { email: payload.assignedTo },
+          { name: payload.assignedTo },
+        ].filter(Boolean),
+      });
+    }
+
+    if (!assignedOfficer) {
+      assignedOfficer = await User.findOne({ role: 'field_officer' });
+    }
+
+    const taskId = `TSK-${Date.now().toString().slice(-4)}`;
+    const task = new FieldOfficerTaskModel({
+      taskId,
+      sector: payload.sector,
+      location: {
+        type: 'Point',
+        coordinates: payload.coordinates || [94.025, 25.685],
+        chainageName: payload.chainageName || payload.sector,
+      },
+      riskLevel: payload.riskLevel || 'High',
+      reason: payload.reason,
+      deadline: payload.deadline || new Date(Date.now() + 48 * 3600000),
+      status: 'Assigned',
+      assignedBy: officerUser?.name || 'Disaster Operations Desk',
+      assignedTo: assignedOfficer?._id,
+      assignedAt: new Date(),
+    });
+
+    await task.save();
+
+    if (assignedOfficer) {
+      await Notification.create({
+        userId: assignedOfficer._id,
+        title: `📋 New Task Assigned: ${taskId}`,
+        message: `${payload.reason} (${payload.sector})`,
+        type: 'task',
+        entityId: taskId,
+      });
+    }
+
+    if (payload.reportId) {
+      await Report.findOneAndUpdate(
+        { reportId: payload.reportId },
+        { status: 'under_review', verificationNotes: `Assigned inspection task ${taskId}` }
+      );
+    }
+
+    await AuditLog.create({
+      userId: officerUser?._id,
+      userEmail: officerUser?.email,
+      role: officerUser?.role || 'officer',
+      action: 'TASK_ASSIGNED',
+      resourceType: 'Task',
+      resourceId: taskId,
+      details: { sector: payload.sector, assignedTo: assignedOfficer?.name, reason: payload.reason },
+      timestamp: new Date(),
+    });
+
+    return task;
   }
 }
 

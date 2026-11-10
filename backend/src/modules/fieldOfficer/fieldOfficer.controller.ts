@@ -1,5 +1,6 @@
 /**
  * Terra360 Field Officer Portal Controller (TypeScript)
+ * Canonical API Controller backed by MongoDB persistence.
  */
 
 import { Request, Response, NextFunction } from 'express';
@@ -8,19 +9,16 @@ import { fieldOfficerService } from './fieldOfficer.service';
 export class FieldOfficerController {
   private getOfficerDetails(req: Request) {
     const user = req.user;
-    const headerId = req.headers['x-officer-id'] as string | undefined;
     const headerSector = req.headers['x-officer-sector'] as string | undefined;
 
-    const profile = fieldOfficerService.getProfile(headerId, headerSector);
-
     return {
-      id: user?.id || profile.id,
-      name: user?.name || profile.name,
-      department: user?.department || profile.department,
-      assignedArea: headerSector || user?.assignedArea || profile.assignedArea,
-      phone: user?.phone || profile.phone,
-      language: user?.language || profile.language,
-      badgeNumber: profile.badgeNumber,
+      id: user?.id || (user as any)?._id?.toString() || 'usr-fo-default',
+      name: user?.name || 'Temsu Jamir',
+      department: user?.department || 'Nagaland State Disaster Management Authority (NSDMA)',
+      assignedArea: headerSector || user?.assignedArea || 'Sector 4 - Kohima Ridge',
+      phone: user?.phone || '+91 98765 00003',
+      language: user?.language || 'en',
+      badgeNumber: 'FO-NL-408',
     };
   }
 
@@ -29,7 +27,7 @@ export class FieldOfficerController {
   getProfile = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const officer = this.getOfficerDetails(req);
-      const profile = fieldOfficerService.getProfile(officer.id, officer.assignedArea);
+      const profile = await fieldOfficerService.getProfile(officer.id, officer.assignedArea);
 
       res.status(200).json({
         success: true,
@@ -43,7 +41,8 @@ export class FieldOfficerController {
   updateLanguage = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { language } = req.body;
-      const updatedProfile = fieldOfficerService.updateLanguage(language);
+      const officer = this.getOfficerDetails(req);
+      const updatedProfile = await fieldOfficerService.updateLanguage(officer.id, language);
 
       res.status(200).json({
         success: true,
@@ -62,7 +61,7 @@ export class FieldOfficerController {
       const officer = this.getOfficerDetails(req);
       const { status, riskLevel } = req.query as { status?: string; riskLevel?: string };
 
-      const tasks = fieldOfficerService.getTasks(officer.assignedArea, status, riskLevel);
+      const tasks = await fieldOfficerService.getTasks(officer.assignedArea, status, riskLevel);
 
       res.status(200).json({
         success: true,
@@ -79,7 +78,7 @@ export class FieldOfficerController {
       const { id } = req.params;
       const officer = this.getOfficerDetails(req);
 
-      const task = fieldOfficerService.startTask(id, officer.assignedArea);
+      const task = await fieldOfficerService.startTask(id, officer.assignedArea);
 
       res.status(200).json({
         success: true,
@@ -97,7 +96,7 @@ export class FieldOfficerController {
       const { completionNotes } = req.body;
       const officer = this.getOfficerDetails(req);
 
-      const task = fieldOfficerService.completeTask(id, officer.assignedArea, completionNotes);
+      const task = await fieldOfficerService.completeTask(id, officer.assignedArea, completionNotes);
 
       res.status(200).json({
         success: true,
@@ -115,7 +114,7 @@ export class FieldOfficerController {
       const { reason, priority } = req.body;
       const officer = this.getOfficerDetails(req);
 
-      const result = fieldOfficerService.escalateTask(
+      const result = await fieldOfficerService.escalateTask(
         id,
         officer.assignedArea,
         reason,
@@ -138,7 +137,7 @@ export class FieldOfficerController {
   getMapData = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const officer = this.getOfficerDetails(req);
-      const mapData = fieldOfficerService.getMapData(officer.assignedArea);
+      const mapData = await fieldOfficerService.getMapData(officer.assignedArea);
 
       res.status(200).json({
         success: true,
@@ -156,7 +155,7 @@ export class FieldOfficerController {
       const officer = this.getOfficerDetails(req);
       const { status, hazardType } = req.query as { status?: string; hazardType?: string };
 
-      const reports = fieldOfficerService.getReports(officer.assignedArea, status, hazardType);
+      const reports = await fieldOfficerService.getReports(officer.assignedArea, status, hazardType);
 
       res.status(200).json({
         success: true,
@@ -174,7 +173,7 @@ export class FieldOfficerController {
       const { fieldNotes, inspectorPhotoUrl } = req.body;
       const officer = this.getOfficerDetails(req);
 
-      const report = fieldOfficerService.verifyReport(
+      const report = await fieldOfficerService.verifyReport(
         id,
         officer.assignedArea,
         fieldNotes,
@@ -198,11 +197,10 @@ export class FieldOfficerController {
       const { rejectionReason } = req.body;
       const officer = this.getOfficerDetails(req);
 
-      const report = fieldOfficerService.rejectReport(
+      const report = await fieldOfficerService.rejectReport(
         id,
         officer.assignedArea,
-        rejectionReason,
-        `${officer.name} (${officer.badgeNumber || 'Officer'})`
+        rejectionReason
       );
 
       res.status(200).json({
@@ -218,21 +216,19 @@ export class FieldOfficerController {
   escalateReport = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const { urgency, escalationReason, recommendedAction } = req.body;
+      const { escalationReason, urgency, recommendedAction } = req.body;
       const officer = this.getOfficerDetails(req);
 
-      const result = fieldOfficerService.escalateReport(
+      const result = await fieldOfficerService.escalateReport(
         id,
         officer.assignedArea,
-        escalationReason,
-        urgency,
-        recommendedAction,
+        { escalationReason, urgency, recommendedAction },
         `${officer.name} (${officer.badgeNumber || 'Officer'})`
       );
 
       res.status(200).json({
         success: true,
-        message: `Report '${id}' escalated to high command.`,
+        message: `Report '${id}' escalated to emergency response team.`,
         data: result,
       });
     } catch (error) {
@@ -245,13 +241,12 @@ export class FieldOfficerController {
   getCurrentRoadStatus = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const officer = this.getOfficerDetails(req);
-      const roads = fieldOfficerService.getCurrentRoadStatus(officer.assignedArea);
+      const roadStatuses = await fieldOfficerService.getCurrentRoadStatus(officer.assignedArea);
 
       res.status(200).json({
         success: true,
-        sector: officer.assignedArea,
-        count: roads.length,
-        data: roads,
+        count: roadStatuses.length,
+        data: roadStatuses,
       });
     } catch (error) {
       next(error);
@@ -260,40 +255,32 @@ export class FieldOfficerController {
 
   updateRoadStatus = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { roadSegmentId, stretchName, condition, reason, photoUrl, timestamp } = req.body;
       const officer = this.getOfficerDetails(req);
-
-      const result = fieldOfficerService.updateRoadStatus(
+      const updatedStatus = await fieldOfficerService.updateRoadStatus(
+        req.body,
         officer.assignedArea,
-        roadSegmentId,
-        stretchName,
-        condition,
-        reason,
-        photoUrl,
-        timestamp,
         `${officer.name} (${officer.badgeNumber || 'Officer'})`
       );
 
       res.status(200).json({
         success: true,
-        message: `Road status updated and synced to central disaster officer dashboard.`,
-        data: result,
+        message: `Road segment status updated and synchronized with live highway telemetry.`,
+        data: updatedStatus,
       });
     } catch (error) {
       next(error);
     }
   };
 
-  // ── Sector Alerts ─────────────────────────────────────────────────────────
+  // ── Alerts ────────────────────────────────────────────────────────────────
 
   getAlerts = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const officer = this.getOfficerDetails(req);
-      const alerts = fieldOfficerService.getAlerts(officer.assignedArea);
+      const alerts = await fieldOfficerService.getAlerts(officer.assignedArea, officer.id);
 
       res.status(200).json({
         success: true,
-        sector: officer.assignedArea,
         count: alerts.length,
         data: alerts,
       });
@@ -306,8 +293,7 @@ export class FieldOfficerController {
     try {
       const { id } = req.params;
       const officer = this.getOfficerDetails(req);
-
-      const alert = fieldOfficerService.acknowledgeAlert(id, officer.assignedArea, officer.id);
+      const alert = await fieldOfficerService.acknowledgeAlert(id, officer.assignedArea, officer.id);
 
       res.status(200).json({
         success: true,
@@ -321,4 +307,3 @@ export class FieldOfficerController {
 }
 
 export const fieldOfficerController = new FieldOfficerController();
-

@@ -31,7 +31,10 @@ function RegisterForm() {
   // Sync email query param if it changes
   useEffect(() => {
     if (emailParam) {
-      setEmail(emailParam);
+      const timer = setTimeout(() => {
+        setEmail(emailParam);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [emailParam]);
 

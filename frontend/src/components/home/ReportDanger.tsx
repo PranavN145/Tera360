@@ -1,5 +1,6 @@
 "use client";
 
+import { AlertTriangle } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 
 export default function ReportDanger() {
@@ -64,21 +65,7 @@ export default function ReportDanger() {
                 onClick={openReportModal}
                 className="h-[46px] sm:h-[48px] px-6 sm:px-7 rounded-full bg-[#D6A65D] hover:bg-[#c9984e] text-[#173D32] text-[14px] sm:text-[15px] font-bold tracking-wide inline-flex items-center justify-center gap-2 transition-all duration-200 hover:-translate-y-0.5 shadow-md hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D6A65D] cursor-pointer"
               >
-                {/* Warning Triangle Icon */}
-                <svg
-                  className="w-4 h-4 sm:w-[18px] sm:h-[18px] text-[#173D32] shrink-0"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={2.2}
-                  stroke="currentColor"
-                  aria-hidden="true"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-                  />
-                </svg>
+                <AlertTriangle className="w-4 h-4 sm:w-[18px] sm:h-[18px] text-[#173D32] shrink-0" aria-hidden="true" />
                 <span>Report an Incident</span>
               </button>
             </div>

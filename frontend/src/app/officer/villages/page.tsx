@@ -21,7 +21,7 @@ import {
   X,
 } from "lucide-react";
 import PortalLayout from "@/components/portal/PortalLayout";
-import { publicApi, reportsApi } from "@/lib/api";
+import { publicApi, reportsApi, officerApi } from "@/lib/api";
 import {
   PublicAlertItem,
   PublicRoadStatusItem,
@@ -86,6 +86,7 @@ export default function OfficerVillagesPage() {
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
 
   // Selection & Telemetry State
+  const [villagesList, setVillagesList] = useState<VillageItem[]>(MONITORED_VILLAGES);
   const [selectedVillageId, setSelectedVillageId] = useState<string>(
     MONITORED_VILLAGES[0]?.id || ""
   );
@@ -104,13 +105,63 @@ export default function OfficerVillagesPage() {
 
     async function fetchBackendData() {
       try {
-        const [alertsRes, roadsRes, reportsRes] = await Promise.allSettled([
+        const [villagesRes, alertsRes, roadsRes, reportsRes] = await Promise.allSettled([
+          officerApi.listVillages(),
           publicApi.getAlerts({ limit: 50 }),
           publicApi.getRoadStatus({}),
           reportsApi.getReports({ limit: 50 }),
         ]);
 
         if (!mounted) return;
+
+        if (villagesRes.status === "fulfilled" && Array.isArray(villagesRes.value)) {
+          const liveVillages: VillageItem[] = villagesRes.value.map((v: any, idx: number) => {
+            const risk: VillageRiskLevel = (v.riskLevel === "Critical" || v.riskLevel === "High" || v.riskLevel === "Medium" || v.riskLevel === "Low") ? v.riskLevel : "Medium";
+            return {
+              id: v._id || v.id || `vil-${idx}`,
+              name: v.villageName,
+              district: v.district,
+              state: v.state,
+              corridor: v.corridor || "NH-29",
+              baseRiskLevel: risk,
+              currentRiskLevel: risk,
+              populationEstimate: v.population || 1200,
+              householdsEstimate: Math.round((v.population || 1200) / 4.5),
+              contactPerson: v.contactPersons?.[0] ? {
+                name: v.contactPersons[0].name,
+                phone: v.contactPersons[0].phone,
+                designation: v.contactPersons[0].role || "Village Headman",
+              } : null,
+              safeShelter: {
+                id: v.primaryShelterId?._id || "sh-01",
+                name: v.primaryShelterId?.name || "Community Relief Shelter",
+                capacity: v.primaryShelterId?.capacity || 300,
+                status: "Operational",
+                helpline: v.contactPersons?.[0]?.phone || "1077",
+              },
+              evacuationRoute: {
+                id: "er-01",
+                name: `${v.villageName} Primary Bypass`,
+                corridor: v.corridor || "NH-29",
+                status: v.evacuationStatus === "Evacuate" ? "blocked" : v.evacuationStatus === "Advisory" ? "caution" : "clear",
+                estimatedTransitTime: "45 mins",
+                vehicleEligibility: "LMVs & Ambulances",
+              },
+              riskHistory: [
+                { date: "Oct 28", level: "Low", trigger: "Periodic Monitoring" },
+                { date: "Nov 01", level: "Medium", trigger: "Rainfall Advisory" },
+                { date: "Nov 05", level: risk, trigger: "Automated Sensor Telemetry" },
+              ],
+            };
+          });
+
+          if (liveVillages.length > 0) {
+            setVillagesList(liveVillages);
+            setSelectedVillageId((prev) =>
+              liveVillages.some((v) => v.id === prev) ? prev : liveVillages[0].id
+            );
+          }
+        }
 
         if (alertsRes.status === "fulfilled") {
           setAlerts(alertsRes.value.alerts);
@@ -206,7 +257,8 @@ export default function OfficerVillagesPage() {
 
   // ── Dynamic live enrichment of villages with backend data ───────────
   const enrichedVillages: VillageItem[] = useMemo(() => {
-    return MONITORED_VILLAGES.map((v) => {
+    const baseList = villagesList.length > 0 ? villagesList : MONITORED_VILLAGES;
+    return baseList.map((v) => {
       const vAlerts = getVillageAlerts(v);
       const vRoads = roads.filter((r) => r.code === v.corridor);
 

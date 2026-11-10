@@ -55,6 +55,14 @@ export const deleteAccountSchema = z.object({
     .min(1, 'Confirmation text is required'),
 });
 
+export const revokeSessionParamsSchema = z.object({
+  id: z
+    .string()
+    .regex(/^[0-9a-fA-F]{24}$/, 'Session ID must be a valid 24-character hexadecimal ObjectId'),
+});
+
+export type RevokeSessionParamsInput = z.infer<typeof revokeSessionParamsSchema>;
+
 export type UserVillageInput = z.infer<typeof userVillageInputSchema>;
 export type FamilyContactInput = z.infer<typeof familyContactInputSchema>;
 export type AlertPreferencesInput = z.infer<typeof alertPreferencesInputSchema>;

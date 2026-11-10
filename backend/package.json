@@ -17,7 +17,9 @@
     "test:public": "tsx src/tests/public.test.ts",
     "test:write": "tsx src/tests/public-write.test.ts",
     "test:field-officer": "tsx src/tests/fieldOfficer.test.ts",
-    "test:all": "tsx src/tests/auth.test.ts && tsx src/tests/models.test.ts && tsx src/tests/public.test.ts && tsx src/tests/public-write.test.ts && tsx src/tests/fieldOfficer.test.ts",
+    "test:sprint2": "tsx src/tests/sprint2-security.test.ts",
+    "test:sprint4": "tsx src/tests/sprint4-core.test.ts",
+    "test:all": "tsx src/tests/auth.test.ts && tsx src/tests/models.test.ts && tsx src/tests/public.test.ts && tsx src/tests/public-write.test.ts && tsx src/tests/fieldOfficer.test.ts && tsx src/tests/sprint2-security.test.ts && tsx src/tests/sprint4-core.test.ts",
     "test:postman": "npx --yes newman run postman/collection.json -e postman/environment.json"
   },
   "dependencies": {

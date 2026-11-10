@@ -100,7 +100,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
        !!localStorage.getItem("terra360_active_demo_user"));
 
     if (!hasSession) {
-      setIsLoadingAuth(false);
+      setTimeout(() => {
+        if (isMounted) setIsLoadingAuth(false);
+      }, 0);
       return;
     }
 
@@ -111,19 +113,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const profile = await authApi.getMe();
           if (isMounted) {
             setUser(profile);
-            demoDataManager.setActiveDemoUser(profile);
           }
           return true;
         }
       } catch {
-        // Backend offline or token expired
-      }
-
-      // Offline Development Mode Fallback: restore active demo session from localStorage if present
-      const activeDemo = demoDataManager.getActiveDemoUser();
-      if (activeDemo && isMounted) {
-        setUser(activeDemo);
-        return true;
+        // Token expired or unauthenticated
       }
 
       if (isMounted) {

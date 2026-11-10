@@ -278,7 +278,7 @@ export default function RiskMapPage() {
 
       <Header />
 
-      <main className="relative z-10 flex-1 max-w-[1340px] w-full mx-auto px-4 sm:px-6 lg:px-10 py-10 sm:py-14">
+      <main className="relative z-10 flex-1 max-w-[1340px] w-full mx-auto px-4 sm:px-6 lg:px-10 pt-28 pb-14 sm:pt-32 sm:pb-16 lg:pt-36 lg:pb-20">
         {/* Page Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 pb-8 border-b border-[#173D32]/10">
           <div>
