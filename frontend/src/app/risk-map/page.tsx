@@ -67,7 +67,7 @@ function resolveMapCoordinates(
 }
 
 export default function RiskMapPage() {
-  const { openAlertModal, openReportModal } = useApp();
+  const { openAlertModal, openReportModal, addToast } = useApp();
   const [selectedState, setSelectedState] = useState("All States");
   const [selectedSeverity, setSelectedSeverity] = useState("All");
   const [search, setSearch] = useState("");
@@ -234,7 +234,7 @@ export default function RiskMapPage() {
               </span>
             </h1>
             <p className="mt-3.5 text-base sm:text-lg text-[#173D32]/85 max-w-2xl font-normal leading-relaxed">
-              Real-time spatial monitoring of active landslide hotspots, rainfall saturation, and highway vulnerabilities across the 8 Northeast states.
+              Live map tracking landslide risk areas, heavy rainfall updates, and highway road status across the 8 Northeast states.
             </p>
           </div>
 

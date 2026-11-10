@@ -52,7 +52,6 @@ const SEVERITY_THEME: Record<
 export default function AlertsPage() {
   const { openAlertModal } = useApp();
   const [filterSeverity, setFilterSeverity] = useState("All");
-  const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "compact">("grid");
 
   // Initialize with fallback demo data so cards are immediately visible
@@ -91,21 +90,7 @@ export default function AlertsPage() {
     };
   }, [filterSeverity]);
 
-  const filtered = alerts.filter((a) => {
-    const loc = a.location || a.title || "";
-    const state = a.state || "";
-    const desc = a.description || "";
-    const corridor = a.corridor || "";
-    const query = searchTerm.toLowerCase();
-
-    return (
-      !searchTerm.trim() ||
-      loc.toLowerCase().includes(query) ||
-      state.toLowerCase().includes(query) ||
-      corridor.toLowerCase().includes(query) ||
-      desc.toLowerCase().includes(query)
-    );
-  });
+  const filtered = alerts;
 
   const criticalCount = alerts.filter((a) => a.severity === "Critical").length;
   const warningCount = alerts.filter((a) => a.severity === "Warning").length;
@@ -191,42 +176,8 @@ export default function AlertsPage() {
             })}
           </div>
 
-          {/* Search & Layout View Toggle */}
+          {/* Layout View Toggle */}
           <div className="flex items-center gap-2.5">
-            {/* Search Box */}
-            <div className="relative flex-1 sm:w-72">
-              <input
-                type="text"
-                placeholder="Search location, highway, state..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full h-10 pl-9 pr-8 rounded-full bg-[#F6F4EC] border border-[#173D32]/20 text-xs sm:text-sm text-[#173D32] placeholder:text-[#173D32]/50 focus:outline-none focus:ring-1 focus:ring-[#173D32]"
-              />
-              <svg
-                className="w-4 h-4 text-[#173D32]/50 absolute left-3 top-3 pointer-events-none"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-                />
-              </svg>
-              {searchTerm && (
-                <button
-                  type="button"
-                  onClick={() => setSearchTerm("")}
-                  className="absolute right-3 top-2.5 text-xs text-[#173D32]/50 hover:text-[#173D32] cursor-pointer"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-
             {/* View Mode Toggle: Cards vs Rows */}
             <div className="hidden sm:flex items-center bg-[#F6F4EC] border border-[#173D32]/15 rounded-full p-1 shrink-0">
               <button

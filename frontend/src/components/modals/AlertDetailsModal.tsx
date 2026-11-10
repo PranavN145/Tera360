@@ -115,21 +115,26 @@ export default function AlertDetailsModal() {
           </div>
 
           {/* Telemetry Metrics */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-2 gap-2.5">
             <div className="p-3 rounded-xl bg-[#F6F4EC] border border-[#173D32]/10">
-              <span className="text-[10px] uppercase font-bold text-[#173D32]/60 block">24h Rainfall</span>
+              <span className="text-[10px] uppercase font-bold text-[#173D32]/60 block mb-0.5">24h Rainfall</span>
               <span className="text-sm sm:text-base font-bold text-[#173D32]">{selectedAlert.rainfall24h}</span>
             </div>
 
             <div className="p-3 rounded-xl bg-[#F6F4EC] border border-[#173D32]/10">
-              <span className="text-[10px] uppercase font-bold text-[#173D32]/60 block">Soil Saturation</span>
+              <span className="text-[10px] uppercase font-bold text-[#173D32]/60 block mb-0.5">Soil Saturation</span>
               <span className="text-sm sm:text-base font-bold text-[#173D32]">{selectedAlert.saturation}</span>
             </div>
+          </div>
 
-            <div className="p-3 rounded-xl bg-[#F6F4EC] border border-[#173D32]/10 col-span-2 sm:col-span-1">
-              <span className="text-[10px] uppercase font-bold text-[#173D32]/60 block">Traffic Status</span>
-              <span className="text-xs font-bold text-amber-700 block truncate">{selectedAlert.trafficStatus}</span>
-            </div>
+          {/* Traffic Status & Clearance Info */}
+          <div className="p-3.5 rounded-xl bg-[#F6F4EC] border border-[#173D32]/10">
+            <span className="text-[10px] uppercase font-bold text-[#173D32]/60 block mb-1">
+              Traffic Status
+            </span>
+            <p className="text-xs sm:text-sm font-semibold text-amber-800 leading-relaxed break-words whitespace-normal">
+              {selectedAlert.trafficStatus || "Active Monitoring"}
+            </p>
           </div>
 
           {/* Action Advisory */}
