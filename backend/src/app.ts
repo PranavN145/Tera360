@@ -63,6 +63,7 @@ app.use(
   helmet({
     contentSecurityPolicy: env.NODE_ENV === 'production' ? undefined : false,
     crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
   })
 );
 
@@ -80,7 +81,7 @@ app.use(
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-refresh-token', 'X-Refresh-Token', 'x-officer-id', 'x-officer-sector'],
   })
 );
 

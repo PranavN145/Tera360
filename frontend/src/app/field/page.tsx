@@ -14,6 +14,7 @@ import type {
   FieldOfficerMapData,
   RoadCondition,
 } from "@/types/fieldOfficer";
+import RiskMap from "@/components/RiskMap";
 import {
   LayoutDashboard,
   ArrowLeft,
@@ -62,7 +63,7 @@ import {
   Activity,
 } from "lucide-react";
 
-type TabType = "tasks" | "map" | "reports" | "roads" | "alerts";
+type TabType = "tasks" | "map" | "reports" | "roads" | "alerts" | "profile";
 
 // Initial seed fallbacks for smooth client-side hydration before API responds
 const DEFAULT_PROFILE: FieldOfficerProfile = {
@@ -612,23 +613,11 @@ export default function FieldOfficerPortalPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F6F4EC] text-[#173D32] flex flex-col font-sans">
-      {/* ── 1. PORTAL HEADER ───────────────────────────────────────────────── */}
-      <header className="bg-[#173D32] text-[#F8F4EC] border-b border-[#DCE8D4]/20 shadow-xs sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-          {/* Left: Brand + Navigation Quick Actions */}
-          <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2 group" title="Return to Main Website">
-              <span className="text-xl sm:text-2xl font-black tracking-wider text-[#DCE8D4] group-hover:text-[#D6A65D] transition-colors">
-                TERRA<span className="text-[#D6A65D]">360</span>
-              </span>
-              <span className="text-sm font-semibold text-[#DCE8D4]/50">/</span>
-              <span className="bg-[#D6A65D]/20 text-[#D6A65D] border border-[#D6A65D]/30 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider">
-                Field Direct View
-              </span>
-            </Link>
-
-            {/* Back Button */}
+    <div className="w-full text-[#173D32] flex flex-col font-sans">
+      {/* ── 1. OPERATIONAL CONTEXT TOOLBAR ─────────────────────────────────── */}
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-[#FAF8F2] border border-[#173D32]/15 rounded-2xl shadow-2xs">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <button
               type="button"
               onClick={() => {
@@ -638,178 +627,57 @@ export default function FieldOfficerPortalPage() {
                   router.push("/");
                 }
               }}
-              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#DCE8D4]/20 hover:bg-[#DCE8D4]/10 text-[#DCE8D4] text-xs font-semibold transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-[#DCE8D4]/30 text-[#173D32] border border-[#173D32]/15 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
               title="Go to previous page"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Back</span>
             </button>
 
-            {/* Home / Dashboard Reset Button */}
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("tasks");
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors cursor-pointer ${
-                activeTab === "tasks"
-                  ? "bg-[#D6A65D] text-[#173D32] border-[#D6A65D]"
-                  : "border-[#DCE8D4]/20 text-[#DCE8D4] hover:bg-[#DCE8D4]/10"
-              }`}
-              title="Overview Dashboard"
-            >
-              <LayoutDashboard className="w-3.5 h-3.5" />
-              <span>Dashboard</span>
-            </button>
-
-            {/* Public Website Link */}
-            <Link
-              href="/"
-              className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#DCE8D4]/20 hover:bg-[#DCE8D4]/10 text-[#DCE8D4] text-xs font-medium transition-colors"
-              title="Visit Public Website"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              <span>Main Site</span>
-            </Link>
-          </div>
-
-          {/* Right: Telemetry & Profile Tools */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* Live Sector Pulse */}
-            <div className="hidden xl:flex items-center gap-1.5 bg-[#122e26] border border-[#DCE8D4]/20 px-3 py-1 rounded-full text-xs">
-              <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="font-semibold text-[#DCE8D4] truncate max-w-[200px]">{profile.assignedArea}</span>
+            <div className="inline-flex items-center gap-1.5 bg-[#173D32]/10 border border-[#173D32]/20 px-3 py-1.5 rounded-xl text-xs font-semibold text-[#173D32]">
+              <MapPin className="w-3.5 h-3.5 text-emerald-700" />
+              <span className="truncate max-w-[240px]">{profile.assignedArea}</span>
             </div>
 
-            {/* Re-sync Button */}
+            <span className="text-xs text-[#173D32]/60 font-mono font-bold hidden md:inline">
+              Badge: {profile.badgeNumber || profile.id}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => loadAllData()}
               disabled={refreshing}
               title={`Last synced: ${lastSynced}. Click to re-sync.`}
-              className="flex items-center gap-1.5 bg-[#122e26] hover:bg-[#1f4e40] border border-[#DCE8D4]/20 text-[#DCE8D4] px-2.5 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1.5 bg-white hover:bg-[#DCE8D4]/30 border border-[#173D32]/20 text-[#173D32] px-3 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
               <span className="hidden sm:inline">{refreshing ? "Syncing..." : lastSynced}</span>
             </button>
 
-            {/* Language Switcher */}
-            <div className="flex items-center gap-1 bg-[#122e26] border border-[#DCE8D4]/20 rounded-lg px-2 py-1 text-xs">
-              <Globe className="w-3.5 h-3.5 text-[#DCE8D4]/70" />
+            <div className="flex items-center gap-1 bg-white border border-[#173D32]/20 rounded-xl px-2.5 py-1 text-xs shadow-2xs">
+              <Globe className="w-3.5 h-3.5 text-[#173D32]/70" />
               <select
                 aria-label="Operational Language"
                 value={preferredLang}
                 onChange={(e) => handleLanguageChange(e.target.value)}
-                className="bg-transparent text-[#DCE8D4] font-semibold text-xs outline-none cursor-pointer"
+                className="bg-transparent text-[#173D32] font-semibold text-xs outline-none cursor-pointer"
               >
-                <option value="en" className="bg-[#173D32] text-[#F8F4EC]">EN</option>
-                <option value="hi" className="bg-[#173D32] text-[#F8F4EC]">HI</option>
-                <option value="mr" className="bg-[#173D32] text-[#F8F4EC]">MR</option>
-                <option value="ao" className="bg-[#173D32] text-[#F8F4EC]">AO</option>
+                <option value="en">EN</option>
+                <option value="hi">HI</option>
+                <option value="mr">MR</option>
+                <option value="ao">AO</option>
               </select>
             </div>
 
-            {/* Emergency Alerts Bell */}
-            <button
-              type="button"
-              onClick={() => setActiveTab("alerts")}
-              className={`relative p-2 rounded-lg border transition-colors cursor-pointer ${
-                activeTab === "alerts"
-                  ? "bg-[#D6A65D] text-[#173D32] border-[#D6A65D]"
-                  : "bg-[#122e26] text-[#DCE8D4] hover:text-[#D6A65D] border-[#DCE8D4]/20"
-              }`}
-              title="Emergency Alerts"
-            >
-              <Bell className="w-4 h-4" />
-              {alerts.some((a) => !a.acknowledged) && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white font-bold text-[10px] flex items-center justify-center">
-                  {alerts.filter((a) => !a.acknowledged).length}
-                </span>
-              )}
-            </button>
-
-            {/* Accessible Header Logout Button */}
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#DCE8D4]/10 hover:bg-rose-950/40 border border-[#DCE8D4]/20 hover:border-rose-400/50 text-[#DCE8D4] hover:text-rose-200 text-xs font-semibold transition-colors cursor-pointer"
-              title="Sign Out"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Logout</span>
-            </button>
-
-            {/* Profile Dropdown Toggle */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setProfileOpen(!profileOpen)}
-                className="flex items-center gap-2 bg-[#DCE8D4]/15 hover:bg-[#DCE8D4]/25 border border-[#DCE8D4]/30 px-2.5 py-1 rounded-lg transition-all cursor-pointer"
-              >
-                <div className="w-6 h-6 rounded-md bg-[#D6A65D] text-[#173D32] font-extrabold flex items-center justify-center text-xs">
-                  {officerInitials}
-                </div>
-                <span className="font-semibold text-xs text-[#F8F4EC] hidden lg:inline">{profile.name}</span>
-                <ChevronDown className="w-3 h-3 opacity-70" />
-              </button>
-
-              {/* Profile Dropdown Card */}
-              {profileOpen && (
-                <div className="absolute right-0 mt-2 w-76 bg-[#FAF8F2] text-[#173D32] rounded-2xl shadow-lg border border-[#173D32]/15 p-4 z-50">
-                  <div className="flex items-center gap-3 pb-3 border-b border-[#173D32]/10 mb-3">
-                    <div className="w-10 h-10 rounded-xl bg-[#173D32] text-[#D6A65D] font-bold flex items-center justify-center text-sm">
-                      {officerInitials}
-                    </div>
-                    <div className="overflow-hidden">
-                      <h4 className="font-bold text-sm text-[#173D32] truncate">{profile.name}</h4>
-                      <p className="text-xs text-[#173D32]/60 font-mono">{profile.badgeNumber || profile.id}</p>
-                    </div>
-                  </div>
-                  <div className="space-y-2 text-xs">
-                    <div>
-                      <span className="text-[#173D32]/60 block font-medium">Department</span>
-                      <span className="font-semibold">{profile.department}</span>
-                    </div>
-                    <div>
-                      <span className="text-[#173D32]/60 block font-medium">Assigned Area</span>
-                      <span className="font-semibold">{profile.assignedArea}</span>
-                    </div>
-                    <div>
-                      <span className="text-[#173D32]/60 block font-medium">Phone</span>
-                      <span className="font-mono font-semibold">{profile.phone}</span>
-                    </div>
-                    <div>
-                      <span className="text-[#173D32]/60 block font-medium">Duty Status</span>
-                      <span className="inline-flex items-center gap-1.5 text-emerald-800 font-bold bg-emerald-100 px-2 py-0.5 rounded-md mt-0.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                        {profile.activeDutyStatus ? "Active On-Duty" : "Standby"}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="mt-4 pt-3 border-t border-[#173D32]/10 flex flex-col gap-2">
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      className="w-full py-2 rounded-xl bg-rose-700 hover:bg-rose-800 text-white text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <LogOut className="w-3.5 h-3.5" />
-                      <span>Sign Out</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setProfileOpen(false)}
-                      className="w-full py-1.5 rounded-xl border border-[#173D32]/20 text-[#173D32] text-xs font-semibold hover:bg-black/5 transition-colors cursor-pointer"
-                    >
-                      Close
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+            <span className="inline-flex items-center gap-1.5 text-emerald-800 font-bold bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-xl text-xs shadow-2xs">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+              <span className="hidden sm:inline">{profile.activeDutyStatus ? "Active On-Duty" : "Standby"}</span>
+            </span>
           </div>
         </div>
-      </header>
+      </div>
 
       {/* ── 2. MOBILE MODULE TAB BAR ───────────────────────────────────────── */}
       <div className="md:hidden bg-[#FAF8F2] border-b border-[#173D32]/15 px-3 py-2 sticky top-16 z-30 overflow-x-auto scrollbar-none flex items-center gap-2">
@@ -863,6 +731,16 @@ export default function FieldOfficerPortalPage() {
           <Bell className="w-3.5 h-3.5" />
           <span>Alerts ({alerts.filter((a) => !a.acknowledged).length})</span>
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("profile")}
+          className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+            activeTab === "profile" ? "bg-[#173D32] text-[#F8F4EC]" : "bg-white/60 text-[#173D32] border border-[#173D32]/10"
+          }`}
+        >
+          <User className="w-3.5 h-3.5" />
+          <span>Profile</span>
+        </button>
       </div>
 
       {/* ── 3. LIVE TOAST NOTIFICATION ─────────────────────────────────────── */}
@@ -888,29 +766,30 @@ export default function FieldOfficerPortalPage() {
       {/* ── 4. MAIN CONTENT LAYOUT ─────────────────────────────────────────── */}
       <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col md:flex-row gap-6">
         {/* Desktop Sidebar Navigation */}
-        <aside className="w-full md:w-64 shrink-0 space-y-4" aria-label="Module Navigation">
-          <div className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-2xl p-2.5 shadow-xs space-y-1">
-            <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-[#173D32]/60">
-              Field Modules
+        <aside className="w-full md:w-64 lg:w-72 shrink-0 space-y-4" aria-label="Field Operations Modules">
+          <div className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-2xl p-3 shadow-xs space-y-1.5">
+            <div className="px-3 py-2 text-[11px] font-extrabold uppercase tracking-wider text-[#173D32]/70 border-b border-[#173D32]/10 mb-1 flex items-center justify-between">
+              <span>Field Modules</span>
+              <span className="text-[10px] text-emerald-800 bg-emerald-100 font-bold px-1.5 py-0.5 rounded-md">Sector 4</span>
             </div>
 
             {/* 1. My Tasks */}
             <button
               type="button"
               onClick={() => setActiveTab("tasks")}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+              className={`w-full h-11 px-3.5 rounded-xl text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${
                 activeTab === "tasks"
                   ? "bg-[#173D32] text-[#F8F4EC] shadow-xs"
-                  : "text-[#173D32] hover:bg-[#DCE8D4]/40"
+                  : "text-[#173D32] hover:bg-[#DCE8D4]/40 bg-transparent"
               }`}
             >
-              <div className="flex items-center gap-2.5">
-                <ClipboardList className="w-4 h-4" />
-                <span>My Tasks</span>
+              <div className="flex items-center gap-3">
+                <ClipboardList className="w-4 h-4 shrink-0" />
+                <span className="font-semibold">My Tasks</span>
               </div>
               <span
-                className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
-                  activeTab === "tasks" ? "bg-[#D6A65D] text-[#173D32]" : "bg-[#173D32]/10"
+                className={`h-5.5 min-w-5.5 px-2 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0 ${
+                  activeTab === "tasks" ? "bg-[#D6A65D] text-[#173D32]" : "bg-[#173D32]/10 text-[#173D32]"
                 }`}
               >
                 {tasks.filter((t) => t.status !== "Completed").length}
@@ -921,17 +800,21 @@ export default function FieldOfficerPortalPage() {
             <button
               type="button"
               onClick={() => setActiveTab("map")}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+              className={`w-full h-11 px-3.5 rounded-xl text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${
                 activeTab === "map"
                   ? "bg-[#173D32] text-[#F8F4EC] shadow-xs"
-                  : "text-[#173D32] hover:bg-[#DCE8D4]/40"
+                  : "text-[#173D32] hover:bg-[#DCE8D4]/40 bg-transparent"
               }`}
             >
-              <div className="flex items-center gap-2.5">
-                <MapIcon className="w-4 h-4" />
-                <span>Assigned Area Map</span>
+              <div className="flex items-center gap-3">
+                <MapIcon className="w-4 h-4 shrink-0" />
+                <span className="font-semibold">Assigned Area Map</span>
               </div>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-bold">
+              <span
+                className={`h-5.5 px-2 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ${
+                  activeTab === "map" ? "bg-[#D6A65D] text-[#173D32]" : "bg-emerald-100 text-emerald-800"
+                }`}
+              >
                 Live
               </span>
             </button>
@@ -940,19 +823,19 @@ export default function FieldOfficerPortalPage() {
             <button
               type="button"
               onClick={() => setActiveTab("reports")}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+              className={`w-full h-11 px-3.5 rounded-xl text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${
                 activeTab === "reports"
                   ? "bg-[#173D32] text-[#F8F4EC] shadow-xs"
-                  : "text-[#173D32] hover:bg-[#DCE8D4]/40"
+                  : "text-[#173D32] hover:bg-[#DCE8D4]/40 bg-transparent"
               }`}
             >
-              <div className="flex items-center gap-2.5">
-                <FileText className="w-4 h-4" />
-                <span>Reports</span>
+              <div className="flex items-center gap-3">
+                <FileText className="w-4 h-4 shrink-0" />
+                <span className="font-semibold">Reports</span>
               </div>
               <span
-                className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
-                  activeTab === "reports" ? "bg-[#D6A65D] text-[#173D32]" : "bg-[#173D32]/10"
+                className={`h-5.5 min-w-5.5 px-2 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0 ${
+                  activeTab === "reports" ? "bg-[#D6A65D] text-[#173D32]" : "bg-[#173D32]/10 text-[#173D32]"
                 }`}
               >
                 {reports.filter((r) => r.status === "Pending").length}
@@ -963,17 +846,21 @@ export default function FieldOfficerPortalPage() {
             <button
               type="button"
               onClick={() => setActiveTab("roads")}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+              className={`w-full h-11 px-3.5 rounded-xl text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${
                 activeTab === "roads"
                   ? "bg-[#173D32] text-[#F8F4EC] shadow-xs"
-                  : "text-[#173D32] hover:bg-[#DCE8D4]/40"
+                  : "text-[#173D32] hover:bg-[#DCE8D4]/40 bg-transparent"
               }`}
             >
-              <div className="flex items-center gap-2.5">
-                <Route className="w-4 h-4" />
-                <span>Road Status</span>
+              <div className="flex items-center gap-3">
+                <Route className="w-4 h-4 shrink-0" />
+                <span className="font-semibold">Road Status</span>
               </div>
-              <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold">
+              <span
+                className={`h-5.5 min-w-5.5 px-2 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0 ${
+                  activeTab === "roads" ? "bg-[#D6A65D] text-[#173D32]" : "bg-amber-100 text-amber-900"
+                }`}
+              >
                 {roads.length}
               </span>
             </button>
@@ -982,24 +869,49 @@ export default function FieldOfficerPortalPage() {
             <button
               type="button"
               onClick={() => setActiveTab("alerts")}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+              className={`w-full h-11 px-3.5 rounded-xl text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${
                 activeTab === "alerts"
                   ? "bg-[#173D32] text-[#F8F4EC] shadow-xs"
-                  : "text-[#173D32] hover:bg-[#DCE8D4]/40"
+                  : "text-[#173D32] hover:bg-[#DCE8D4]/40 bg-transparent"
               }`}
             >
-              <div className="flex items-center gap-2.5">
-                <Bell className="w-4 h-4" />
-                <span>Alerts</span>
+              <div className="flex items-center gap-3">
+                <Bell className="w-4 h-4 shrink-0" />
+                <span className="font-semibold">Alerts</span>
               </div>
               <span
-                className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+                className={`h-5.5 px-2 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0 ${
                   alerts.some((a) => !a.acknowledged)
                     ? "bg-rose-600 text-white"
+                    : activeTab === "alerts"
+                    ? "bg-[#D6A65D] text-[#173D32]"
                     : "bg-[#173D32]/10 text-[#173D32]"
                 }`}
               >
                 {alerts.filter((a) => !a.acknowledged).length} New
+              </span>
+            </button>
+
+            {/* 6. Profile */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("profile")}
+              className={`w-full h-11 px-3.5 rounded-xl text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${
+                activeTab === "profile"
+                  ? "bg-[#173D32] text-[#F8F4EC] shadow-xs"
+                  : "text-[#173D32] hover:bg-[#DCE8D4]/40 bg-transparent"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <User className="w-4 h-4 shrink-0" />
+                <span className="font-semibold">Profile</span>
+              </div>
+              <span
+                className={`h-5.5 px-2 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ${
+                  activeTab === "profile" ? "bg-[#D6A65D] text-[#173D32]" : "bg-emerald-100 text-emerald-800"
+                }`}
+              >
+                Active
               </span>
             </button>
           </div>
@@ -1371,6 +1283,14 @@ export default function FieldOfficerPortalPage() {
                   <span className="text-xs font-mono text-[#DCE8D4]/70">
                     Lat: {selectedLocation.coordinates[0].toFixed(4)}° N, Long: {selectedLocation.coordinates[1].toFixed(4)}° E
                   </span>
+                </div>
+
+                {/* 3D Mapbox GIS Interactive Workstation */}
+                <div className="h-80 sm:h-96 rounded-xl overflow-hidden border border-[#DCE8D4]/20 relative shadow-inner mb-4 bg-[#122e26]">
+                  <RiskMap
+                    variant="dashboard"
+                    className="w-full h-full"
+                  />
                 </div>
 
                 {/* Spatial Map Simulation Screen */}
@@ -1982,6 +1902,63 @@ export default function FieldOfficerPortalPage() {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {/* TAB 6: PROFILE & CLEARANCE                                     */}
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {activeTab === "profile" && (
+            <div className="space-y-6">
+              <div className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold text-[#173D32]">Field Responder Profile & Operational Clearance</h2>
+                  <p className="text-xs text-[#173D32]/70 mt-0.5">
+                    Official deployment credentials, sector clearance, and emergency dispatch communications
+                  </p>
+                </div>
+                <span className="inline-flex items-center gap-1.5 text-emerald-800 font-bold bg-emerald-100 border border-emerald-200 px-3 py-1 rounded-xl text-xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+                  <span>Active On-Duty</span>
+                </span>
+              </div>
+
+              {/* Profile Card */}
+              <div className="bg-[#FAF8F2] border border-[#173D32]/15 rounded-2xl p-6 shadow-xs space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#173D32]/10">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-[#173D32] text-[#D6A65D] font-extrabold text-xl flex items-center justify-center shadow-xs shrink-0">
+                      {officerInitials}
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-[#173D32]">{profile.name}</h3>
+                      <p className="text-xs font-mono text-[#173D32]/60 mt-0.5">Badge ID: {profile.badgeNumber || profile.id}</p>
+                      <span className="inline-block mt-1.5 px-2.5 py-0.5 rounded-full bg-[#173D32]/10 text-[#173D32] text-[11px] font-bold">
+                        {profile.department}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div className="p-4 bg-white rounded-xl border border-[#173D32]/10 space-y-1">
+                    <span className="text-[#173D32]/60 font-medium block">Assigned Operational Sector</span>
+                    <span className="font-extrabold text-[#173D32] text-sm block">{profile.assignedArea}</span>
+                  </div>
+                  <div className="p-4 bg-white rounded-xl border border-[#173D32]/10 space-y-1">
+                    <span className="text-[#173D32]/60 font-medium block">Emergency Contact Phone</span>
+                    <span className="font-extrabold font-mono text-[#173D32] text-sm block">{profile.phone}</span>
+                  </div>
+                  <div className="p-4 bg-white rounded-xl border border-[#173D32]/10 space-y-1">
+                    <span className="text-[#173D32]/60 font-medium block">Radio Dispatch Call Sign</span>
+                    <span className="font-extrabold font-mono text-[#173D32] text-sm block">TERRA-ECHO-42 (Channel 4)</span>
+                  </div>
+                  <div className="p-4 bg-white rounded-xl border border-[#173D32]/10 space-y-1">
+                    <span className="text-[#173D32]/60 font-medium block">Preferred Operational Language</span>
+                    <span className="font-extrabold text-[#173D32] text-sm block uppercase">{preferredLang} (Standard Emergency Protocol)</span>
+                  </div>
+                </div>
               </div>
             </div>
           )}

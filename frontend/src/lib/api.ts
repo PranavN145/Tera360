@@ -47,15 +47,42 @@ export class ApiClientError extends Error {
   }
 }
 
-// Strictly in-memory access token storage
+// Access token storage with browser session persistence for page-refresh resilience
 let inMemoryAccessToken: string | null = null;
 
 export function getAccessToken(): string | null {
-  return inMemoryAccessToken;
+  if (inMemoryAccessToken) return inMemoryAccessToken;
+  if (typeof window !== 'undefined') {
+    try {
+      const persisted =
+        sessionStorage.getItem('terra360_access_token') ||
+        localStorage.getItem('terra360_access_token');
+      if (persisted) {
+        inMemoryAccessToken = persisted;
+        return persisted;
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }
+  return null;
 }
 
 export function setAccessToken(token: string | null): void {
   inMemoryAccessToken = token;
+  if (typeof window !== 'undefined') {
+    try {
+      if (token) {
+        sessionStorage.setItem('terra360_access_token', token);
+        localStorage.setItem('terra360_access_token', token);
+      } else {
+        sessionStorage.removeItem('terra360_access_token');
+        localStorage.removeItem('terra360_access_token');
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }
 }
 
 // Single-flight refresh mutex to prevent duplicate concurrent refresh calls within runtime
@@ -138,8 +165,9 @@ export async function rawApiRequest<T>(
     ...(customHeaders as Record<string, string>),
   };
 
-  if (inMemoryAccessToken && !headers['Authorization']) {
-    headers['Authorization'] = `Bearer ${inMemoryAccessToken}`;
+  const token = getAccessToken();
+  if (token && !headers['Authorization']) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
 
   const fetchOptions: RequestInit = {
@@ -152,12 +180,26 @@ export async function rawApiRequest<T>(
   try {
     response = await fetch(url, fetchOptions);
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Network connection failure';
-    throw new ApiClientError(
-      `Unable to reach server. Please check your connection. (${message})`,
-      'NETWORK_ERROR',
-      0
-    );
+    // If external cross-origin URL failed (e.g. Render CORS/CORP or cold-start), try same-origin proxy
+    if (API_BASE_URL && !endpoint.startsWith('http') && typeof window !== 'undefined') {
+      try {
+        response = await fetch(endpoint, fetchOptions);
+      } catch {
+        const message = err instanceof Error ? err.message : 'Network connection failure';
+        throw new ApiClientError(
+          `Unable to reach Terra360 server. The backend may be spinning up from standby or network is offline. (${message})`,
+          'NETWORK_ERROR',
+          0
+        );
+      }
+    } else {
+      const message = err instanceof Error ? err.message : 'Network connection failure';
+      throw new ApiClientError(
+        `Unable to reach Terra360 server. The backend may be spinning up from standby or network is offline. (${message})`,
+        'NETWORK_ERROR',
+        0
+      );
+    }
   }
 
   // Handle 401 Unauthorized with token refresh (once)
@@ -532,6 +574,33 @@ export const publicApi = {
       contact: res.data as ContactOutput,
       message: res.message || 'Your message has been received. Our operations desk will get in touch shortly.',
     };
+  },
+};
+
+export const reportsApi = {
+  /**
+   * GET /api/v1/reports
+   * List hazard reports for operational officers and emergency desks.
+   */
+  async getReports(query?: {
+    state?: string;
+    status?: string;
+    limit?: number;
+  }): Promise<HazardReportOutput[]> {
+    const params = new URLSearchParams();
+    if (query?.state && query.state !== 'All' && query.state !== 'All States') {
+      params.set('state', query.state);
+    }
+    if (query?.status && query.status !== 'All') {
+      params.set('status', query.status);
+    }
+    if (query?.limit) {
+      params.set('limit', String(query.limit));
+    }
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    return apiClient<HazardReportOutput[]>(`/api/v1/reports${qs}`, {
+      method: 'GET',
+    });
   },
 };
 

@@ -76,6 +76,22 @@ function LoginForm() {
 
     const enteredIdentifier = identifier.trim();
 
+    const resolveLoginEmail = (enteredId: string, role: RoleOption): string => {
+      const trimmed = enteredId.trim();
+      if (role === "field-officer") {
+        if (!trimmed || trimmed === "OFF-2026-094" || trimmed.toLowerCase().includes("patil") || trimmed.toLowerCase() === "field") {
+          return "field@terra360.in";
+        }
+      } else if (role === "disaster-command") {
+        if (!trimmed || trimmed.toLowerCase().includes("sharma") || trimmed.toLowerCase() === "officer") {
+          return "officer@terra360.in";
+        }
+      } else if (role === "citizen") {
+        if (!trimmed) return "citizen@terra360.in";
+      }
+      return trimmed;
+    };
+
     try {
       let roleHeader = "citizen";
       let destination = redirectParam;
@@ -88,8 +104,10 @@ function LoginForm() {
         destination = redirectParam || "/officer/dashboard";
       }
 
+      const loginEmail = resolveLoginEmail(enteredIdentifier, selectedRole);
+
       const loggedInUser = await login({
-        email: enteredIdentifier || (selectedRole === "field-officer" ? "OFF-2026-094" : "citizen@terra360.in"),
+        email: loginEmail,
         password,
         role: roleHeader,
       });
@@ -119,14 +137,14 @@ function LoginForm() {
 
   const handleDemoOfficerLogin = async () => {
     setSelectedRole("field-officer");
-    setIdentifier("OFF-2026-094");
+    setIdentifier("field@terra360.in");
     setPassword("Password123!");
     setIsLoading(true);
     setErrorMessage(null);
 
     try {
       await login({
-        email: "OFF-2026-094",
+        email: "field@terra360.in",
         password: "Password123!",
         role: "field-officer",
       });
